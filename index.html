@@ -106,8 +106,8 @@ h2 { font: 600 18px/1.2 var(--display); margin: 4px 0 0 }
 
 /* Formulare */
 .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 14px; display: grid; gap: 14px }
-label.f { display: grid; gap: 5px; font-size: 14px; font-weight: 700 }
-label.f small { font-weight: 400; color: var(--muted); font-size: 13px }
+label.f, div.f { display: grid; gap: 5px; font-size: 14px; font-weight: 700 }
+label.f small, div.f small { font-weight: 400; color: var(--muted); font-size: 13px }
 .field { border: 1px solid var(--line); background: var(--bg); border-radius: 10px; padding: 10px 12px; width: 100%; min-width: 0; font-size: 16px }
 textarea.field { min-height: 110px; resize: vertical; font-size: 15px }
 .row3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px }
@@ -182,6 +182,13 @@ details.adv[open], details.adv-inner[open] { display: grid; gap: 14px }
 .ftitle.sm { font-size: 14px; margin-top: 2px }
 .pushrules { display: grid; gap: 14px }
 .pushrules.off { opacity: .45; pointer-events: none }
+.recips { display: grid; gap: 6px }
+.recip { display: flex; align-items: center; justify-content: space-between; gap: 8px; background: var(--sunk); border-radius: 10px; padding: 6px 6px 6px 12px; font-size: 15px; min-width: 0 }
+.recip span { overflow-wrap: anywhere; min-width: 0 }
+.recip button { border: 0; background: none; width: 36px; height: 36px; border-radius: 18px; cursor: pointer; color: var(--muted); flex: none; display: grid; place-items: center }
+.recip button svg { width: 18px; height: 18px }
+.addrow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px }
+.addrow .btn { flex: none }
 .tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 4px }
 .tag { font-size: 12px; background: var(--sunk); border-radius: 999px; padding: 2px 9px; color: var(--fg) }
 
@@ -336,9 +343,29 @@ details.adv[open], details.adv-inner[open] { display: grid; gap: 14px }
       </div>
     </div>
 
-    <div class="panel">
-      <div class="ftitle">Tagesmail</div>
-      <label class="f" for="digestTo"><small>Zusammenfassung jeden Morgen an</small><input class="field" id="digestTo" type="email" autocomplete="email"></label>
+    <div class="panel" id="digestPanel">
+      <div class="ftitle">Tägliches Briefing</div>
+      <p class="hint">Eine Mail mit allen neuen Wohnungen seit dem letzten Briefing, mit Foto und Link. Es gelten dieselben Regeln wie für Push.</p>
+      <label class="switch" for="dgOn"><span><b>Briefing aktiv</b></span><input type="checkbox" id="dgOn"></label>
+      <div id="dgRules" class="pushrules">
+        <div class="ftitle sm">Empfänger</div>
+        <div class="recips" id="dgList"></div>
+        <div class="addrow">
+          <input class="field" id="dgAdd" type="email" inputmode="email" autocomplete="email" placeholder="name@beispiel.ch">
+          <button class="btn" id="dgAddBtn" type="button">Hinzufügen</button>
+        </div>
+        <div class="row2">
+          <label class="f" for="dgTime"><small>Uhrzeit</small><select class="field" id="dgTime"></select></label>
+          <div class="f"><small>Tage</small>
+            <div class="seg" id="dgDays">
+              <button type="button" class="opt" data-days="daily">Täglich</button>
+              <button type="button" class="opt" data-days="weekdays">Mo–Fr</button>
+            </div>
+          </div>
+        </div>
+        <label class="switch" for="dgSkip"><span>Nur senden, wenn es Neues gibt</span><input type="checkbox" id="dgSkip"></label>
+        <button class="btn" id="dgNow" type="button">Briefing jetzt senden</button>
+      </div>
     </div>
 
     <div class="savebar">
@@ -600,7 +627,7 @@ const EXCL = { befristet: "Befristete Verträge", moebliert: "Möbliert", unterm
 const ROOMS = [1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5, 5.5, 6, 7];
 const RENTS = [1000, 1250, 1500, 1750, 2000, 2250, 2500, 2750, 3000, 3250, 3500, 3750, 4000, 4500, 5000, 6000];
 const M2 = [30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 140, 160, 200];
-const F = { rooms: [null, null], types: new Set() };
+const F = { rooms: [null, null], types: new Set(), recips: [], days: "daily" };
 
 function opts(sel, values, fmt, anyLabel, current) {
   const list = current != null && !values.includes(current) ? [...values, current].sort((a, b) => a - b) : values;
@@ -615,6 +642,8 @@ function buildStatic() {
   $("pushFeat").innerHTML = Object.entries(FEATURES).map(([k, l]) =>
     `<label class="check" for="pf-${k}"><input type="checkbox" id="pf-${k}" data-pfeat="${k}">${l}</label>`).join("");
   $("roomChips").innerHTML = ROOMS.map((r) => `<button type="button" data-room="${r}">${r === 7 ? "7+" : r}</button>`).join("");
+  const times = []; for (let h = 5; h <= 22; h++) for (const m of ["00", "30"]) times.push(`${String(h).padStart(2, "0")}:${m}`);
+  $("dgTime").innerHTML = times.map((t) => `<option value="${t}">${t} Uhr</option>`).join("");
   const hours = [...Array(24).keys()];
   opts("quietFrom", hours, (h) => `${h}:00`, "nie", null);
   opts("quietTo", hours, (h) => `${h}:00`, "–", null);
@@ -662,7 +691,8 @@ function renderSummary() {
     p.features.forEach((k) => pp.push(FEATURES[k]));
   }
   $("critSummary").innerHTML = esc((c.active ? "" : "Pausiert · ") + parts.join(" · ")) +
-    `<span class="sw-sub">Push: ${esc(pp.length ? pp.join(" · ") : "bei jedem Treffer")}</span>`;
+    `<span class="sw-sub">Push und Briefing: ${esc(pp.length ? pp.join(" · ") : "bei jedem Treffer")}</span>` +
+    (c.digest && c.digest.enabled && c.digest.to.length ? `<span class="sw-sub">Briefing ${c.digest.days === "weekdays" ? "Mo–Fr" : "täglich"} ${esc(c.digest.time)} Uhr an ${c.digest.to.length} Empfänger</span>` : "");
 }
 const fmtN = (v) => Number(v).toLocaleString("de-CH");
 function fillForm() {
@@ -686,7 +716,12 @@ function fillForm() {
   const s = c.sources || {};
   $("srcMail").checked = s.mail_alerts !== false; $("srcFlatfox").checked = s.flatfox !== false; $("srcPages").checked = s.watch_pages !== false;
   $("pages").value = (c.watch_pages || []).map((p) => `${p.name} | ${p.url}`).join("\n");
-  $("digestTo").value = c.digest_to || "";
+  const d = c.digest || { enabled: true, to: c.digest_to ? [c.digest_to] : [], time: "07:00", days: "daily", skip_empty: true };
+  $("dgOn").checked = d.enabled !== false;
+  F.recips = [...(d.to || [])]; F.days = d.days || "daily";
+  $("dgTime").value = d.time || "07:00"; if (!$("dgTime").value) $("dgTime").value = "07:00";
+  $("dgSkip").checked = d.skip_empty !== false;
+  renderDigest();
   $("quietFrom").value = c.quiet_hours?.from ?? ""; $("quietTo").value = c.quiet_hours?.to ?? "";
   const p = c.push || {};
   $("pushOn").checked = p.enabled !== false;
@@ -720,7 +755,8 @@ function readForm() {
     const [name, url] = ln.includes("|") ? ln.split("|").map((s) => s.trim()) : [ln, ln];
     return { ...(old[url] || {}), name: name || url, url };
   }).filter((p) => /^https?:\/\//.test(p.url));
-  c.digest_to = $("digestTo").value.trim();
+  delete c.digest_to;
+  c.digest = { enabled: $("dgOn").checked, to: [...F.recips], time: $("dgTime").value, days: F.days, skip_empty: $("dgSkip").checked };
   const qf = sel("quietFrom"), qt = sel("quietTo");
   c.quiet_hours = qf === null || qt === null ? {} : { from: qf, to: qt };
   c.push = { enabled: $("pushOn").checked, rent_max: sel("pushRent"), rooms_min: sel("pushRooms"), m2_min: sel("pushM2"),
@@ -738,6 +774,32 @@ function validate(c) {
 }
 document.getElementById("v-criteria").addEventListener("change", renderSummary);
 $("pushOn").addEventListener("change", () => $("pushRules").classList.toggle("off", !$("pushOn").checked));
+function renderDigest() {
+  $("dgList").innerHTML = F.recips.length ? F.recips.map((m, i) => `<div class="recip"><span>${esc(m)}</span><button type="button" data-rm="${i}" aria-label="${esc(m)} entfernen">${icon.x}</button></div>`).join("")
+    : '<p class="hint">Noch keine Empfänger.</p>';
+  document.querySelectorAll("[data-days]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.days === F.days)));
+  $("dgRules").classList.toggle("off", !$("dgOn").checked);
+  renderSummary();
+}
+function addRecipient() {
+  const v = $("dgAdd").value.trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) { toast("Bitte eine gültige E-Mail-Adresse eingeben.", "err"); return; }
+  if (!F.recips.includes(v)) F.recips.push(v);
+  $("dgAdd").value = ""; renderDigest(); toast("Hinzugefügt. Zum Übernehmen unten speichern.");
+}
+$("dgAddBtn").addEventListener("click", addRecipient);
+$("dgAdd").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); addRecipient(); } });
+$("dgList").addEventListener("click", (e) => { const b = e.target.closest("[data-rm]"); if (!b) return; F.recips.splice(+b.dataset.rm, 1); renderDigest(); toast("Entfernt. Zum Übernehmen unten speichern."); });
+$("dgDays").addEventListener("click", (e) => { const b = e.target.closest("[data-days]"); if (!b) return; F.days = b.dataset.days; renderDigest(); });
+$("dgOn").addEventListener("change", renderDigest);
+$("dgNow").addEventListener("click", async () => {
+  const c = readForm(); const p = validate(c); if (p) { toast(p, "err"); return; }
+  if (!c.digest.to.length) { toast("Bitte zuerst einen Empfänger hinzufügen.", "err"); return; }
+  c.digest_requested_at = new Date().toISOString();
+  $("dgNow").disabled = true;
+  await saveConfig(c, "Briefing von Hand angefordert", "Gespeichert. Das Briefing kommt in ein, zwei Minuten.");
+  setTimeout(() => ($("dgNow").disabled = false), 60000);
+});
 buildStatic();
 async function saveConfig(c, message, okText) {
   try {
@@ -769,6 +831,7 @@ function renderStatus() {
     <div class="stat"><b>${week}</b><span>Treffer 7 Tage</span></div>
     <div class="stat"><b>${src.length - bad.length}/${src.length}</b><span>Quellen ok</span></div>`;
   const rows = src.map(([name, v]) => `<div class="src"><span class="s ${v.ok ? "" : "bad"}"></span><b>${esc(name)}</b><div class="m">${esc(v.msg)} · ${esc(ago(v.at))}</div></div>`);
+  if (h?.last_digest) rows.push(`<div class="src"><span class="s"></span><b>Briefing</b><div class="m">zuletzt ${esc(ago(h.last_digest))}</div></div>`);
   if (h?.push) rows.push(`<div class="src"><span class="s ${h.push.ok ? "" : "bad"}"></span><b>Push-Meldungen</b><div class="m">${h.push.ok ? "funktionieren" : esc(h.push.msg)}</div></div>`);
   $("sources").innerHTML = rows.join("") || '<p class="hint">Noch kein Lauf.</p>';
   const ev = [...S.events].reverse().slice(0, 10);
