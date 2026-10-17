@@ -295,8 +295,12 @@ details.adv[open], details.adv-inner[open] { display: grid; gap: 14px }
           <option value="">nie, alle befristeten ausblenden</option>
           <option value="6">6 Monate</option>
           <option value="12">1 Jahr</option>
+          <option value="18">1½ Jahre</option>
           <option value="24">2 Jahre</option>
+          <option value="30">2½ Jahre</option>
           <option value="36">3 Jahre</option>
+          <option value="42">3½ Jahre</option>
+          <option value="48">4 Jahre</option>
         </select></label>
       <p class="hint" id="befrHint">Ist die Dauer im Inserat nicht erkennbar, kommt es mit dem Hinweis «befristet, Dauer unklar».</p>
     </div>
@@ -697,7 +701,7 @@ function renderSummary() {
   if (c.rooms_min != null) parts.push(c.rooms_min === c.rooms_max ? `${c.rooms_min} Zi.` : `${c.rooms_min}–${c.rooms_max >= 7 ? "7+" : c.rooms_max} Zi.`);
   if (c.rent_min || c.rent_max) parts.push(c.rent_min && c.rent_max ? `CHF ${fmtN(c.rent_min)}–${fmtN(c.rent_max)}` : c.rent_max ? `bis CHF ${fmtN(c.rent_max)}` : `ab CHF ${fmtN(c.rent_min)}`);
   if (c.m2_min || c.m2_max) parts.push(c.m2_min && c.m2_max ? `${c.m2_min}–${c.m2_max} m²` : c.m2_min ? `ab ${c.m2_min} m²` : `bis ${c.m2_max} m²`);
-  if ((c.exclude_groups || []).includes("befristet") && c.befristet_min_months) parts.push(`befristet ab ${c.befristet_min_months % 12 ? c.befristet_min_months + " Mt." : c.befristet_min_months / 12 + (c.befristet_min_months === 12 ? " Jahr" : " Jahre")}`);
+  if ((c.exclude_groups || []).includes("befristet") && c.befristet_min_months) parts.push(`befristet ab ${$("befrMin").selectedOptions[0]?.textContent || c.befristet_min_months + " Mt."}`);
   if (c.features_required.length) parts.push(c.features_required.map((k) => FEATURES[k]).join(c.features_mode === "any" ? " oder " : " · "));
   const p = c.push, pp = [];
   if (!p.enabled) pp.push("aus");
@@ -997,7 +1001,7 @@ let installEvt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("installBtn").hidden = false; $("installHint").hidden = true; });
 $("installBtn").addEventListener("click", async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("installBtn").hidden = true; });
 if (window.matchMedia("(display-mode: standalone)").matches) { $("installHint").textContent = "Läuft als App."; }
-const APP_VERSION = "9 · 17.10.2026";
+const APP_VERSION = "10 · 17.10.2026";
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").then((reg) => { reg.update().catch(() => {}); }).catch(() => {});
   let reloaded = false;
