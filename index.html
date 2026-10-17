@@ -350,7 +350,7 @@ details.adv[open], details.adv-inner[open] { display: grid; gap: 14px }
         <div class="ftitle sm">Empfänger</div>
         <div class="recips" id="dgList"></div>
         <div class="addrow">
-          <input class="field" id="dgAdd" type="email" inputmode="email" autocomplete="email" placeholder="name@beispiel.ch">
+          <input class="field" id="dgAdd" type="email" inputmode="email" autocomplete="email" placeholder="E-Mail-Adresse eingeben">
           <button class="btn" id="dgAddBtn" type="button">Hinzufügen</button>
         </div>
         <div class="row2">
@@ -392,6 +392,7 @@ details.adv[open], details.adv-inner[open] { display: grid; gap: 14px }
       <button class="btn" id="installBtn" type="button" hidden>Auf dem Startbildschirm installieren</button>
       <p class="hint" id="installHint">In Chrome: Menü ⋮ → «App installieren» oder «Zum Startbildschirm hinzufügen».</p>
       <button class="btn" id="logoutBtn" type="button">Schlüssel auf diesem Gerät entfernen</button>
+      <p class="hint" id="appVersion"></p>
     </div>
   </section>
 
@@ -750,6 +751,8 @@ function readForm() {
     return { ...(old[url] || {}), name: name || url, url };
   }).filter((p) => /^https?:\/\//.test(p.url));
   delete c.digest_to;
+  const typed = $("dgAdd").value.trim().toLowerCase();
+  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(typed) && !F.recips.includes(typed)) { F.recips.push(typed); $("dgAdd").value = ""; setTimeout(renderDigest); }
   c.digest = { enabled: $("dgOn").checked, to: [...F.recips], time: $("dgTime").value, days: F.days, skip_empty: $("dgSkip").checked };
   const qf = sel("quietFrom"), qt = sel("quietTo");
   c.quiet_hours = qf === null || qt === null ? {} : { from: qf, to: qt };
@@ -960,8 +963,14 @@ let installEvt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("installBtn").hidden = false; $("installHint").hidden = true; });
 $("installBtn").addEventListener("click", async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("installBtn").hidden = true; });
 if (window.matchMedia("(display-mode: standalone)").matches) { $("installHint").textContent = "Läuft als App."; }
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+const APP_VERSION = "7 · 17.10.2026";
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("sw.js").then((reg) => { reg.update().catch(() => {}); }).catch(() => {});
+  let reloaded = false;
+  navigator.serviceWorker.addEventListener("controllerchange", () => { if (!reloaded) { reloaded = true; location.reload(); } });
+}
 
+$("appVersion").textContent = "App-Version " + APP_VERSION;
 S.token ? showApp() : showSetup();
 </script>
 </body>
