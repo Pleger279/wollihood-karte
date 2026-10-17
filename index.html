@@ -290,6 +290,15 @@ details.adv[open], details.adv-inner[open] { display: grid; gap: 14px }
     <div class="panel">
       <div class="ftitle">Nicht anzeigen</div>
       <div class="checks" id="exclChecks"></div>
+      <label class="f" for="befrMin" id="befrRow"><small>Befristete trotzdem anzeigen, wenn die Dauer mindestens …</small>
+        <select class="field" id="befrMin">
+          <option value="">nie, alle befristeten ausblenden</option>
+          <option value="6">6 Monate</option>
+          <option value="12">1 Jahr</option>
+          <option value="24">2 Jahre</option>
+          <option value="36">3 Jahre</option>
+        </select></label>
+      <p class="hint" id="befrHint">Ist die Dauer im Inserat nicht erkennbar, kommt es mit dem Hinweis «befristet, Dauer unklar».</p>
     </div>
 
     <div class="panel">
@@ -688,6 +697,7 @@ function renderSummary() {
   if (c.rooms_min != null) parts.push(c.rooms_min === c.rooms_max ? `${c.rooms_min} Zi.` : `${c.rooms_min}–${c.rooms_max >= 7 ? "7+" : c.rooms_max} Zi.`);
   if (c.rent_min || c.rent_max) parts.push(c.rent_min && c.rent_max ? `CHF ${fmtN(c.rent_min)}–${fmtN(c.rent_max)}` : c.rent_max ? `bis CHF ${fmtN(c.rent_max)}` : `ab CHF ${fmtN(c.rent_min)}`);
   if (c.m2_min || c.m2_max) parts.push(c.m2_min && c.m2_max ? `${c.m2_min}–${c.m2_max} m²` : c.m2_min ? `ab ${c.m2_min} m²` : `bis ${c.m2_max} m²`);
+  if ((c.exclude_groups || []).includes("befristet") && c.befristet_min_months) parts.push(`befristet ab ${c.befristet_min_months % 12 ? c.befristet_min_months + " Mt." : c.befristet_min_months / 12 + (c.befristet_min_months === 12 ? " Jahr" : " Jahre")}`);
   if (c.features_required.length) parts.push(c.features_required.map((k) => FEATURES[k]).join(c.features_mode === "any" ? " oder " : " · "));
   const p = c.push, pp = [];
   if (!p.enabled) pp.push("aus");
@@ -716,6 +726,7 @@ function fillForm() {
   document.querySelectorAll("[data-feat]").forEach((el) => (el.checked = (c.features_required || []).includes(el.dataset.feat)));
   F.fmode = c.features_mode === "any" ? "any" : "all"; F.pmode = c.push?.features_mode === "any" ? "any" : "all"; renderModes();
   document.querySelectorAll("[data-excl]").forEach((el) => (el.checked = (c.exclude_groups || []).includes(el.dataset.excl)));
+  $("befrMin").value = c.befristet_min_months ? String(c.befristet_min_months) : ""; renderBefr();
   $("unkPrice").checked = !!c.include_unknown_price; $("unkRooms").checked = !!c.include_unknown_rooms;
   $("plz").value = (c.plz_fallback || []).join(", ");
   $("excl").value = (c.exclude_keywords || []).join("\n");
@@ -753,6 +764,7 @@ function readForm() {
   c.features_required = [...document.querySelectorAll("[data-feat]:checked")].map((el) => el.dataset.feat);
   c.features_mode = F.fmode;
   c.exclude_groups = [...document.querySelectorAll("[data-excl]:checked")].map((el) => el.dataset.excl);
+  c.befristet_min_months = $("befrMin").value ? +$("befrMin").value : null;
   c.include_unknown_price = $("unkPrice").checked; c.include_unknown_rooms = $("unkRooms").checked;
   c.plz_fallback = $("plz").value.split(/[,\s]+/).map((s) => s.trim()).filter(Boolean);
   c.exclude_keywords = lines($("excl").value);
@@ -798,6 +810,12 @@ function addRecipient() {
   if (!F.recips.includes(v)) F.recips.push(v);
   $("dgAdd").value = ""; renderDigest(); toast("Hinzugefügt. Zum Übernehmen unten speichern.");
 }
+function renderBefr() {
+  const on = !!document.querySelector("[data-excl=befristet]")?.checked;
+  $("befrRow").hidden = !on; $("befrHint").hidden = !on || !$("befrMin").value;
+}
+$("exclChecks").addEventListener("change", renderBefr);
+$("befrMin").addEventListener("change", renderBefr);
 $("dgAddBtn").addEventListener("click", addRecipient);
 $("featMode").addEventListener("click", (e) => { const b = e.target.closest("[data-fmode]"); if (!b) return; F.fmode = b.dataset.fmode; renderModes(); renderSummary(); });
 $("pushFeatMode").addEventListener("click", (e) => { const b = e.target.closest("[data-pmode]"); if (!b) return; F.pmode = b.dataset.pmode; renderModes(); renderSummary(); });
@@ -979,7 +997,7 @@ let installEvt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("installBtn").hidden = false; $("installHint").hidden = true; });
 $("installBtn").addEventListener("click", async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("installBtn").hidden = true; });
 if (window.matchMedia("(display-mode: standalone)").matches) { $("installHint").textContent = "Läuft als App."; }
-const APP_VERSION = "8 · 17.10.2026";
+const APP_VERSION = "9 · 17.10.2026";
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").then((reg) => { reg.update().catch(() => {}); }).catch(() => {});
   let reloaded = false;
