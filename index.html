@@ -353,6 +353,15 @@ details.adv[open], details.adv-inner[open] { display: grid; gap: 14px }
     <div class="panel"><h2>Quellen</h2><div id="sources"></div></div>
     <div class="panel"><h2>Genossenschaftsseiten</h2><div id="events"></div></div>
     <div class="panel">
+      <h2>Push auf diesem Gerät</h2>
+      <p class="hint" id="wpState">Prüfe …</p>
+      <div class="actions" style="margin-top:0">
+        <button class="btn primary" id="wpOn" type="button" hidden>Push aktivieren</button>
+        <button class="btn" id="wpTest" type="button" hidden>Test senden</button>
+        <button class="btn" id="wpOff" type="button" hidden>Abmelden</button>
+      </div>
+    </div>
+    <div class="panel">
       <h2>App</h2>
       <button class="btn" id="installBtn" type="button" hidden>Auf dem Startbildschirm installieren</button>
       <p class="hint" id="installHint">In Chrome: Menü ⋮ → «App installieren» oder «Zum Startbildschirm hinzufügen».</p>
@@ -801,6 +810,7 @@ function showTab(t) {
   ["hits", "map", "criteria", "status"].forEach((n) => ($("v-" + n).hidden = n !== t));
   document.querySelectorAll(".tab").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.tab === t)));
   if (t === "map") ensureMap();
+  if (t === "status") renderPush();
   window.scrollTo(0, 0);
 }
 document.querySelectorAll(".tab").forEach((b) => b.addEventListener("click", () => showTab(b.dataset.tab)));
@@ -825,6 +835,68 @@ $("connectBtn").addEventListener("click", () => {
 });
 $("logoutBtn").addEventListener("click", () => { store.del("wh_token"); S.token = null; showSetup(); });
 document.addEventListener("visibilitychange", () => { if (!document.hidden && S.token && S.config) load(); });
+
+
+// ---------- Web-Push ----------
+const VAPID_PUBLIC = "BEC006PeYd8byQ5aZW6O-YYPsLOSGG_emq7vkptzGHcB3FKo5t0wQqgezz4cFDmuTEjRoW0hhe3CojFsGeqIISo";
+const SUBS_PATH = "state/subscriptions.json";
+function urlB64ToBytes(b64) { const p = "=".repeat((4 - (b64.length % 4)) % 4); const raw = atob((b64 + p).replace(/-/g, "+").replace(/_/g, "/")); return Uint8Array.from(raw, (c) => c.charCodeAt(0)); }
+async function readSubs() {
+  try { const r = await readJson(SUBS_PATH); const d = Array.isArray(r.data) ? { devices: r.data } : r.data; return { data: { devices: d.devices || [], ...d }, sha: r.sha }; }
+  catch (e) { if (e.status === 404) return { data: { devices: [] }, sha: null }; throw e; }
+}
+function deviceLabel() {
+  const ua = navigator.userAgent; const m = ua.match(/Android [\d.]+; ([^;)]+)/);
+  return (m ? m[1].trim() : /iPhone|iPad/.test(ua) ? "iPhone/iPad" : /Mac/.test(ua) ? "Mac" : /Windows/.test(ua) ? "Windows" : "Gerät") + (matchMedia("(display-mode: standalone)").matches ? " (App)" : " (Browser)");
+}
+async function currentSub() {
+  if (!("serviceWorker" in navigator) || !("PushManager" in window)) return null;
+  const reg = await navigator.serviceWorker.ready; return reg.pushManager.getSubscription();
+}
+async function renderPush() {
+  const supported = "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+  if (!supported) { $("wpState").textContent = "Dieser Browser kann keine Push-Meldungen empfangen. Installiere die App über Chrome."; return; }
+  const sub = await currentSub().catch(() => null);
+  const perm = Notification.permission;
+  if (perm === "denied") { $("wpState").textContent = "Mitteilungen sind für Wollihood blockiert. Erlaube sie in den Android-Einstellungen unter Apps → Wollihood → Benachrichtigungen."; ["wpOn","wpTest","wpOff"].forEach((i) => ($(i).hidden = true)); return; }
+  $("wpState").textContent = sub ? "Aktiv. Neue Treffer kommen direkt als Mitteilung auf dieses Gerät." : "Noch nicht aktiv. Nach dem Aktivieren brauchst du ntfy nicht mehr.";
+  $("wpOn").hidden = !!sub; $("wpTest").hidden = !sub; $("wpOff").hidden = !sub;
+}
+async function saveDevice(sub, message) {
+  const { data, sha } = await readSubs();
+  const json = sub.toJSON();
+  const devices = data.devices.filter((d) => (d.subscription || d).endpoint !== json.endpoint);
+  devices.push({ label: deviceLabel(), added: new Date().toISOString(), subscription: json });
+  await writeJson(SUBS_PATH, { ...data, devices, updated: new Date().toISOString() }, sha, message);
+}
+$("wpOn").addEventListener("click", async () => {
+  $("wpOn").disabled = true;
+  try {
+    const perm = await Notification.requestPermission();
+    if (perm !== "granted") { toast("Ohne Erlaubnis für Mitteilungen geht es nicht.", "err"); return; }
+    const reg = await navigator.serviceWorker.ready;
+    const sub = (await reg.pushManager.getSubscription()) || await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlB64ToBytes(VAPID_PUBLIC) });
+    await saveDevice(sub, "Push-Gerät hinzugefügt");
+    toast("Push aktiv. In etwa einer Minute kommt eine Testmeldung.", "ok", 7000);
+  } catch (e) { toast("Aktivieren hat nicht geklappt: " + e.message, "err", 8000); }
+  finally { $("wpOn").disabled = false; renderPush(); }
+});
+$("wpTest").addEventListener("click", async () => {
+  $("wpTest").disabled = true;
+  try { const sub = await currentSub(); if (sub) { await saveDevice(sub, "Push-Gerät Test"); toast("Testmeldung angefordert. Sie kommt in etwa einer Minute.", "ok", 7000); } }
+  catch (e) { toast(e.message, "err"); }
+  finally { setTimeout(() => ($("wpTest").disabled = false), 60000); }
+});
+$("wpOff").addEventListener("click", async () => {
+  try {
+    const sub = await currentSub(); if (!sub) return;
+    const endpoint = sub.endpoint; await sub.unsubscribe();
+    const { data, sha } = await readSubs();
+    await writeJson(SUBS_PATH, { ...data, devices: data.devices.filter((d) => (d.subscription || d).endpoint !== endpoint) }, sha, "Gerät abgemeldet");
+    toast("Dieses Gerät bekommt keine Push-Meldungen mehr.", "ok");
+  } catch (e) { toast(e.message, "err"); }
+  renderPush();
+});
 
 // Installation
 let installEvt = null;
