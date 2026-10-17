@@ -1,252 +1,490 @@
 <!doctype html>
-<html lang="de">
+<html lang="de-CH">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Wollihood</title>
 <meta name="robots" content="noindex">
+<meta name="theme-color" content="#2F6B4F" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#16201B" media="(prefers-color-scheme: dark)">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Wollihood">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,750&family=Atkinson+Hyperlegible:wght@400;700&display=swap">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@geoman-io/leaflet-geoman-free@2.17.0/dist/leaflet-geoman.css">
 <style>
-/* Layout: eine Spalte am Handy, ab Tablet Karte links und Kriterien rechts. Seegrün als einziger Akzent. */
+/* App-Hülle: feste Kopfzeile, scrollender Inhalt, Tableiste unten. Seegrün als einziger Akzent, Preise in Tabellenziffern. */
 :root {
-  --bg: #F3F5F2; --surface: #FFFFFF; --fg: #18211C; --muted: #5C6760; --line: #D9DFDA;
-  --accent: #2F6B4F; --accent-ink: #FFFFFF; --ok: #2F7A4A; --bad: #A6392C; --warn: #8A6A12;
+  --bg: #F1F4F1; --surface: #FFFFFF; --sunk: #E6EBE7; --fg: #17201B; --muted: #5B6760; --line: #D7DED9;
+  --accent: #2F6B4F; --accent-soft: #DCEBE2; --accent-ink: #FFFFFF; --bar: #2F6B4F; --bar-ink: #FFFFFF;
+  --ok: #2F7A4A; --bad: #A6392C; --warn: #8A6A12; --star: #B7791F;
   --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
   --body: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
+  --tabbar-h: 64px;
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
-  --bg: #121815; --surface: #1A221E; --fg: #E6ECE8; --muted: #9AA69F; --line: #2C3832;
-  --accent: #6FBF95; --accent-ink: #0E1512; --ok: #6FBF95; --bad: #E58A7D; --warn: #D9B65A; color-scheme: dark } }
+  --bg: #0F1512; --surface: #18201C; --sunk: #222C27; --fg: #E5ECE7; --muted: #98A49D; --line: #2B3731;
+  --accent: #74C29A; --accent-soft: #1F3A2D; --accent-ink: #0D1511; --bar: #16201B; --bar-ink: #E5ECE7;
+  --ok: #74C29A; --bad: #E88B7E; --warn: #D9B65A; --star: #E2B65C; color-scheme: dark } }
 :root[data-theme="dark"] {
-  --bg: #121815; --surface: #1A221E; --fg: #E6ECE8; --muted: #9AA69F; --line: #2C3832;
-  --accent: #6FBF95; --accent-ink: #0E1512; --ok: #6FBF95; --bad: #E58A7D; --warn: #D9B65A; color-scheme: dark }
+  --bg: #0F1512; --surface: #18201C; --sunk: #222C27; --fg: #E5ECE7; --muted: #98A49D; --line: #2B3731;
+  --accent: #74C29A; --accent-soft: #1F3A2D; --accent-ink: #0D1511; --bar: #16201B; --bar-ink: #E5ECE7;
+  --ok: #74C29A; --bad: #E88B7E; --warn: #D9B65A; --star: #E2B65C; color-scheme: dark }
 
-* { box-sizing: border-box }
-html, body { margin: 0 }
-body { background: var(--bg); color: var(--fg); font: 16px/1.5 var(--body);
-  padding: env(safe-area-inset-top, 0px) max(16px, env(safe-area-inset-right, 0px)) 96px max(16px, env(safe-area-inset-left, 0px)) }
-h1, h2 { font-family: var(--display); margin: 0; text-wrap: balance }
-h1 { font-size: 30px; font-weight: 750; letter-spacing: -.02em }
-h2 { font-size: 19px; font-weight: 600 }
-.wrap { max-width: 1180px; margin: 0 auto; display: grid; gap: 20px; padding-block: 20px }
-header { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: baseline; justify-content: space-between }
-.sub { color: var(--muted); font-size: 14px }
-.grid { display: grid; gap: 20px; grid-template-columns: minmax(0, 1fr) }
-@media (min-width: 900px) { .grid { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr) } }
-section { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: grid; gap: 14px; min-width: 0 }
-#map { height: 62vh; min-height: 340px; border-radius: 8px; border: 1px solid var(--line) }
-label { display: grid; gap: 4px; font-size: 14px; font-weight: 700 }
-label small, .hint { font-weight: 400; color: var(--muted); font-size: 13px }
-input[type=text], input[type=number], input[type=email], input[type=password], textarea {
-  font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; width: 100%; min-width: 0 }
-textarea { min-height: 96px; resize: vertical; font-size: 14px }
-input:focus-visible, textarea:focus-visible, button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
-.row { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 12px }
-.check { display: flex; gap: 10px; align-items: center; font-weight: 400 }
-.check input { width: 20px; height: 20px; accent-color: var(--accent) }
-button { font: 700 15px var(--body); border-radius: 8px; padding: 10px 16px; cursor: pointer; border: 1px solid var(--line); background: var(--surface); color: var(--fg) }
-button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent) }
-button:disabled { opacity: .5; cursor: default }
-.savebar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 1000; background: var(--surface); border-top: 1px solid var(--line);
-  padding: 12px max(16px, env(safe-area-inset-right, 0px)) calc(12px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)) }
-.savebar .in { max-width: 1180px; margin: 0 auto; display: flex; gap: 12px; align-items: center; justify-content: space-between }
-#msg { font-size: 14px; color: var(--muted); min-width: 0 }
-#msg.err { color: var(--bad) } #msg.ok { color: var(--ok) }
-.chips { display: flex; flex-wrap: wrap; gap: 6px }
-.chip { font-size: 12px; padding: 3px 9px; border-radius: 999px; border: 1px solid var(--line); white-space: nowrap }
-.chip.ok { color: var(--ok); border-color: currentColor } .chip.bad { color: var(--bad); border-color: currentColor }
-.src { display: grid; gap: 2px; font-size: 14px; padding: 8px 0; border-top: 1px solid var(--line) }
-.src:first-child { border-top: 0 }
-.src .m { color: var(--muted); font-size: 13px; overflow-wrap: anywhere }
-.hits { display: grid; gap: 10px }
-.hit { display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: 12px; align-items: start; text-decoration: none; color: inherit }
-.hit img, .hit .ph { width: 76px; height: 56px; object-fit: cover; border-radius: 5px; background: var(--bg) }
-.hit b { font-variant-numeric: tabular-nums }
-.hit .m { color: var(--muted); font-size: 13px }
-.tools { display: flex; flex-wrap: wrap; gap: 8px }
-#setup[hidden], [hidden] { display: none !important }
-.leaflet-container { font: 14px var(--body) }
-@media (prefers-reduced-motion: reduce) { * { transition: none !important } }
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent }
+html, body { margin: 0; height: 100% }
+body { background: var(--bg); color: var(--fg); font: 16px/1.45 var(--body); overscroll-behavior-y: contain }
+button, input, textarea { font: inherit; color: inherit }
+a { color: var(--accent) }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
+[hidden] { display: none !important }
+
+/* Kopfzeile */
+.appbar { position: sticky; top: 0; z-index: 20; background: var(--bar); color: var(--bar-ink);
+  padding: calc(env(safe-area-inset-top, 0px) + 10px) max(16px, env(safe-area-inset-right, 0px)) 10px max(16px, env(safe-area-inset-left, 0px));
+  display: flex; align-items: center; gap: 12px }
+.appbar h1 { font: 750 22px/1 var(--display); letter-spacing: -.02em; margin: 0; flex: 1; min-width: 0 }
+.appbar .sub { font: 400 12px var(--body); opacity: .8; display: block; margin-top: 3px; letter-spacing: 0 }
+.iconbtn { width: 42px; height: 42px; border-radius: 21px; border: 0; background: transparent; color: inherit;
+  display: grid; place-items: center; cursor: pointer }
+.iconbtn:active { background: rgba(255,255,255,.14) }
+.iconbtn svg { width: 22px; height: 22px }
+.spin svg { animation: spin 1s linear infinite }
+@keyframes spin { to { transform: rotate(360deg) } }
+.dot { width: 9px; height: 9px; border-radius: 50%; background: #9fd9b9; display: inline-block; margin-right: 6px; vertical-align: 1px }
+.dot.bad { background: #ffb4a8 }
+
+/* Inhalt */
+main { padding: 14px max(16px, env(safe-area-inset-right, 0px)) calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px) + 24px) max(16px, env(safe-area-inset-left, 0px));
+  max-width: 720px; margin: 0 auto }
+.view { display: grid; gap: 14px }
+h2 { font: 600 18px/1.2 var(--display); margin: 4px 0 0 }
+.hint { color: var(--muted); font-size: 14px; margin: 0 }
+
+/* Filter-Chips */
+.chips { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px }
+.chips::-webkit-scrollbar { display: none }
+.chip { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 7px 14px; font-size: 14px;
+  white-space: nowrap; cursor: pointer; font-variant-numeric: tabular-nums }
+.chip[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 700 }
+
+/* Trefferkarten */
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; display: grid }
+.card .photo { display: block; aspect-ratio: 16 / 9; background: var(--sunk); position: relative; max-width: 100% }
+.card .photo img { width: 100%; height: 100%; object-fit: cover; display: block }
+.card .photo.noimg { aspect-ratio: auto; height: 56px }
+.card .photo.noimg::after { content: attr(data-label); position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
+  color: var(--muted); font-size: 13px }
+.badge { position: absolute; left: 10px; top: 10px; background: var(--accent); color: var(--accent-ink); font-size: 12px; font-weight: 700;
+  padding: 3px 9px; border-radius: 999px }
+.badge.fav { left: auto; right: 10px; background: var(--star); color: #fff }
+.card .body { padding: 12px 14px 12px; display: grid; gap: 3px; min-width: 0 }
+.price { font: 750 21px/1.15 var(--display); font-variant-numeric: tabular-nums; letter-spacing: -.01em }
+.price small { font: 400 15px var(--body); color: var(--muted); letter-spacing: 0 }
+.addr { font-size: 15px; overflow-wrap: anywhere }
+.meta { color: var(--muted); font-size: 13px }
+.notes { color: var(--warn); font-size: 13px }
+.actions { display: flex; gap: 8px; margin-top: 8px }
+.btn { flex: 1; border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 9px 10px; font-size: 14px; font-weight: 700;
+  cursor: pointer; text-align: center; text-decoration: none; color: var(--fg); display: inline-flex; gap: 6px; align-items: center; justify-content: center; min-height: 42px }
+.btn svg { width: 18px; height: 18px }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink) }
+.btn.on { color: var(--star); border-color: currentColor }
+.btn:disabled { opacity: .5 }
+.empty { text-align: center; padding: 40px 10px; color: var(--muted) }
+.empty b { display: block; font: 600 18px var(--display); color: var(--fg); margin-bottom: 6px }
+
+/* Karte */
+#map { height: calc(100dvh - 230px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); min-height: 320px; border-radius: 14px; border: 1px solid var(--line) }
+.leaflet-container { font: 14px var(--body); background: var(--sunk) }
+
+/* Formulare */
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 14px; display: grid; gap: 14px }
+label.f { display: grid; gap: 5px; font-size: 14px; font-weight: 700 }
+label.f small { font-weight: 400; color: var(--muted); font-size: 13px }
+.field { border: 1px solid var(--line); background: var(--bg); border-radius: 10px; padding: 10px 12px; width: 100%; min-width: 0; font-size: 16px }
+textarea.field { min-height: 110px; resize: vertical; font-size: 15px }
+.row3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px }
+.row2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px }
+.switch { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 15px; cursor: pointer }
+.switch input { appearance: none; width: 46px; height: 28px; border-radius: 14px; background: var(--line); position: relative; flex: none; cursor: pointer; transition: background .15s }
+.switch input::after { content: ""; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: var(--surface); transition: transform .15s; box-shadow: 0 1px 2px rgba(0,0,0,.25) }
+.switch input:checked { background: var(--accent) }
+.switch input:checked::after { transform: translateX(18px) }
+.savebar { position: sticky; bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px) + 10px); display: grid; gap: 6px; z-index: 5 }
+.savebar .btn { box-shadow: 0 4px 14px rgba(0,0,0,.18) }
+.toast { font-size: 14px; text-align: center; color: var(--muted); background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px }
+.toast.ok { color: var(--ok) } .toast.err { color: var(--bad) }
+
+/* Status */
+.src { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 10px; padding: 10px 0; border-top: 1px solid var(--line) }
+.src:first-child { border-top: 0; padding-top: 0 }
+.src .s { width: 10px; height: 10px; border-radius: 50%; margin-top: 7px; background: var(--ok) }
+.src .s.bad { background: var(--bad) }
+.src .m { grid-column: 2; color: var(--muted); font-size: 13px; overflow-wrap: anywhere }
+.stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px }
+.stat { background: var(--sunk); border-radius: 10px; padding: 10px; text-align: center }
+.stat b { display: block; font: 750 22px var(--display); font-variant-numeric: tabular-nums }
+.stat span { font-size: 12px; color: var(--muted) }
+.ev { padding: 10px 0; border-top: 1px solid var(--line); font-size: 14px }
+.ev:first-child { border-top: 0; padding-top: 0 }
+.ev ul { margin: 4px 0 0; padding-left: 18px; color: var(--muted) }
+
+/* Tableiste */
+.tabbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; background: var(--surface); border-top: 1px solid var(--line);
+  padding: 0 max(8px, env(safe-area-inset-right, 0px)) env(safe-area-inset-bottom, 0px) max(8px, env(safe-area-inset-left, 0px));
+  display: grid; grid-template-columns: repeat(4, 1fr); height: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px)) }
+.tab { border: 0; background: none; display: grid; justify-items: center; align-content: center; gap: 3px; font-size: 12px; color: var(--muted); cursor: pointer; position: relative }
+.tab svg { width: 24px; height: 24px }
+.tab[aria-selected="true"] { color: var(--accent); font-weight: 700 }
+.tab[aria-selected="true"] .pill { background: var(--accent-soft) }
+.tab .pill { width: 58px; height: 30px; border-radius: 15px; display: grid; place-items: center; transition: background .15s }
+.tab .count { position: absolute; top: 6px; left: calc(50% + 8px); background: var(--bad); color: #fff; font-size: 11px; font-weight: 700;
+  min-width: 18px; height: 18px; border-radius: 9px; display: grid; place-items: center; padding: 0 5px; font-variant-numeric: tabular-nums }
+
+/* Einrichtung */
+.setup { max-width: 520px; margin: 0 auto; display: grid; gap: 14px }
+.setup ol { margin: 0; padding-left: 20px; color: var(--muted); font-size: 14px; display: grid; gap: 6px }
+
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important } }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <header>
-    <div>
-      <h1>Wollihood</h1>
-      <div class="sub">Suchgebiet und Kriterien für die stündliche Wohnungssuche</div>
-    </div>
-    <div class="chips" id="statusChips"><span class="chip">noch nicht verbunden</span></div>
-  </header>
 
-  <section id="setup" hidden>
+<header class="appbar">
+  <h1>Wollihood<span class="sub" id="subline">Wohnungssuche Wollishofen</span></h1>
+  <button class="iconbtn" id="refreshBtn" type="button" aria-label="Neu laden">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg>
+  </button>
+</header>
+
+<main>
+  <!-- Einrichtung -->
+  <section class="setup" id="setup" hidden>
     <h2>Einmal verbinden</h2>
-    <p class="hint">Damit diese Seite die Kriterien im Repo speichern kann, braucht sie einen GitHub-Schlüssel.
-      Er bleibt nur in diesem Browser gespeichert.</p>
-    <ol class="hint">
+    <p class="hint">Die App liest und speichert deine Suche im privaten Repo «Wollihood». Dafür braucht sie einen GitHub-Schlüssel, der nur auf diesem Gerät bleibt.</p>
+    <ol>
       <li>Öffne <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">neuen Schlüssel erstellen</a>.</li>
-      <li>Name «Wollihood Karte», Ablauf z.&nbsp;B. 1 Jahr. Bei «Repository access» nur <b>wollihood</b> wählen.</li>
-      <li>Unter «Permissions → Contents» <b>Read and write</b> wählen, erstellen, Schlüssel kopieren.</li>
+      <li>Bei «Repository access» nur <b>Wollihood</b> wählen.</li>
+      <li>Unter «Permissions → Contents» <b>Read and write</b> wählen, erstellen und kopieren.</li>
     </ol>
-    <label for="tokenInput">GitHub-Schlüssel
-      <input id="tokenInput" type="password" autocomplete="off" placeholder="github_pat_…">
-    </label>
-    <label for="repoInput">Repo
-      <input id="repoInput" type="text" value="Pleger279/wollihood">
-    </label>
-    <div><button class="primary" id="connectBtn" type="button">Verbinden</button></div>
+    <label class="f" for="tokenInput">GitHub-Schlüssel
+      <input class="field" id="tokenInput" type="password" autocomplete="off" placeholder="github_pat_…"></label>
+    <label class="f" for="repoInput">Repo
+      <input class="field" id="repoInput" type="text" value="Pleger279/Wollihood"></label>
+    <button class="btn primary" id="connectBtn" type="button">Verbinden</button>
+    <div class="toast err" id="setupMsg" hidden></div>
   </section>
 
-  <div class="grid" id="main" hidden>
-    <section>
-      <h2>Suchgebiet</h2>
-      <p class="hint">Fläche einzeichnen mit dem Fünfeck-Werkzeug links. Mehrere Flächen sind möglich.
-        Bearbeiten mit dem Stift, löschen mit dem Papierkorb. Punkte zeigen die letzten Treffer.</p>
-      <div id="map"></div>
-    </section>
-
-    <div style="display:grid;gap:20px;min-width:0">
-      <section>
-        <h2>Kriterien</h2>
-        <label class="check" for="active"><input type="checkbox" id="active"> Suche aktiv</label>
-        <div class="row">
-          <label for="roomsMin">Zimmer ab<input id="roomsMin" type="number" step="0.5" min="1"></label>
-          <label for="roomsMax">Zimmer bis<input id="roomsMax" type="number" step="0.5" min="1"></label>
-          <label for="rentMax">Miete max. (CHF)<input id="rentMax" type="number" step="50" min="0"></label>
-        </div>
-        <label class="check" for="unkPrice"><input type="checkbox" id="unkPrice"> Inserate ohne erkennbaren Preis trotzdem melden</label>
-        <label class="check" for="unkRooms"><input type="checkbox" id="unkRooms"> Inserate ohne erkennbare Zimmerzahl trotzdem melden</label>
-        <label for="plz">PLZ, wenn die Adresse fehlt <small>Kommagetrennt. Gilt nur, wenn ein Inserat keine genaue Adresse hat.</small>
-          <input id="plz" type="text"></label>
-        <label for="excl">Ausschliessen, wenn im Text <small>Eine Zeile pro Begriff</small>
-          <textarea id="excl"></textarea></label>
-        <label for="titleExcl">Ausschliessen, wenn im Titel <small>Für Parkplätze, Büros und Ähnliches</small>
-          <textarea id="titleExcl"></textarea></label>
-      </section>
-
-      <section>
-        <h2>Quellen und Meldungen</h2>
-        <label class="check" for="srcMail"><input type="checkbox" id="srcMail"> Suchabo-Mails der Portale</label>
-        <label class="check" for="srcFlatfox"><input type="checkbox" id="srcFlatfox"> Flatfox direkt</label>
-        <label class="check" for="srcPages"><input type="checkbox" id="srcPages"> Genossenschafts- und Stiftungsseiten</label>
-        <label for="pages">Beobachtete Seiten <small>Eine Zeile pro Seite: Name | Adresse</small>
-          <textarea id="pages" style="min-height:130px"></textarea></label>
-        <label for="areaKw">Stichworte für diese Seiten <small>Neue Zeilen werden nur gemeldet, wenn eines davon vorkommt</small>
-          <textarea id="areaKw"></textarea></label>
-        <label for="digestTo">Tagesmail an<input id="digestTo" type="email"></label>
-        <div class="row">
-          <label for="quietFrom">Leise ab (Uhr)<input id="quietFrom" type="number" min="0" max="23"></label>
-          <label for="quietTo">Leise bis (Uhr)<input id="quietTo" type="number" min="0" max="23"></label>
-        </div>
-      </section>
-
-      <section>
-        <h2>Zustand</h2>
-        <div id="health" class="hint">Lade …</div>
-        <h2>Letzte Treffer</h2>
-        <div id="hits" class="hits hint">Lade …</div>
-        <div class="tools">
-          <button type="button" id="reloadBtn">Neu laden</button>
-          <button type="button" id="logoutBtn">Schlüssel entfernen</button>
-        </div>
-      </section>
+  <!-- Treffer -->
+  <section class="view" id="v-hits" hidden>
+    <div class="chips" role="group" aria-label="Filter">
+      <button class="chip" type="button" data-filter="new" aria-pressed="true">Neu</button>
+      <button class="chip" type="button" data-filter="fav" aria-pressed="false">Gemerkt</button>
+      <button class="chip" type="button" data-filter="all" aria-pressed="false">Alle</button>
+      <button class="chip" type="button" data-filter="no" aria-pressed="false">Aussortiert</button>
     </div>
-  </div>
-</div>
+    <div id="hitList" class="view"></div>
+    <button class="btn" id="allSeenBtn" type="button" hidden>Alle als gelesen markieren</button>
+  </section>
 
-<div class="savebar" id="savebar" hidden>
-  <div class="in">
-    <div id="msg">Änderungen werden erst beim Speichern übernommen.</div>
-    <button class="primary" id="saveBtn" type="button">Speichern</button>
-  </div>
-</div>
+  <!-- Karte -->
+  <section class="view" id="v-map" hidden>
+    <p class="hint">Suchgebiet mit dem Fünfeck links einzeichnen, mit dem Stift anpassen, mit dem Papierkorb löschen. Grüne Punkte sind deine Treffer.</p>
+    <div id="map"></div>
+    <div class="savebar">
+      <button class="btn primary" type="button" data-save>Suchgebiet speichern</button>
+    </div>
+  </section>
+
+  <!-- Kriterien -->
+  <section class="view" id="v-criteria" hidden>
+    <div class="panel">
+      <label class="switch" for="active">Suche aktiv <input type="checkbox" id="active"></label>
+      <div class="row3">
+        <label class="f" for="roomsMin">Zimmer ab<input class="field" id="roomsMin" type="number" inputmode="decimal" step="0.5" min="1"></label>
+        <label class="f" for="roomsMax">bis<input class="field" id="roomsMax" type="number" inputmode="decimal" step="0.5" min="1"></label>
+        <label class="f" for="rentMax">Max. CHF<input class="field" id="rentMax" type="number" inputmode="numeric" step="50" min="0"></label>
+      </div>
+      <label class="switch" for="unkPrice">Ohne erkennbaren Preis trotzdem melden <input type="checkbox" id="unkPrice"></label>
+      <label class="switch" for="unkRooms">Ohne erkennbare Zimmerzahl trotzdem melden <input type="checkbox" id="unkRooms"></label>
+      <label class="f" for="plz">PLZ, wenn die Adresse fehlt<small>Kommagetrennt</small>
+        <input class="field" id="plz" type="text" inputmode="numeric"></label>
+    </div>
+    <div class="panel">
+      <label class="f" for="excl">Aussortieren, wenn im Text<small>Ein Begriff pro Zeile</small>
+        <textarea class="field" id="excl"></textarea></label>
+      <label class="f" for="titleExcl">Aussortieren, wenn im Titel<small>Für Parkplätze, Büros und Ähnliches</small>
+        <textarea class="field" id="titleExcl"></textarea></label>
+    </div>
+    <div class="panel">
+      <h2>Quellen</h2>
+      <label class="switch" for="srcMail">Suchabo-Mails der Portale <input type="checkbox" id="srcMail"></label>
+      <label class="switch" for="srcFlatfox">Flatfox direkt <input type="checkbox" id="srcFlatfox"></label>
+      <label class="switch" for="srcPages">Genossenschaftsseiten <input type="checkbox" id="srcPages"></label>
+      <label class="f" for="pages">Beobachtete Seiten<small>Pro Zeile: Name | Adresse</small>
+        <textarea class="field" id="pages"></textarea></label>
+      <label class="f" for="areaKw">Stichworte für diese Seiten<small>Neue Einträge werden nur gemeldet, wenn eines vorkommt</small>
+        <textarea class="field" id="areaKw"></textarea></label>
+    </div>
+    <div class="panel">
+      <h2>Meldungen</h2>
+      <label class="f" for="digestTo">Tagesmail an<input class="field" id="digestTo" type="email" autocomplete="email"></label>
+      <div class="row2">
+        <label class="f" for="quietFrom">Leise ab<input class="field" id="quietFrom" type="number" inputmode="numeric" min="0" max="23"></label>
+        <label class="f" for="quietTo">bis (Uhr)<input class="field" id="quietTo" type="number" inputmode="numeric" min="0" max="23"></label>
+      </div>
+    </div>
+    <div class="savebar">
+      <button class="btn primary" type="button" data-save>Kriterien speichern</button>
+    </div>
+  </section>
+
+  <!-- Status -->
+  <section class="view" id="v-status" hidden>
+    <div class="stats" id="stats"></div>
+    <button class="btn primary" id="runBtn" type="button">Jetzt suchen</button>
+    <div class="panel"><h2>Quellen</h2><div id="sources"></div></div>
+    <div class="panel"><h2>Genossenschaftsseiten</h2><div id="events"></div></div>
+    <div class="panel">
+      <h2>App</h2>
+      <button class="btn" id="installBtn" type="button" hidden>Auf dem Startbildschirm installieren</button>
+      <p class="hint" id="installHint">In Chrome: Menü ⋮ → «App installieren» oder «Zum Startbildschirm hinzufügen».</p>
+      <button class="btn" id="logoutBtn" type="button">Schlüssel auf diesem Gerät entfernen</button>
+    </div>
+  </section>
+
+  <div class="toast" id="toast" hidden></div>
+</main>
+
+<nav class="tabbar" id="tabbar" role="tablist" hidden>
+  <button class="tab" role="tab" data-tab="hits" aria-selected="true">
+    <span class="pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 11 12 4l9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg></span>Treffer
+    <span class="count" id="newCount" hidden></span>
+  </button>
+  <button class="tab" role="tab" data-tab="map" aria-selected="false">
+    <span class="pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2z"/><path d="M9 4v14M15 6v14"/></svg></span>Gebiet
+  </button>
+  <button class="tab" role="tab" data-tab="criteria" aria-selected="false">
+    <span class="pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg></span>Kriterien
+  </button>
+  <button class="tab" role="tab" data-tab="status" aria-selected="false">
+    <span class="pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3-7 4 14 3-7h4"/></svg></span>Status
+  </button>
+</nav>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@geoman-io/leaflet-geoman-free@2.17.0/dist/leaflet-geoman.min.js"></script>
 <script>
+"use strict";
 const $ = (id) => document.getElementById(id);
 const store = {
   get(k) { try { return localStorage.getItem(k) } catch { return null } },
   set(k, v) { try { localStorage.setItem(k, v) } catch {} },
   del(k) { try { localStorage.removeItem(k) } catch {} },
 };
-let token = store.get("wh_token");
-let repo = store.get("wh_repo") || "Pleger279/wollihood";
-let config = null, configSha = null, map = null, hitLayer = null;
+const S = {
+  token: store.get("wh_token"),
+  repo: store.get("wh_repo") || "Pleger279/Wollihood",
+  config: null, configSha: null,
+  hits: [], health: null, events: [],
+  marks: {}, marksSha: null,
+  seen: new Set(JSON.parse(store.get("wh_seen") || "[]")),
+  filter: "new", tab: store.get("wh_tab") || "hits",
+  map: null, hitLayer: null, areasDirty: false,
+};
 
-function b64decode(s) {
-  const bin = atob(s.replace(/\n/g, ""));
-  return new TextDecoder().decode(Uint8Array.from(bin, (c) => c.charCodeAt(0)));
-}
-function b64encode(str) {
-  const bytes = new TextEncoder().encode(str);
-  let bin = ""; bytes.forEach((b) => (bin += String.fromCharCode(b)));
-  return btoa(bin);
-}
+// ---------- GitHub ----------
+function b64decode(s) { const bin = atob(s.replace(/\n/g, "")); return new TextDecoder().decode(Uint8Array.from(bin, (c) => c.charCodeAt(0))); }
+function b64encode(str) { const bytes = new TextEncoder().encode(str); let bin = ""; bytes.forEach((b) => (bin += String.fromCharCode(b))); return btoa(bin); }
 async function gh(path, opts = {}) {
-  const r = await fetch(`https://api.github.com/repos/${repo}/contents/${path}`, {
-    ...opts,
-    headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json",
-               "X-GitHub-Api-Version": "2022-11-28", ...(opts.headers || {}) },
-    cache: "no-store",
+  const r = await fetch(`https://api.github.com/repos/${S.repo}/contents/${path}`, {
+    ...opts, cache: "no-store",
+    headers: { Authorization: `Bearer ${S.token}`, Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28", ...(opts.headers || {}) },
   });
   if (!r.ok) {
-    const t = await r.text().catch(() => "");
-    const err = new Error(r.status === 401 ? "Schlüssel ungültig oder abgelaufen."
-      : r.status === 404 ? `Datei ${path} nicht gefunden – stimmt der Repo-Name, und hat der Schlüssel Zugriff?`
+    const e = new Error(r.status === 401 ? "Der Schlüssel ist ungültig oder abgelaufen."
+      : r.status === 404 ? `«${path}» nicht gefunden. Stimmt das Repo, und hat der Schlüssel Zugriff darauf?`
       : r.status === 409 ? "Die Datei wurde inzwischen geändert. Bitte neu laden und nochmals speichern."
-      : `GitHub meldet ${r.status}. ${t.slice(0, 120)}`);
-    err.status = r.status; throw err;
+      : `GitHub meldet Fehler ${r.status}.`);
+    e.status = r.status; throw e;
   }
   return r.json();
 }
-async function readJson(path) {
-  const d = await gh(path);
-  return { data: JSON.parse(b64decode(d.content)), sha: d.sha };
+async function readJson(path) { const d = await gh(path); return { data: JSON.parse(b64decode(d.content)), sha: d.sha }; }
+async function writeJson(path, data, sha, message) {
+  const body = { message, content: b64encode(JSON.stringify(data, null, 2) + "\n"), branch: "main" };
+  if (sha) body.sha = sha;
+  const r = await gh(path, { method: "PUT", body: JSON.stringify(body), headers: { "Content-Type": "application/json" } });
+  return r.content.sha;
 }
-function msg(text, cls = "") { const m = $("msg"); m.textContent = text; m.className = cls; }
 
-function initMap() {
-  map = L.map("map", { zoomControl: true }).setView([47.345, 8.53], 14);
+// ---------- Helfer ----------
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const chf = (v) => v ? "CHF " + Number(v).toLocaleString("de-CH") : "Preis offen";
+const rooms = (v) => v == null ? "? Zi." : `${v} Zi.`;
+const keyOf = (x) => (x.keys && x.keys[0]) || x.url;
+function ago(iso) {
+  if (!iso) return "–";
+  const d = new Date(iso), m = Math.round((Date.now() - d) / 60000);
+  if (m < 1) return "gerade eben";
+  if (m < 60) return `vor ${m} Min.`;
+  if (m < 60 * 24) return `vor ${Math.round(m / 60)} Std.`;
+  if (m < 60 * 24 * 7) return `vor ${Math.round(m / 1440)} Tg.`;
+  return d.toLocaleDateString("de-CH", { day: "2-digit", month: "2-digit" });
+}
+let toastTimer;
+function toast(text, cls = "", ms = 4000) {
+  const t = $("toast"); t.textContent = text; t.className = "toast " + cls; t.hidden = false;
+  clearTimeout(toastTimer); if (ms) toastTimer = setTimeout(() => (t.hidden = true), ms);
+}
+const accent = () => getComputedStyle(document.documentElement).getPropertyValue("--accent").trim() || "#2F6B4F";
+const icon = {
+  star: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1 6.2L12 17.3 6.5 20.2l1-6.2L3 9.6l6.2-.9z"/></svg>',
+  starO: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1 6.2L12 17.3 6.5 20.2l1-6.2L3 9.6l6.2-.9z"/></svg>',
+  x: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>',
+  undo: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></svg>',
+  open: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>',
+};
+
+// ---------- Treffer ----------
+function saveSeen() { store.set("wh_seen", JSON.stringify([...S.seen].slice(-500))); }
+function isNew(x) { const k = keyOf(x); return !S.seen.has(k) && S.marks[k] !== "no"; }
+function filtered() {
+  return S.hits.filter((x) => {
+    const m = S.marks[keyOf(x)];
+    if (S.filter === "new") return isNew(x);
+    if (S.filter === "fav") return m === "fav";
+    if (S.filter === "no") return m === "no";
+    return m !== "no";
+  });
+}
+function renderHits() {
+  const newN = S.hits.filter(isNew).length;
+  const favN = S.hits.filter((x) => S.marks[keyOf(x)] === "fav").length;
+  document.querySelectorAll("[data-filter]").forEach((b) => {
+    const f = b.dataset.filter;
+    b.setAttribute("aria-pressed", String(f === S.filter));
+    b.textContent = { new: `Neu${newN ? " · " + newN : ""}`, fav: `Gemerkt${favN ? " · " + favN : ""}`, all: "Alle", no: "Aussortiert" }[f];
+  });
+  $("newCount").hidden = !newN; $("newCount").textContent = newN;
+  $("allSeenBtn").hidden = !(S.filter === "new" && newN > 1);
+  const list = filtered();
+  if (!list.length) {
+    const msg = {
+      new: ["Nichts Neues", "Sobald eine passende Wohnung auftaucht, erscheint sie hier und du bekommst eine Push-Meldung."],
+      fav: ["Noch nichts gemerkt", "Tippe bei einem Treffer auf «Merken», dann findest du ihn hier wieder."],
+      all: ["Noch keine Treffer", "Die Suche läuft stündlich. Treffer der letzten Wochen erscheinen hier."],
+      no: ["Nichts aussortiert", "Was du mit «Nein» wegklickst, landet hier."],
+    }[S.filter];
+    $("hitList").innerHTML = `<div class="empty"><b>${msg[0]}</b>${msg[1]}</div>`;
+    return;
+  }
+  $("hitList").innerHTML = list.map((x) => {
+    const k = keyOf(x), m = S.marks[k];
+    const place = [x.street, [x.plz, x.city].filter(Boolean).join(" ")].filter(Boolean).join(", ") || x.title || "";
+    const photo = x.image
+      ? `<img src="${esc(x.image)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentNode.classList.add('noimg');this.remove()">`
+      : "";
+    return `<article class="card" data-key="${esc(k)}">
+      <a class="photo ${x.image ? "" : "noimg"}" data-label="kein Bild" href="${esc(x.url)}" target="_blank" rel="noopener" data-open>${photo}
+        ${isNew(x) ? '<span class="badge">Neu</span>' : ""}${m === "fav" ? `<span class="badge fav">Gemerkt</span>` : ""}</a>
+      <div class="body">
+        <div class="price">${esc(chf(x.rent))} <small>· ${esc(rooms(x.rooms))}${x.m2 ? " · " + esc(x.m2) + " m²" : ""}</small></div>
+        <div class="addr">${esc(place)}</div>
+        <div class="meta">${esc(x.portal || "")} · ${esc(ago(x.first_seen))}</div>
+        ${x.notes && x.notes.length ? `<div class="notes">${esc(x.notes.join(" · "))}</div>` : ""}
+        <div class="actions">
+          ${m === "no"
+            ? `<button class="btn" type="button" data-mark="">${icon.undo} Zurückholen</button>`
+            : `<button class="btn ${m === "fav" ? "on" : ""}" type="button" data-mark="${m === "fav" ? "" : "fav"}">${m === "fav" ? icon.star : icon.starO} ${m === "fav" ? "Gemerkt" : "Merken"}</button>
+               <button class="btn" type="button" data-mark="no">${icon.x} Nein</button>`}
+          <a class="btn primary" href="${esc(x.url)}" target="_blank" rel="noopener" data-open>${icon.open} Öffnen</a>
+        </div>
+      </div></article>`;
+  }).join("");
+}
+let marksQueue = Promise.resolve();
+function setMark(k, val) {
+  if (val) S.marks[k] = val; else delete S.marks[k];
+  S.seen.add(k); saveSeen(); renderHits(); renderMarkers();
+  marksQueue = marksQueue.then(async () => {
+    try { S.marksSha = await writeJson("marks.json", S.marks, S.marksSha, "Treffer markiert"); }
+    catch (e) {
+      if (e.status === 409 || e.status === 422) {
+        try { const cur = await readJson("marks.json"); S.marksSha = cur.sha;
+          S.marksSha = await writeJson("marks.json", { ...cur.data, ...S.marks }, S.marksSha, "Treffer markiert"); }
+        catch (e2) { toast("Markierung nur auf diesem Gerät gespeichert: " + e2.message, "err"); }
+      } else toast("Markierung nur auf diesem Gerät gespeichert: " + e.message, "err");
+    }
+    store.set("wh_marks", JSON.stringify(S.marks));
+  });
+}
+$("hitList").addEventListener("click", (e) => {
+  const card = e.target.closest(".card"); if (!card) return;
+  const k = card.dataset.key;
+  const mb = e.target.closest("[data-mark]");
+  if (mb) { setMark(k, mb.dataset.mark); return; }
+  if (e.target.closest("[data-open]")) { S.seen.add(k); saveSeen(); setTimeout(renderHits, 400); }
+});
+document.querySelectorAll("[data-filter]").forEach((b) => b.addEventListener("click", () => { S.filter = b.dataset.filter; S.filterChosen = true; renderHits(); window.scrollTo(0, 0); }));
+$("allSeenBtn").addEventListener("click", () => { S.hits.forEach((x) => S.seen.add(keyOf(x))); saveSeen(); renderHits(); });
+
+// ---------- Karte ----------
+function ensureMap() {
+  if (S.map) { setTimeout(() => S.map.invalidateSize(), 60); return; }
+  S.map = L.map("map", { zoomControl: false }).setView([47.345, 8.53], 14);
+  L.control.zoom({ position: "bottomright" }).addTo(S.map);
   L.tileLayer("https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.pixelkarte-grau/default/current/3857/{z}/{x}/{y}.jpeg", {
     maxZoom: 19, attribution: '© <a href="https://www.swisstopo.admin.ch/" target="_blank" rel="noopener">swisstopo</a>',
-  }).addTo(map);
-  map.pm.setLang("de");
-  map.pm.addControls({
-    position: "topleft", drawMarker: false, drawCircleMarker: false, drawPolyline: false, drawCircle: false,
-    drawText: false, cutPolygon: false, rotateMode: false, drawRectangle: true, drawPolygon: true,
-    editMode: true, dragMode: true, removalMode: true,
-  });
-  map.pm.setPathOptions({ color: getComputedStyle(document.documentElement).getPropertyValue("--accent").trim() || "#2F6B4F", weight: 2, fillOpacity: 0.12 });
-  map.on("pm:create pm:remove", () => msg("Fläche geändert – zum Übernehmen speichern."));
-  hitLayer = L.layerGroup().addTo(map);
+  }).addTo(S.map);
+  S.map.pm.setLang("de");
+  S.map.pm.addControls({ position: "topleft", drawMarker: false, drawCircleMarker: false, drawPolyline: false, drawCircle: false,
+    drawText: false, cutPolygon: false, rotateMode: false, drawRectangle: true, drawPolygon: true, editMode: true, dragMode: false, removalMode: true });
+  S.map.pm.setPathOptions({ color: accent(), weight: 2, fillOpacity: 0.12 });
+  S.map.on("pm:create", (e) => { S.areasDirty = true; e.layer.on("pm:edit", () => (S.areasDirty = true)); });
+  S.map.on("pm:remove", () => (S.areasDirty = true));
+  S.hitLayer = L.layerGroup().addTo(S.map);
+  drawAreas(); renderMarkers();
+  setTimeout(() => S.map.invalidateSize(), 60);
 }
-
-function drawAreas(areas) {
-  map.pm.getGeomanLayers().forEach((l) => l.remove());
-  const color = getComputedStyle(document.documentElement).getPropertyValue("--accent").trim() || "#2F6B4F";
-  const layer = L.geoJSON(areas, { style: { color, weight: 2, fillOpacity: 0.12 } });
-  layer.eachLayer((l) => { l.addTo(map); l.on("pm:edit pm:dragend", () => msg("Fläche geändert – zum Übernehmen speichern.")); });
-  try { map.fitBounds(layer.getBounds(), { padding: [20, 20] }); } catch {}
+function drawAreas() {
+  if (!S.map || !S.config) return;
+  S.map.pm.getGeomanLayers().forEach((l) => l.remove());
+  const g = L.geoJSON(S.config.areas, { style: { color: accent(), weight: 2, fillOpacity: 0.12 } });
+  g.eachLayer((l) => { l.addTo(S.map); l.on("pm:edit", () => (S.areasDirty = true)); });
+  try { S.map.fitBounds(g.getBounds(), { padding: [24, 24] }); } catch {}
+  S.areasDirty = false;
+}
+function renderMarkers() {
+  if (!S.hitLayer) return;
+  S.hitLayer.clearLayers();
+  S.hits.forEach((x) => {
+    const m = S.marks[keyOf(x)];
+    if (x.lat == null || m === "no") return;
+    const c = m === "fav" ? getComputedStyle(document.documentElement).getPropertyValue("--star").trim() : accent();
+    L.circleMarker([x.lat, x.lon], { radius: 8, color: "#fff", weight: 2, fillColor: c, fillOpacity: 0.95, pmIgnore: true })
+      .bindPopup(`<b>${esc(chf(x.rent))} · ${esc(rooms(x.rooms))}</b><br>${esc(x.street || "")}<br><a href="${esc(x.url)}" target="_blank" rel="noopener">Inserat öffnen</a>`)
+      .addTo(S.hitLayer);
+  });
 }
 function collectAreas() {
+  if (!S.map || !S.areasDirty) return S.config.areas;
   const features = [];
-  map.pm.getGeomanLayers().forEach((l) => {
-    if (l instanceof L.Polygon) {
-      const f = l.toGeoJSON(6);
-      f.properties = f.properties || {};
-      features.push(f);
-    }
-  });
+  S.map.pm.getGeomanLayers().forEach((l) => { if (l instanceof L.Polygon) { const f = l.toGeoJSON(6); f.properties = f.properties || {}; features.push(f); } });
   return { type: "FeatureCollection", features };
 }
 
+// ---------- Kriterien ----------
 const lines = (t) => t.split("\n").map((s) => s.trim()).filter(Boolean);
-function fillForm(c) {
+function fillForm() {
+  const c = S.config;
   $("active").checked = c.active !== false;
   $("roomsMin").value = c.rooms_min ?? ""; $("roomsMax").value = c.rooms_max ?? ""; $("rentMax").value = c.rent_max ?? "";
   $("unkPrice").checked = !!c.include_unknown_price; $("unkRooms").checked = !!c.include_unknown_rooms;
@@ -259,11 +497,10 @@ function fillForm(c) {
   $("pages").value = (c.watch_pages || []).map((p) => `${p.name} | ${p.url}`).join("\n");
   $("digestTo").value = c.digest_to || "";
   $("quietFrom").value = c.quiet_hours?.from ?? ""; $("quietTo").value = c.quiet_hours?.to ?? "";
-  drawAreas(c.areas);
 }
 function readForm() {
   const num = (id) => { const v = parseFloat($(id).value); return Number.isFinite(v) ? v : null; };
-  const c = structuredClone(config);
+  const c = structuredClone(S.config);
   c.active = $("active").checked;
   c.rooms_min = num("roomsMin"); c.rooms_max = num("roomsMax"); c.rent_max = num("rentMax");
   c.include_unknown_price = $("unkPrice").checked; c.include_unknown_rooms = $("unkRooms").checked;
@@ -272,10 +509,10 @@ function readForm() {
   c.title_exclude_keywords = lines($("titleExcl").value);
   c.area_keywords = lines($("areaKw").value);
   c.sources = { mail_alerts: $("srcMail").checked, flatfox: $("srcFlatfox").checked, watch_pages: $("srcPages").checked };
-  const oldPages = Object.fromEntries((config.watch_pages || []).map((p) => [p.url, p]));
+  const old = Object.fromEntries((S.config.watch_pages || []).map((p) => [p.url, p]));
   c.watch_pages = lines($("pages").value).map((ln) => {
     const [name, url] = ln.includes("|") ? ln.split("|").map((s) => s.trim()) : [ln, ln];
-    return { ...(oldPages[url] || {}), name: name || url, url };
+    return { ...(old[url] || {}), name: name || url, url };
   }).filter((p) => /^https?:\/\//.test(p.url));
   c.digest_to = $("digestTo").value.trim();
   const qf = num("quietFrom"), qt = num("quietTo");
@@ -285,99 +522,114 @@ function readForm() {
 }
 function validate(c) {
   if (!c.areas.features.length) return "Bitte mindestens eine Fläche einzeichnen.";
-  if (c.rooms_min && c.rooms_max && c.rooms_min > c.rooms_max) return "«Zimmer ab» ist grösser als «Zimmer bis».";
+  if (c.rooms_min && c.rooms_max && c.rooms_min > c.rooms_max) return "«Zimmer ab» ist grösser als «bis».";
   if (!c.rent_max) return "Bitte eine maximale Miete angeben.";
   return null;
 }
+async function saveConfig(c, message, okText) {
+  try {
+    S.configSha = await writeJson("config.json", c, S.configSha, message);
+    S.config = c; S.areasDirty = false;
+    toast(okText, "ok", 6000);
+    return true;
+  } catch (e) { toast(e.message, "err", 8000); return false; }
+}
+document.querySelectorAll("[data-save]").forEach((b) => b.addEventListener("click", async () => {
+  const c = readForm(); const p = validate(c);
+  if (p) { toast(p, "err"); return; }
+  b.disabled = true;
+  await saveConfig(c, "Kriterien angepasst", "Gespeichert. In ein, zwei Minuten sucht Wollihood mit den neuen Einstellungen.");
+  b.disabled = false;
+}));
 
-const fmtTime = (iso) => iso ? new Date(iso).toLocaleString("de-CH", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "–";
-const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-const chf = (v) => v ? "CHF " + v.toLocaleString("de-CH").replace(/[’,]/g, "'") : "Preis ?";
-const rooms = (v) => v == null ? "? Zi." : `${v} Zi.`;
-
-function renderHealth(h) {
-  const chips = $("statusChips");
-  if (!h || !h.last_run) { chips.innerHTML = '<span class="chip">noch kein Lauf</span>'; $("health").textContent = "Noch kein Lauf. Der erste startet nach dem Speichern oder zur nächsten vollen Stunde."; return; }
-  const src = Object.entries(h.sources || {});
+// ---------- Status ----------
+function renderStatus() {
+  const h = S.health;
+  const src = Object.entries(h?.sources || {});
   const bad = src.filter(([, v]) => !v.ok);
-  chips.innerHTML = `<span class="chip">letzter Lauf ${esc(fmtTime(h.last_run))}</span>` +
-    (h.paused ? '<span class="chip bad">pausiert</span>' : "") +
-    `<span class="chip ${bad.length ? "bad" : "ok"}">${src.length - bad.length}/${src.length} Quellen ok</span>` +
-    (h.push && !h.push.ok ? '<span class="chip bad">Push gestört</span>' : "");
-  $("health").innerHTML = src.map(([name, v]) =>
-    `<div class="src"><div><span class="chip ${v.ok ? "ok" : "bad"}">${v.ok ? "ok" : "Problem"}</span> <b>${esc(name)}</b></div><div class="m">${esc(v.msg)}</div></div>`).join("") +
-    (h.push && !h.push.ok ? `<div class="src"><div><span class="chip bad">Problem</span> <b>Push</b></div><div class="m">${esc(h.push.msg)}</div></div>` : "");
+  $("subline").innerHTML = h?.last_run
+    ? `<span class="dot ${bad.length || (h.push && !h.push.ok) ? "bad" : ""}"></span>${h.paused ? "Pausiert" : "Gesucht " + esc(ago(h.last_run))}`
+    : "Wohnungssuche Wollishofen";
+  const week = S.hits.filter((x) => Date.now() - new Date(x.first_seen) < 7 * 864e5).length;
+  $("stats").innerHTML = `
+    <div class="stat"><b>${S.hits.filter(isNew).length}</b><span>neu</span></div>
+    <div class="stat"><b>${week}</b><span>Treffer 7 Tage</span></div>
+    <div class="stat"><b>${src.length - bad.length}/${src.length}</b><span>Quellen ok</span></div>`;
+  const rows = src.map(([name, v]) => `<div class="src"><span class="s ${v.ok ? "" : "bad"}"></span><b>${esc(name)}</b><div class="m">${esc(v.msg)} · ${esc(ago(v.at))}</div></div>`);
+  if (h?.push) rows.push(`<div class="src"><span class="s ${h.push.ok ? "" : "bad"}"></span><b>Push-Meldungen</b><div class="m">${h.push.ok ? "funktionieren" : esc(h.push.msg)}</div></div>`);
+  $("sources").innerHTML = rows.join("") || '<p class="hint">Noch kein Lauf.</p>';
+  const ev = [...S.events].reverse().slice(0, 10);
+  $("events").innerHTML = ev.length ? ev.map((e) => `<div class="ev"><a href="${esc(e.url)}" target="_blank" rel="noopener"><b>${esc(e.name)}</b></a> · <span class="hint">${esc(ago(e.at))}</span>
+      <ul>${e.lines.map((l) => `<li>${esc(l)}</li>`).join("")}</ul></div>`).join("")
+    : '<p class="hint">Keine neuen Einträge in den letzten zwei Wochen.</p>';
 }
-function renderHits(list) {
-  hitLayer.clearLayers();
-  if (!list || !list.length) { $("hits").textContent = "Noch keine Treffer."; return; }
-  const color = getComputedStyle(document.documentElement).getPropertyValue("--accent").trim() || "#2F6B4F";
-  $("hits").innerHTML = list.slice(0, 15).map((x) => `
-    <a class="hit" href="${esc(x.url)}" target="_blank" rel="noopener">
-      ${x.image ? `<img src="${esc(x.image)}" alt="" loading="lazy">` : '<div class="ph"></div>'}
-      <div><b>${esc(rooms(x.rooms))} · ${esc(chf(x.rent))}</b>
-        <div>${esc(x.street || x.title || "")}</div>
-        <div class="m">${esc(x.portal || "")} · ${esc(fmtTime(x.first_seen))}</div></div>
-    </a>`).join("");
-  list.forEach((x) => {
-    if (x.lat == null) return;
-    L.circleMarker([x.lat, x.lon], { radius: 7, color, weight: 2, fillColor: color, fillOpacity: 0.7, pmIgnore: true })
-      .bindPopup(`<b>${esc(rooms(x.rooms))} · ${esc(chf(x.rent))}</b><br>${esc(x.street || "")}<br><a href="${esc(x.url)}" target="_blank" rel="noopener">Inserat öffnen</a>`)
-      .addTo(hitLayer);
-  });
-}
-
-async function load() {
-  msg("Lade Kriterien …");
-  try {
-    const { data, sha } = await readJson("config.json");
-    config = data; configSha = sha;
-    fillForm(config);
-    msg("Änderungen werden erst beim Speichern übernommen.");
-  } catch (e) {
-    msg(e.message, "err");
-    if (e.status === 401) showSetup();
-    return;
-  }
-  try { renderHealth((await readJson("state/health.json")).data); } catch { renderHealth(null); }
-  try { renderHits((await readJson("state/recent.json")).data); } catch { renderHits([]); }
-}
-
-async function save() {
-  const c = readForm();
-  const problem = validate(c);
-  if (problem) { msg(problem, "err"); return; }
-  $("saveBtn").disabled = true; msg("Speichere …");
-  try {
-    const body = { message: "Kriterien angepasst", content: b64encode(JSON.stringify(c, null, 2) + "\n"), sha: configSha, branch: "main" };
-    const r = await gh("config.json", { method: "PUT", body: JSON.stringify(body), headers: { "Content-Type": "application/json" } });
-    configSha = r.content.sha; config = c;
-    msg("Gespeichert. Die Suche läuft in ein, zwei Minuten mit den neuen Kriterien.", "ok");
-  } catch (e) { msg(e.message, "err"); }
-  finally { $("saveBtn").disabled = false; }
-}
-
-function showSetup() { $("setup").hidden = false; $("main").hidden = true; $("savebar").hidden = true; $("repoInput").value = repo; }
-function showMain() {
-  $("setup").hidden = true; $("main").hidden = false; $("savebar").hidden = false;
-  if (!map) initMap();
-  setTimeout(() => map.invalidateSize(), 50);
-  load();
-}
-
-$("connectBtn").addEventListener("click", () => {
-  const t = $("tokenInput").value.trim();
-  if (!t) { $("tokenInput").focus(); return; }
-  token = t; repo = $("repoInput").value.trim() || repo;
-  store.set("wh_token", token); store.set("wh_repo", repo);
-  showMain();
+$("runBtn").addEventListener("click", async () => {
+  const c = structuredClone(S.config); c.requested_at = new Date().toISOString();
+  $("runBtn").disabled = true;
+  if (await saveConfig(c, "Suche von Hand gestartet", "Suche gestartet. Die Ergebnisse erscheinen in etwa einer Minute.")) setTimeout(load, 75000);
+  setTimeout(() => ($("runBtn").disabled = false), 60000);
 });
-$("saveBtn").addEventListener("click", save);
-$("reloadBtn").addEventListener("click", load);
-$("logoutBtn").addEventListener("click", () => { store.del("wh_token"); token = null; showSetup(); });
-document.addEventListener("input", (e) => { if (e.target.closest("#main")) msg("Noch nicht gespeichert."); });
 
-token ? showMain() : showSetup();
+// ---------- Laden, Tabs, Einrichtung ----------
+async function load() {
+  $("refreshBtn").classList.add("spin");
+  try {
+    const cfg = await readJson("config.json");
+    S.config = cfg.data; S.configSha = cfg.sha; fillForm(); drawAreas();
+  } catch (e) {
+    $("refreshBtn").classList.remove("spin");
+    if (e.status === 401 || e.status === 404) { showSetup(e.message); return; }
+    toast(e.message, "err", 8000); return;
+  }
+  const [hits, health, events, marks] = await Promise.allSettled([
+    readJson("state/recent.json"), readJson("state/health.json"), readJson("state/events.json"), readJson("marks.json")]);
+  if (hits.status === "fulfilled") { S.hits = hits.value.data; store.set("wh_cache_hits", JSON.stringify(S.hits)); }
+  if (health.status === "fulfilled") S.health = health.value.data;
+  if (events.status === "fulfilled") S.events = events.value.data;
+  if (marks.status === "fulfilled") { S.marks = marks.value.data; S.marksSha = marks.value.sha; }
+  else if (marks.reason?.status === 404) { S.marks = JSON.parse(store.get("wh_marks") || "{}"); S.marksSha = null; }
+  if (!S.filterChosen) { S.filter = S.hits.some(isNew) ? "new" : "all"; S.filterChosen = true; }
+  renderHits(); renderStatus(); renderMarkers();
+  $("refreshBtn").classList.remove("spin");
+}
+function showTab(t) {
+  S.tab = t; store.set("wh_tab", t);
+  ["hits", "map", "criteria", "status"].forEach((n) => ($("v-" + n).hidden = n !== t));
+  document.querySelectorAll(".tab").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.tab === t)));
+  if (t === "map") ensureMap();
+  window.scrollTo(0, 0);
+}
+document.querySelectorAll(".tab").forEach((b) => b.addEventListener("click", () => showTab(b.dataset.tab)));
+$("refreshBtn").addEventListener("click", () => S.token && load());
+function showSetup(err) {
+  $("setup").hidden = false; $("tabbar").hidden = true;
+  ["hits", "map", "criteria", "status"].forEach((n) => ($("v-" + n).hidden = true));
+  $("repoInput").value = S.repo;
+  if (err) { $("setupMsg").textContent = err; $("setupMsg").hidden = false; }
+}
+function showApp() {
+  $("setup").hidden = true; $("tabbar").hidden = false;
+  try { S.hits = JSON.parse(store.get("wh_cache_hits") || "[]"); S.marks = JSON.parse(store.get("wh_marks") || "{}"); } catch {}
+  S.filter = S.hits.some(isNew) ? "new" : "all";
+  showTab(S.tab); renderHits(); load();
+}
+$("connectBtn").addEventListener("click", () => {
+  const t = $("tokenInput").value.trim(); if (!t) { $("tokenInput").focus(); return; }
+  S.token = t; S.repo = $("repoInput").value.trim() || S.repo;
+  store.set("wh_token", S.token); store.set("wh_repo", S.repo); $("setupMsg").hidden = true;
+  showApp();
+});
+$("logoutBtn").addEventListener("click", () => { store.del("wh_token"); S.token = null; showSetup(); });
+document.addEventListener("visibilitychange", () => { if (!document.hidden && S.token && S.config) load(); });
+
+// Installation
+let installEvt = null;
+window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("installBtn").hidden = false; $("installHint").hidden = true; });
+$("installBtn").addEventListener("click", async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("installBtn").hidden = true; });
+if (window.matchMedia("(display-mode: standalone)").matches) { $("installHint").textContent = "Läuft als App."; }
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+
+S.token ? showApp() : showSetup();
 </script>
 </body>
 </html>
