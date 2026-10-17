@@ -196,6 +196,9 @@ details.adv[open], details.adv-inner[open] { display: grid; gap: 14px }
 .sortbtn[aria-pressed="true"] { color: var(--accent); font-weight: 700; background: var(--accent-soft) }
 .meta b { font-weight: 700; color: var(--fg) }
 .mini { position: relative; height: 128px; border-radius: 10px; background: var(--sunk); margin-top: 8px; border: 1px solid var(--line); overflow: hidden; z-index: 0 }
+.mini .leaflet-control-attribution { font-size: 8px; padding: 0 3px }
+.leaflet-control-layers-expanded { font: 14px var(--body); padding: 8px 10px }
+.leaflet-control-layers-toggle { width: 40px !important; height: 40px !important }
 .mini .leaflet-control-zoom a { width: 30px; height: 30px; line-height: 28px; font-size: 18px }
 .mini .lbl { position: absolute; left: 6px; bottom: 6px; z-index: 500; font-size: 11px; background: var(--surface); color: var(--fg); padding: 3px 8px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,.2); pointer-events: none }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .mini .leaflet-tile-pane { filter: brightness(.8) contrast(1.05) } }
@@ -505,9 +508,10 @@ function initMini(el) {
   if (el.dataset.ready || typeof L === "undefined") return;
   el.dataset.ready = "1";
   const ll = [+el.dataset.lat, +el.dataset.lon];
-  const m = L.map(el, { center: ll, zoom: MINI_ZOOM, zoomControl: false, attributionControl: false, dragging: false,
+  const m = L.map(el, { center: ll, zoom: MINI_ZOOM, zoomControl: false, attributionControl: true, dragging: false,
     touchZoom: "center", scrollWheelZoom: false, doubleClickZoom: "center", boxZoom: false, keyboard: false });
-  L.tileLayer(TILE + "/{z}/{x}/{y}.jpeg", { maxZoom: 19, minZoom: 10 }).addTo(m);
+  baseLayer(baseKey(), { minZoom: 10 }).addTo(m);
+  m.attributionControl.setPrefix(false);
   L.control.zoom({ position: "topright", zoomInTitle: "Näher", zoomOutTitle: "Weiter weg" }).addTo(m);
   L.circleMarker(ll, { radius: 7, color: "#fff", weight: 3, fillColor: accent(), fillOpacity: 1, interactive: false }).addTo(m);
   m.on("click", () => showOnMap(el.dataset.mapkey));
@@ -613,13 +617,30 @@ document.querySelectorAll("[data-filter]").forEach((b) => b.addEventListener("cl
 $("allSeenBtn").addEventListener("click", () => { S.hits.forEach((x) => S.seen.add(keyOf(x))); saveSeen(); renderHits(); });
 
 // ---------- Karte ----------
+const ST = '© <a href="https://www.swisstopo.admin.ch/" target="_blank" rel="noopener">swisstopo</a>';
+const OSM = '© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>';
+const BASEMAPS = {
+  grau: { name: "swisstopo grau", url: "https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.pixelkarte-grau/default/current/3857/{z}/{x}/{y}.jpeg", attr: ST, max: 19 },
+  farbe: { name: "swisstopo farbig", url: "https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.pixelkarte-farbe/default/current/3857/{z}/{x}/{y}.jpeg", attr: ST, max: 19 },
+  luft: { name: "Luftbild", url: "https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.swissimage/default/current/3857/{z}/{x}/{y}.jpeg", attr: ST, max: 20 },
+  osm: { name: "OpenStreetMap", url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png", attr: OSM, max: 19 },
+  hell: { name: "Stadtplan hell", url: "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", attr: OSM + ' © <a href="https://carto.com/attributions" target="_blank" rel="noopener">CARTO</a>', max: 20 },
+};
+const baseKey = () => { const k = store.get("wh_basemap"); return BASEMAPS[k] ? k : "grau"; };
+const baseLayer = (k, extra = {}) => L.tileLayer(BASEMAPS[k].url, { maxZoom: BASEMAPS[k].max, attribution: BASEMAPS[k].attr, subdomains: "abcd", ...extra });
+
 function ensureMap() {
   if (S.map) { setTimeout(() => S.map.invalidateSize(), 60); return; }
   S.map = L.map("map", { zoomControl: false }).setView([47.345, 8.53], 14);
   L.control.zoom({ position: "bottomright" }).addTo(S.map);
-  L.tileLayer("https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.pixelkarte-grau/default/current/3857/{z}/{x}/{y}.jpeg", {
-    maxZoom: 19, attribution: '© <a href="https://www.swisstopo.admin.ch/" target="_blank" rel="noopener">swisstopo</a>',
-  }).addTo(S.map);
+  const layers = {};
+  Object.keys(BASEMAPS).forEach((k) => (layers[BASEMAPS[k].name] = baseLayer(k)));
+  layers[BASEMAPS[baseKey()].name].addTo(S.map);
+  L.control.layers(layers, null, { position: "topright" }).addTo(S.map);
+  S.map.on("baselayerchange", (e) => {
+    const k = Object.keys(BASEMAPS).find((x) => BASEMAPS[x].name === e.name);
+    if (k) { store.set("wh_basemap", k); minis.forEach((m) => { m.eachLayer((l) => l instanceof L.TileLayer && m.removeLayer(l)); baseLayer(k, { minZoom: 10 }).addTo(m); }); }
+  });
   S.map.pm.setLang("de");
   S.map.pm.addControls({ position: "topleft", drawMarker: false, drawCircleMarker: false, drawPolyline: false, drawCircle: false,
     drawText: false, cutPolygon: false, rotateMode: false, drawRectangle: true, drawPolygon: true, editMode: true, dragMode: false, removalMode: true });
@@ -1083,7 +1104,7 @@ let installEvt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("installBtn").hidden = false; $("installHint").hidden = true; });
 $("installBtn").addEventListener("click", async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("installBtn").hidden = true; });
 if (window.matchMedia("(display-mode: standalone)").matches) { $("installHint").textContent = "Läuft als App."; }
-const APP_VERSION = "14 · 17.10.2026";
+const APP_VERSION = "15 · 17.10.2026";
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").then((reg) => { reg.update().catch(() => {}); }).catch(() => {});
   let reloaded = false;
