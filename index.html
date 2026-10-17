@@ -155,6 +155,8 @@ textarea.field { min-height: 110px; resize: vertical; font-size: 15px }
 
 /* Kriterien im Stil der Portale */
 .summary { background: var(--accent-soft); color: var(--fg); border-radius: 12px; padding: 10px 14px; font-size: 14px; font-weight: 700 }
+.sumlabel { display: block; font-size: 12px; font-weight: 400; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 2px }
+.tabs2 { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 64px); z-index: 6; background: var(--bg); padding-block: 4px }
 .ftitle { font: 600 16px var(--display); display: flex; justify-content: space-between; align-items: baseline; gap: 8px }
 .fval { font: 400 14px var(--body); color: var(--muted) }
 .sw-sub { display: block; font-size: 13px; color: var(--muted); font-weight: 400 }
@@ -244,152 +246,95 @@ details.adv[open], details.adv-inner[open] { display: grid; gap: 14px }
 
   <!-- Kriterien -->
   <section class="view" id="v-criteria" hidden>
-    <div class="summary" id="critSummary"></div>
-
-    <div class="panel">
-      <label class="switch" for="active"><span><b>Suche aktiv</b><small class="sw-sub">Aus = keine Meldungen, nichts wird gesucht</small></span><input type="checkbox" id="active"></label>
+    <div class="seg tabs2" id="critTabs" role="tablist">
+      <button type="button" class="opt" data-ctab="search" aria-pressed="true">Suche</button>
+      <button type="button" class="opt" data-ctab="notify" aria-pressed="false">Push &amp; Briefing</button>
     </div>
 
-    <div class="panel">
-      <div class="ftitle">Objektart</div>
-      <div class="seg" id="objTypes">
-        <button type="button" class="opt" data-type="APARTMENT">Wohnung</button>
-        <button type="button" class="opt" data-type="HOUSE">Haus</button>
+    <!-- Suche -->
+    <div class="view" id="cs-search">
+      <div class="summary"><span class="sumlabel">In der App erscheinen</span><span id="sumSearch"></span></div>
+      <div class="panel">
+        <label class="switch" for="active"><span><b>Suche aktiv</b><small class="sw-sub">Aus = nichts wird gesucht, keine Meldungen</small></span><input type="checkbox" id="active"></label>
       </div>
-    </div>
-
-    <div class="panel">
-      <div class="ftitle">Zimmer <span class="fval" id="roomsVal"></span></div>
-      <div class="rooms" id="roomChips"></div>
-      <p class="hint">Erst das Minimum, dann das Maximum antippen.</p>
-    </div>
-
-    <div class="panel">
-      <div class="ftitle">Miete pro Monat <span class="fval">brutto</span></div>
-      <div class="row2">
-        <label class="f" for="rentMin"><small>von</small><select class="field" id="rentMin"></select></label>
-        <label class="f" for="rentMax"><small>bis</small><select class="field" id="rentMax"></select></label>
-      </div>
-      <div class="ftitle" style="margin-top:4px">Wohnfläche</div>
-      <div class="row2">
-        <label class="f" for="m2Min"><small>von</small><select class="field" id="m2Min"></select></label>
-        <label class="f" for="m2Max"><small>bis</small><select class="field" id="m2Max"></select></label>
-      </div>
-    </div>
-
-    <div class="panel">
-      <div class="ftitle">Muss haben</div>
-      <div class="seg" id="featMode">
-        <button type="button" class="opt" data-fmode="all">Alle angekreuzten</button>
-        <button type="button" class="opt" data-fmode="any">Mindestens eines</button>
-      </div>
-      <div class="checks" id="featChecks"></div>
-      <p class="hint">Hat ein Inserat zu wenig Text, um das zu prüfen, kommt es trotzdem, mit dem Hinweis «Ausstattung ungeprüft».</p>
-    </div>
-
-    <div class="panel">
-      <div class="ftitle">Nicht anzeigen</div>
-      <div class="checks" id="exclChecks"></div>
-      <label class="f" for="befrMin" id="befrRow"><small>Befristete trotzdem anzeigen, wenn die Dauer mindestens …</small>
-        <select class="field" id="befrMin">
-          <option value="">nie, alle befristeten ausblenden</option>
-          <option value="6">6 Monate</option>
-          <option value="12">1 Jahr</option>
-          <option value="18">1½ Jahre</option>
-          <option value="24">2 Jahre</option>
-          <option value="30">2½ Jahre</option>
-          <option value="36">3 Jahre</option>
-          <option value="42">3½ Jahre</option>
-          <option value="48">4 Jahre</option>
-        </select></label>
-      <p class="hint" id="befrHint">Ist die Dauer im Inserat nicht erkennbar, kommt es mit dem Hinweis «befristet, Dauer unklar».</p>
-    </div>
-
-    <div class="panel">
-      <div class="ftitle">Unvollständige Inserate</div>
-      <label class="switch" for="unkPrice">Ohne Preisangabe trotzdem melden <input type="checkbox" id="unkPrice"></label>
-      <label class="switch" for="unkRooms">Ohne Zimmerzahl trotzdem melden <input type="checkbox" id="unkRooms"></label>
-    </div>
-
-    <details class="panel adv">
-      <summary>Erweitert</summary>
-      <label class="f" for="excl">Eigene Ausschluss-Begriffe<small>Ein Begriff pro Zeile, irgendwo im Inserat</small>
-        <textarea class="field" id="excl"></textarea></label>
-      <label class="f" for="titleExcl">Ausschluss im Titel<small>Für Parkplätze, Büros und Ähnliches</small>
-        <textarea class="field" id="titleExcl"></textarea></label>
-      <label class="f" for="plz">PLZ, wenn die Adresse fehlt<small>Kommagetrennt</small>
-        <input class="field" id="plz" type="text" inputmode="numeric"></label>
-    </details>
-
-    <div class="panel">
-      <div class="ftitle">Quellen</div>
-      <label class="switch" for="srcMail">Suchabo-Mails der Portale <input type="checkbox" id="srcMail"></label>
-      <label class="switch" for="srcFlatfox">Flatfox direkt <input type="checkbox" id="srcFlatfox"></label>
-      <label class="switch" for="srcPages">Genossenschaftsseiten <input type="checkbox" id="srcPages"></label>
-      <details class="adv-inner">
-        <summary>Seiten und Stichworte bearbeiten</summary>
-        <label class="f" for="pages">Beobachtete Seiten<small>Pro Zeile: Name | Adresse</small>
-          <textarea class="field" id="pages"></textarea></label>
-        <label class="f" for="areaKw">Stichworte für diese Seiten<small>Neue Einträge werden nur gemeldet, wenn eines vorkommt</small>
-          <textarea class="field" id="areaKw"></textarea></label>
+      <div class="view" id="critS"></div>
+      <details class="panel adv">
+        <summary>Erweitert</summary>
+        <label class="f" for="excl">Eigene Ausschluss-Begriffe<small>Ein Begriff pro Zeile, irgendwo im Inserat</small>
+          <textarea class="field" id="excl"></textarea></label>
+        <label class="f" for="titleExcl">Ausschluss im Titel<small>Für Parkplätze, Büros und Ähnliches</small>
+          <textarea class="field" id="titleExcl"></textarea></label>
+        <label class="f" for="plz">PLZ, wenn die Adresse fehlt<small>Kommagetrennt</small>
+          <input class="field" id="plz" type="text" inputmode="numeric"></label>
       </details>
-    </div>
-
-    <div class="panel" id="pushPanel">
-      <div class="ftitle">Push-Meldungen</div>
-      <p class="hint">In der App erscheinen alle Treffer. Aufs Handy kommt eine Meldung nur, wenn zusätzlich das hier passt.</p>
-      <label class="switch" for="pushOn"><span><b>Push aktiv</b></span><input type="checkbox" id="pushOn"></label>
-      <div id="pushRules" class="pushrules">
-        <div class="row2">
-          <label class="f" for="pushRent"><small>Nur bis</small><select class="field" id="pushRent"></select></label>
-          <label class="f" for="pushRooms"><small>Nur ab Zimmer</small><select class="field" id="pushRooms"></select></label>
-        </div>
-        <label class="f" for="pushM2"><small>Nur ab Fläche</small><select class="field" id="pushM2"></select></label>
-        <div class="ftitle sm">Nur mit</div>
-        <div class="seg" id="pushFeatMode">
-          <button type="button" class="opt" data-pmode="all">Alle angekreuzten</button>
-          <button type="button" class="opt" data-pmode="any">Mindestens eines</button>
-        </div>
-        <div class="checks" id="pushFeat"></div>
-        <div class="ftitle sm">Push bei Treffern aus</div>
-        <label class="switch" for="pushMail">Portal-Abos (Homegate, ImmoScout …) <input type="checkbox" id="pushMail"></label>
-        <label class="switch" for="pushFlatfox">Flatfox <input type="checkbox" id="pushFlatfox"></label>
-        <label class="switch" for="pushPages">Genossenschaftsseiten <input type="checkbox" id="pushPages"></label>
-        <label class="switch" for="pushIncomplete"><span>Auch bei unvollständigen Inseraten<small class="sw-sub">Wenn Preis, Zimmer oder Ausstattung nicht erkennbar sind</small></span><input type="checkbox" id="pushIncomplete"></label>
-        <div class="row2">
-          <label class="f" for="quietFrom"><small>Leise ab</small><select class="field" id="quietFrom"></select></label>
-          <label class="f" for="quietTo"><small>bis</small><select class="field" id="quietTo"></select></label>
-        </div>
+      <div class="panel">
+        <div class="ftitle">Quellen</div>
+        <label class="switch" for="srcMail">Suchabo-Mails der Portale <input type="checkbox" id="srcMail"></label>
+        <label class="switch" for="srcFlatfox">Flatfox direkt <input type="checkbox" id="srcFlatfox"></label>
+        <label class="switch" for="srcPages">Genossenschaftsseiten <input type="checkbox" id="srcPages"></label>
+        <details class="adv-inner">
+          <summary>Seiten und Stichworte bearbeiten</summary>
+          <label class="f" for="pages">Beobachtete Seiten<small>Pro Zeile: Name | Adresse</small>
+            <textarea class="field" id="pages"></textarea></label>
+          <label class="f" for="areaKw">Stichworte für diese Seiten<small>Neue Einträge werden nur gemeldet, wenn eines vorkommt</small>
+            <textarea class="field" id="areaKw"></textarea></label>
+        </details>
       </div>
     </div>
 
-    <div class="panel" id="digestPanel">
-      <div class="ftitle">Tägliches Briefing</div>
-      <p class="hint">Eine Mail mit allen neuen Wohnungen seit dem letzten Briefing, mit Foto und Link. Es gelten dieselben Regeln wie für Push.</p>
-      <label class="switch" for="dgOn"><span><b>Briefing aktiv</b></span><input type="checkbox" id="dgOn"></label>
-      <div id="dgRules" class="pushrules">
-        <div class="ftitle sm">Empfänger</div>
-        <div class="recips" id="dgList"></div>
-        <div class="addrow">
-          <input class="field" id="dgAdd" type="email" inputmode="email" autocomplete="email" placeholder="E-Mail-Adresse eingeben">
-          <button class="btn" id="dgAddBtn" type="button">Hinzufügen</button>
-        </div>
-        <div class="row2">
-          <label class="f" for="dgTime"><small>Uhrzeit</small><select class="field" id="dgTime"></select></label>
-          <div class="f"><small>Tage</small>
-            <div class="seg" id="dgDays">
-              <button type="button" class="opt" data-days="daily">Täglich</button>
-              <button type="button" class="opt" data-days="weekdays">Mo–Fr</button>
-            </div>
+    <!-- Push & Briefing -->
+    <div class="view" id="cs-notify" hidden>
+      <div class="summary"><span class="sumlabel">Push und Briefing bei</span><span id="sumNotify"></span><span class="sw-sub" id="sumNotifyDiff"></span></div>
+      <div class="panel">
+        <p class="hint">Diese Kriterien gelten für Push-Mitteilungen und das tägliche Briefing. Gemeldet wird nur, was auch in der Suche erscheint. Setz sie also gleich streng oder strenger.</p>
+        <button class="btn" id="copyCrit" type="button">Kriterien der Suche übernehmen</button>
+      </div>
+      <div class="view" id="critN"></div>
+
+      <div class="panel">
+        <div class="ftitle">Push-Mitteilungen</div>
+        <label class="switch" for="pushOn"><span><b>Push aktiv</b></span><input type="checkbox" id="pushOn"></label>
+        <div id="pushRules" class="pushrules">
+          <div class="ftitle sm">Treffer aus diesen Quellen melden</div>
+          <label class="switch" for="pushMail">Portal-Abos (Homegate, ImmoScout …) <input type="checkbox" id="pushMail"></label>
+          <label class="switch" for="pushFlatfox">Flatfox <input type="checkbox" id="pushFlatfox"></label>
+          <label class="switch" for="pushPages">Genossenschaftsseiten <input type="checkbox" id="pushPages"></label>
+          <label class="switch" for="pushIncomplete"><span>Auch wenn die Ausstattung nicht prüfbar ist<small class="sw-sub">Bei kurzen Inseraten ohne Beschreibung</small></span><input type="checkbox" id="pushIncomplete"></label>
+          <div class="row2">
+            <label class="f" for="quietFrom"><small>Leise ab</small><select class="field" id="quietFrom"></select></label>
+            <label class="f" for="quietTo"><small>bis</small><select class="field" id="quietTo"></select></label>
           </div>
         </div>
-        <label class="switch" for="dgSkip"><span>Nur senden, wenn es Neues gibt</span><input type="checkbox" id="dgSkip"></label>
-        <button class="btn" id="dgNow" type="button">Briefing jetzt senden</button>
+      </div>
+
+      <div class="panel" id="digestPanel">
+        <div class="ftitle">Tägliches Briefing</div>
+        <p class="hint">Eine Mail mit allen neuen Wohnungen seit dem letzten Briefing, mit Foto und Link.</p>
+        <label class="switch" for="dgOn"><span><b>Briefing aktiv</b></span><input type="checkbox" id="dgOn"></label>
+        <div id="dgRules" class="pushrules">
+          <div class="ftitle sm">Empfänger</div>
+          <div class="recips" id="dgList"></div>
+          <div class="addrow">
+            <input class="field" id="dgAdd" type="email" inputmode="email" autocomplete="email" placeholder="E-Mail-Adresse eingeben">
+            <button class="btn" id="dgAddBtn" type="button">Hinzufügen</button>
+          </div>
+          <div class="row2">
+            <label class="f" for="dgTime"><small>Uhrzeit</small><select class="field" id="dgTime"></select></label>
+            <div class="f"><small>Tage</small>
+              <div class="seg" id="dgDays">
+                <button type="button" class="opt" data-days="daily">Täglich</button>
+                <button type="button" class="opt" data-days="weekdays">Mo–Fr</button>
+              </div>
+            </div>
+          </div>
+          <label class="switch" for="dgSkip"><span>Nur senden, wenn es Neues gibt</span><input type="checkbox" id="dgSkip"></label>
+          <button class="btn" id="dgNow" type="button">Briefing jetzt senden</button>
+        </div>
       </div>
     </div>
 
     <div class="savebar">
-      <button class="btn primary" type="button" data-save>Kriterien speichern</button>
+      <button class="btn primary" type="button" data-save>Speichern</button>
     </div>
   </section>
 
@@ -643,165 +588,222 @@ const EXCL = { befristet: "Befristete Verträge", moebliert: "Möbliert", unterm
 const ROOMS = [1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5, 5.5, 6, 7];
 const RENTS = [1000, 1250, 1500, 1750, 2000, 2250, 2500, 2750, 3000, 3250, 3500, 3750, 4000, 4500, 5000, 6000];
 const M2 = [30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 140, 160, 200];
-const F = { rooms: [null, null], types: new Set(), recips: [], days: "daily", fmode: "all", pmode: "all" };
-function renderModes() {
-  document.querySelectorAll("[data-fmode]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.fmode === F.fmode)));
-  document.querySelectorAll("[data-pmode]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.pmode === F.pmode)));
-}
+const BEFR = [[6, "6 Monate"], [12, "1 Jahr"], [18, "1½ Jahre"], [24, "2 Jahre"], [30, "2½ Jahre"], [36, "3 Jahre"], [42, "3½ Jahre"], [48, "4 Jahre"]];
+const CRIT_KEYS = ["object_types", "rooms_min", "rooms_max", "rent_min", "rent_max", "m2_min", "m2_max", "features_required",
+  "features_mode", "exclude_groups", "befristet_min_months", "include_unknown_price", "include_unknown_rooms"];
+const CS = { s: { rooms: [null, null], types: new Set(["APARTMENT"]), fmode: "all" }, n: { rooms: [null, null], types: new Set(["APARTMENT"]), fmode: "all" } };
+const F = { recips: [], days: "daily", ctab: "search" };
+const fmtN = (v) => Number(v).toLocaleString("de-CH");
 
+function critMarkup(p) {
+  const checks = (obj, attr) => Object.entries(obj).map(([k, l]) =>
+    `<label class="check" for="${p}-${attr}-${k}"><input type="checkbox" id="${p}-${attr}-${k}" data-${attr}="${k}">${l}</label>`).join("");
+  return `
+  <div class="panel">
+    <div class="ftitle">Objektart</div>
+    <div class="seg">
+      <button type="button" class="opt" data-type="APARTMENT">Wohnung</button>
+      <button type="button" class="opt" data-type="HOUSE">Haus</button>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="ftitle">Zimmer <span class="fval" data-roomsval></span></div>
+    <div class="rooms">${ROOMS.map((r) => `<button type="button" data-room="${r}">${r === 7 ? "7+" : r}</button>`).join("")}</div>
+    <p class="hint">Erst das Minimum, dann das Maximum antippen.</p>
+  </div>
+  <div class="panel">
+    <div class="ftitle">Miete pro Monat <span class="fval">brutto</span></div>
+    <div class="row2">
+      <label class="f" for="${p}RentMin"><small>von</small><select class="field" id="${p}RentMin"></select></label>
+      <label class="f" for="${p}RentMax"><small>bis</small><select class="field" id="${p}RentMax"></select></label>
+    </div>
+    <div class="ftitle" style="margin-top:4px">Wohnfläche</div>
+    <div class="row2">
+      <label class="f" for="${p}M2Min"><small>von</small><select class="field" id="${p}M2Min"></select></label>
+      <label class="f" for="${p}M2Max"><small>bis</small><select class="field" id="${p}M2Max"></select></label>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="ftitle">Muss haben</div>
+    <div class="seg">
+      <button type="button" class="opt" data-fmode="all">Alle angekreuzten</button>
+      <button type="button" class="opt" data-fmode="any">Mindestens eines</button>
+    </div>
+    <div class="checks">${checks(FEATURES, "feat")}</div>
+    <p class="hint">Hat ein Inserat zu wenig Text, um das zu prüfen, kommt es trotzdem, mit dem Hinweis «Ausstattung ungeprüft».</p>
+  </div>
+  <div class="panel">
+    <div class="ftitle">Nicht anzeigen</div>
+    <div class="checks">${checks(EXCL, "excl")}</div>
+    <label class="f" for="${p}Befr" data-befrrow><small>Befristete trotzdem, wenn die Dauer mindestens …</small>
+      <select class="field" id="${p}Befr"><option value="">nie, alle befristeten ausblenden</option>${BEFR.map(([v, l]) => `<option value="${v}">${l}</option>`).join("")}</select></label>
+  </div>
+  <div class="panel">
+    <div class="ftitle">Unvollständige Inserate</div>
+    <label class="switch" for="${p}UnkPrice">Ohne Preisangabe trotzdem <input type="checkbox" id="${p}UnkPrice"></label>
+    <label class="switch" for="${p}UnkRooms">Ohne Zimmerzahl trotzdem <input type="checkbox" id="${p}UnkRooms"></label>
+  </div>`;
+}
+const root = (p) => $(p === "s" ? "critS" : "critN");
 function opts(sel, values, fmt, anyLabel, current) {
   const list = current != null && !values.includes(current) ? [...values, current].sort((a, b) => a - b) : values;
   $(sel).innerHTML = `<option value="">${anyLabel}</option>` + list.map((v) => `<option value="${v}">${fmt(v)}</option>`).join("");
   $(sel).value = current ?? "";
 }
-function buildStatic() {
-  $("featChecks").innerHTML = Object.entries(FEATURES).map(([k, l]) =>
-    `<label class="check" for="ft-${k}"><input type="checkbox" id="ft-${k}" data-feat="${k}">${l}</label>`).join("");
-  $("exclChecks").innerHTML = Object.entries(EXCL).map(([k, l]) =>
-    `<label class="check" for="ex-${k}"><input type="checkbox" id="ex-${k}" data-excl="${k}">${l}</label>`).join("");
-  $("pushFeat").innerHTML = Object.entries(FEATURES).map(([k, l]) =>
-    `<label class="check" for="pf-${k}"><input type="checkbox" id="pf-${k}" data-pfeat="${k}">${l}</label>`).join("");
-  $("roomChips").innerHTML = ROOMS.map((r) => `<button type="button" data-room="${r}">${r === 7 ? "7+" : r}</button>`).join("");
-  const times = []; for (let h = 5; h <= 22; h++) for (const m of ["00", "30"]) times.push(`${String(h).padStart(2, "0")}:${m}`);
-  $("dgTime").innerHTML = times.map((t) => `<option value="${t}">${t} Uhr</option>`).join("");
-  const hours = [...Array(24).keys()];
-  opts("quietFrom", hours, (h) => `${h}:00`, "nie", null);
-  opts("quietTo", hours, (h) => `${h}:00`, "–", null);
-}
-function renderRooms() {
-  const [a, b] = F.rooms;
-  document.querySelectorAll("[data-room]").forEach((el) => {
+function renderCrit(p) {
+  const st = CS[p], r = root(p), [a, b] = st.rooms;
+  r.querySelectorAll("[data-room]").forEach((el) => {
     const v = +el.dataset.room;
     el.classList.toggle("end", v === a || v === b);
     el.classList.toggle("in", a != null && b != null && v > a && v < b);
   });
-  $("roomsVal").textContent = a == null ? "beliebig" : a === b ? `${a}` : `${a} – ${b === 7 ? "7+" : b}`;
-  renderSummary();
+  r.querySelector("[data-roomsval]").textContent = a == null ? "beliebig" : a === b ? `${a}` : `${a} – ${b === 7 ? "7+" : b}`;
+  r.querySelectorAll("[data-type]").forEach((el) => el.setAttribute("aria-pressed", String(st.types.has(el.dataset.type))));
+  r.querySelectorAll("[data-fmode]").forEach((el) => el.setAttribute("aria-pressed", String(el.dataset.fmode === st.fmode)));
+  r.querySelector("[data-befrrow]").hidden = !r.querySelector("[data-excl=befristet]").checked;
 }
-$("roomChips").addEventListener("click", (e) => {
-  const el = e.target.closest("[data-room]"); if (!el) return;
-  const v = +el.dataset.room; let [a, b] = F.rooms;
-  if (a == null || (a !== b)) { a = b = v; }        // neue Auswahl beginnt
-  else if (v === a) { a = b = null; }               // gleiches Feld nochmals: zurücksetzen
-  else if (v < a) { b = a; a = v; } else { b = v; }
-  F.rooms = [a, b]; renderRooms();
-});
-$("objTypes").addEventListener("click", (e) => {
-  const el = e.target.closest("[data-type]"); if (!el) return;
-  const t = el.dataset.type;
-  if (F.types.has(t) && F.types.size > 1) F.types.delete(t); else F.types.add(t);
-  document.querySelectorAll("[data-type]").forEach((b) => b.setAttribute("aria-pressed", String(F.types.has(b.dataset.type))));
-  renderSummary();
-});
-function renderSummary() {
-  if (!S.config) return;
-  const c = readForm();
+function setCrit(p, c) {
+  const st = CS[p], r = root(p);
+  st.types = new Set(c.object_types && c.object_types.length ? c.object_types : ["APARTMENT"]);
+  const rmax = c.rooms_max != null && c.rooms_max >= 7 ? 7 : c.rooms_max;
+  st.rooms = [c.rooms_min ?? null, rmax ?? c.rooms_min ?? null];
+  st.fmode = c.features_mode === "any" ? "any" : "all";
+  opts(p + "RentMin", RENTS, (v) => `CHF ${fmtN(v)}`, "beliebig", c.rent_min ?? null);
+  opts(p + "RentMax", RENTS, (v) => `CHF ${fmtN(v)}`, "beliebig", c.rent_max ?? null);
+  opts(p + "M2Min", M2, (v) => `${v} m²`, "beliebig", c.m2_min ?? null);
+  opts(p + "M2Max", M2, (v) => `${v} m²`, "beliebig", c.m2_max ?? null);
+  r.querySelectorAll("[data-feat]").forEach((el) => (el.checked = (c.features_required || []).includes(el.dataset.feat)));
+  r.querySelectorAll("[data-excl]").forEach((el) => (el.checked = (c.exclude_groups || []).includes(el.dataset.excl)));
+  $(p + "Befr").value = c.befristet_min_months ? String(c.befristet_min_months) : "";
+  $(p + "UnkPrice").checked = !!c.include_unknown_price; $(p + "UnkRooms").checked = !!c.include_unknown_rooms;
+  renderCrit(p);
+}
+function getCrit(p) {
+  const st = CS[p], r = root(p);
+  const sel = (id) => { const v = parseFloat($(id).value); return Number.isFinite(v) ? v : null; };
+  return {
+    object_types: [...st.types],
+    rooms_min: st.rooms[0], rooms_max: st.rooms[1] == null ? null : (st.rooms[1] >= 7 ? 99 : st.rooms[1]),
+    rent_min: sel(p + "RentMin"), rent_max: sel(p + "RentMax"), m2_min: sel(p + "M2Min"), m2_max: sel(p + "M2Max"),
+    features_required: [...r.querySelectorAll("[data-feat]:checked")].map((el) => el.dataset.feat),
+    features_mode: st.fmode,
+    exclude_groups: [...r.querySelectorAll("[data-excl]:checked")].map((el) => el.dataset.excl),
+    befristet_min_months: $(p + "Befr").value ? +$(p + "Befr").value : null,
+    include_unknown_price: $(p + "UnkPrice").checked, include_unknown_rooms: $(p + "UnkRooms").checked,
+  };
+}
+function wireCrit(p) {
+  const r = root(p);
+  r.innerHTML = critMarkup(p);
+  r.addEventListener("click", (e) => {
+    const st = CS[p];
+    const room = e.target.closest("[data-room]");
+    if (room) {
+      const v = +room.dataset.room; let [a, b] = st.rooms;
+      if (a == null || a !== b) { a = b = v; } else if (v === a) { a = b = null; } else if (v < a) { b = a; a = v; } else { b = v; }
+      st.rooms = [a, b];
+    }
+    const t = e.target.closest("[data-type]");
+    if (t) { const k = t.dataset.type; if (st.types.has(k) && st.types.size > 1) st.types.delete(k); else st.types.add(k); }
+    const fm = e.target.closest("[data-fmode]");
+    if (fm) st.fmode = fm.dataset.fmode;
+    if (room || t || fm) { renderCrit(p); renderSummary(); }
+  });
+  r.addEventListener("change", () => { renderCrit(p); renderSummary(); });
+}
+function critParts(c) {
   const parts = [];
   parts.push(c.object_types.length > 1 ? "Wohnung oder Haus" : c.object_types[0] === "HOUSE" ? "Haus" : "Wohnung");
   if (c.rooms_min != null) parts.push(c.rooms_min === c.rooms_max ? `${c.rooms_min} Zi.` : `${c.rooms_min}–${c.rooms_max >= 7 ? "7+" : c.rooms_max} Zi.`);
   if (c.rent_min || c.rent_max) parts.push(c.rent_min && c.rent_max ? `CHF ${fmtN(c.rent_min)}–${fmtN(c.rent_max)}` : c.rent_max ? `bis CHF ${fmtN(c.rent_max)}` : `ab CHF ${fmtN(c.rent_min)}`);
   if (c.m2_min || c.m2_max) parts.push(c.m2_min && c.m2_max ? `${c.m2_min}–${c.m2_max} m²` : c.m2_min ? `ab ${c.m2_min} m²` : `bis ${c.m2_max} m²`);
-  if ((c.exclude_groups || []).includes("befristet") && c.befristet_min_months) parts.push(`befristet ab ${$("befrMin").selectedOptions[0]?.textContent || c.befristet_min_months + " Mt."}`);
-  if (c.features_required.length) parts.push(c.features_required.map((k) => FEATURES[k]).join(c.features_mode === "any" ? " oder " : " · "));
-  const p = c.push, pp = [];
-  if (!p.enabled) pp.push("aus");
-  else {
-    if (p.rent_max) pp.push(`bis CHF ${fmtN(p.rent_max)}`);
-    if (p.rooms_min) pp.push(`ab ${p.rooms_min} Zi.`);
-    if (p.m2_min) pp.push(`ab ${p.m2_min} m²`);
-    if (p.features.length) pp.push(p.features.map((k) => FEATURES[k]).join(p.features_mode === "any" ? " oder " : " · "));
-  }
-  $("critSummary").innerHTML = esc((c.active ? "" : "Pausiert · ") + parts.join(" · ")) +
-    `<span class="sw-sub">Push und Briefing: ${esc(pp.length ? pp.join(" · ") : "bei jedem Treffer")}</span>` +
-    (c.digest && c.digest.enabled && c.digest.to.length ? `<span class="sw-sub">Briefing ${c.digest.days === "weekdays" ? "Mo–Fr" : "täglich"} ${esc(c.digest.time)} Uhr an ${c.digest.to.length} Empfänger</span>` : "");
+  if (c.features_required.length) parts.push(c.features_required.map((k) => FEATURES[k]).join(c.features_mode === "any" ? " oder " : " + "));
+  if (c.exclude_groups.includes("befristet") && c.befristet_min_months) parts.push(`befristet ab ${(BEFR.find(([v]) => v === c.befristet_min_months) || [0, c.befristet_min_months + " Mt."])[1]}`);
+  if (!c.exclude_groups.includes("befristet")) parts.push("auch befristete");
+  return parts;
 }
-const fmtN = (v) => Number(v).toLocaleString("de-CH");
+function renderSummary() {
+  if (!S.config) return;
+  const s = getCrit("s"), n = getCrit("n");
+  $("sumSearch").textContent = ($("active").checked ? "" : "Pausiert · ") + critParts(s).join(" · ");
+  const ps = critParts(s), pn = critParts(n);
+  $("sumNotify").textContent = pn.join(" · ");
+  const diff = pn.filter((x) => !ps.includes(x));
+  const chans = [];
+  if (!$("pushOn").checked) chans.push("Push aus");
+  if (!$("dgOn").checked) chans.push("Briefing aus");
+  else if (F.recips.length) chans.push(`Briefing ${F.days === "weekdays" ? "Mo–Fr" : "täglich"} ${$("dgTime").value} an ${F.recips.length}`);
+  $("sumNotifyDiff").textContent = (diff.length ? "Strenger als die Suche: " + diff.join(" · ") : "Gleich wie die Suche") + (chans.length ? " · " + chans.join(" · ") : "");
+}
+function showCritTab(t) {
+  F.ctab = t;
+  $("cs-search").hidden = t !== "search"; $("cs-notify").hidden = t !== "notify";
+  document.querySelectorAll("[data-ctab]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.ctab === t)));
+  window.scrollTo(0, 0);
+}
+$("critTabs").addEventListener("click", (e) => { const b = e.target.closest("[data-ctab]"); if (b) showCritTab(b.dataset.ctab); });
+$("copyCrit").addEventListener("click", () => { setCrit("n", getCrit("s")); renderSummary(); toast("Kriterien der Suche übernommen. Jetzt anpassen und speichern."); });
+
 function fillForm() {
   const c = S.config;
   $("active").checked = c.active !== false;
-  F.types = new Set(c.object_types && c.object_types.length ? c.object_types : ["APARTMENT"]);
-  document.querySelectorAll("[data-type]").forEach((b) => b.setAttribute("aria-pressed", String(F.types.has(b.dataset.type))));
-  const rmax = c.rooms_max != null && c.rooms_max >= 7 ? 7 : c.rooms_max;
-  F.rooms = [c.rooms_min ?? null, rmax ?? c.rooms_min ?? null];
-  opts("rentMin", RENTS, (v) => `CHF ${fmtN(v)}`, "beliebig", c.rent_min ?? null);
-  opts("rentMax", RENTS, (v) => `CHF ${fmtN(v)}`, "beliebig", c.rent_max ?? null);
-  opts("m2Min", M2, (v) => `${v} m²`, "beliebig", c.m2_min ?? null);
-  opts("m2Max", M2, (v) => `${v} m²`, "beliebig", c.m2_max ?? null);
-  document.querySelectorAll("[data-feat]").forEach((el) => (el.checked = (c.features_required || []).includes(el.dataset.feat)));
-  F.fmode = c.features_mode === "any" ? "any" : "all"; F.pmode = c.push?.features_mode === "any" ? "any" : "all"; renderModes();
-  document.querySelectorAll("[data-excl]").forEach((el) => (el.checked = (c.exclude_groups || []).includes(el.dataset.excl)));
-  $("befrMin").value = c.befristet_min_months ? String(c.befristet_min_months) : ""; renderBefr();
-  $("unkPrice").checked = !!c.include_unknown_price; $("unkRooms").checked = !!c.include_unknown_rooms;
+  setCrit("s", c);
+  const p = c.push || {};
+  setCrit("n", { ...Object.fromEntries(CRIT_KEYS.map((k) => [k, c[k]])), ...(p.criteria || {}) });
   $("plz").value = (c.plz_fallback || []).join(", ");
   $("excl").value = (c.exclude_keywords || []).join("\n");
   $("titleExcl").value = (c.title_exclude_keywords || []).join("\n");
   $("areaKw").value = (c.area_keywords || []).join("\n");
-  const s = c.sources || {};
-  $("srcMail").checked = s.mail_alerts !== false; $("srcFlatfox").checked = s.flatfox !== false; $("srcPages").checked = s.watch_pages !== false;
-  $("pages").value = (c.watch_pages || []).map((p) => `${p.name} | ${p.url}`).join("\n");
-  const d = c.digest || { enabled: true, to: c.digest_to ? [c.digest_to] : [], time: "07:00", days: "daily", skip_empty: true };
+  const src = c.sources || {};
+  $("srcMail").checked = src.mail_alerts !== false; $("srcFlatfox").checked = src.flatfox !== false; $("srcPages").checked = src.watch_pages !== false;
+  $("pages").value = (c.watch_pages || []).map((x) => `${x.name} | ${x.url}`).join("\n");
+  $("pushOn").checked = p.enabled !== false;
+  $("pushMail").checked = p.mail_alerts !== false; $("pushFlatfox").checked = p.flatfox !== false; $("pushPages").checked = p.pages !== false;
+  $("pushIncomplete").checked = p.allow_incomplete !== false;
+  $("quietFrom").value = c.quiet_hours?.from ?? ""; $("quietTo").value = c.quiet_hours?.to ?? "";
+  const d = c.digest || { enabled: true, to: [], time: "07:00", days: "daily", skip_empty: true };
   $("dgOn").checked = d.enabled !== false;
   F.recips = [...(d.to || [])]; F.days = d.days || "daily";
   $("dgTime").value = d.time || "07:00"; if (!$("dgTime").value) $("dgTime").value = "07:00";
   $("dgSkip").checked = d.skip_empty !== false;
-  renderDigest();
-  $("quietFrom").value = c.quiet_hours?.from ?? ""; $("quietTo").value = c.quiet_hours?.to ?? "";
-  const p = c.push || {};
-  $("pushOn").checked = p.enabled !== false;
-  opts("pushRent", RENTS, (v) => `CHF ${fmtN(v)}`, "wie Suche", p.rent_max ?? null);
-  opts("pushRooms", ROOMS.slice(0, 11), (v) => `${v} Zimmer`, "wie Suche", p.rooms_min ?? null);
-  opts("pushM2", M2, (v) => `${v} m²`, "wie Suche", p.m2_min ?? null);
-  document.querySelectorAll("[data-pfeat]").forEach((el) => (el.checked = (p.features || []).includes(el.dataset.pfeat)));
-  $("pushMail").checked = p.mail_alerts !== false; $("pushFlatfox").checked = p.flatfox !== false; $("pushPages").checked = p.pages !== false;
-  $("pushIncomplete").checked = p.allow_incomplete !== false;
-  $("pushRules").classList.toggle("off", !$("pushOn").checked);
-  renderRooms();
+  renderChannels();
 }
 function readForm() {
-  const sel = (id) => { const v = parseFloat($(id).value); return Number.isFinite(v) ? v : null; };
   const c = structuredClone(S.config);
+  const sel = (id) => { const v = parseFloat($(id).value); return Number.isFinite(v) ? v : null; };
   c.active = $("active").checked;
-  c.object_types = [...F.types];
-  c.rooms_min = F.rooms[0]; c.rooms_max = F.rooms[1] == null ? null : (F.rooms[1] >= 7 ? 99 : F.rooms[1]);
-  c.rent_min = sel("rentMin"); c.rent_max = sel("rentMax");
-  c.m2_min = sel("m2Min"); c.m2_max = sel("m2Max");
-  c.features_required = [...document.querySelectorAll("[data-feat]:checked")].map((el) => el.dataset.feat);
-  c.features_mode = F.fmode;
-  c.exclude_groups = [...document.querySelectorAll("[data-excl]:checked")].map((el) => el.dataset.excl);
-  c.befristet_min_months = $("befrMin").value ? +$("befrMin").value : null;
-  c.include_unknown_price = $("unkPrice").checked; c.include_unknown_rooms = $("unkRooms").checked;
+  Object.assign(c, getCrit("s"));
   c.plz_fallback = $("plz").value.split(/[,\s]+/).map((s) => s.trim()).filter(Boolean);
   c.exclude_keywords = lines($("excl").value);
   c.title_exclude_keywords = lines($("titleExcl").value);
   c.area_keywords = lines($("areaKw").value);
   c.sources = { mail_alerts: $("srcMail").checked, flatfox: $("srcFlatfox").checked, watch_pages: $("srcPages").checked };
-  const old = Object.fromEntries((S.config.watch_pages || []).map((p) => [p.url, p]));
+  const old = Object.fromEntries((S.config.watch_pages || []).map((x) => [x.url, x]));
   c.watch_pages = lines($("pages").value).map((ln) => {
     const [name, url] = ln.includes("|") ? ln.split("|").map((s) => s.trim()) : [ln, ln];
     return { ...(old[url] || {}), name: name || url, url };
-  }).filter((p) => /^https?:\/\//.test(p.url));
-  delete c.digest_to;
-  const typed = $("dgAdd").value.trim().toLowerCase();
-  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(typed) && !F.recips.includes(typed)) { F.recips.push(typed); $("dgAdd").value = ""; setTimeout(renderDigest); }
-  c.digest = { enabled: $("dgOn").checked, to: [...F.recips], time: $("dgTime").value, days: F.days, skip_empty: $("dgSkip").checked };
+  }).filter((x) => /^https?:\/\//.test(x.url));
   const qf = sel("quietFrom"), qt = sel("quietTo");
   c.quiet_hours = qf === null || qt === null ? {} : { from: qf, to: qt };
-  c.push = { enabled: $("pushOn").checked, rent_max: sel("pushRent"), rooms_min: sel("pushRooms"), m2_min: sel("pushM2"),
-    features: [...document.querySelectorAll("[data-pfeat]:checked")].map((el) => el.dataset.pfeat), features_mode: F.pmode,
-    mail_alerts: $("pushMail").checked, flatfox: $("pushFlatfox").checked, pages: $("pushPages").checked,
-    allow_incomplete: $("pushIncomplete").checked };
+  c.push = { enabled: $("pushOn").checked, mail_alerts: $("pushMail").checked, flatfox: $("pushFlatfox").checked,
+    pages: $("pushPages").checked, allow_incomplete: $("pushIncomplete").checked, criteria: getCrit("n") };
+  delete c.digest_to;
+  const typed = $("dgAdd").value.trim().toLowerCase();
+  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(typed) && !F.recips.includes(typed)) { F.recips.push(typed); $("dgAdd").value = ""; setTimeout(renderChannels); }
+  c.digest = { enabled: $("dgOn").checked, to: [...F.recips], time: $("dgTime").value, days: F.days, skip_empty: $("dgSkip").checked };
   c.areas = collectAreas();
   return c;
 }
 function validate(c) {
   if (!c.areas.features.length) return "Bitte mindestens eine Fläche einzeichnen.";
-  if (c.rent_min && c.rent_max && c.rent_min > c.rent_max) return "Die Mindestmiete ist höher als die Höchstmiete.";
-  if (c.m2_min && c.m2_max && c.m2_min > c.m2_max) return "Die Mindestfläche ist grösser als die Höchstfläche.";
+  for (const [label, k] of [["Suche", c], ["Push & Briefing", c.push.criteria]]) {
+    if (k.rent_min && k.rent_max && k.rent_min > k.rent_max) return `${label}: Die Mindestmiete ist höher als die Höchstmiete.`;
+    if (k.m2_min && k.m2_max && k.m2_min > k.m2_max) return `${label}: Die Mindestfläche ist grösser als die Höchstfläche.`;
+  }
   return null;
 }
-document.getElementById("v-criteria").addEventListener("change", renderSummary);
-$("pushOn").addEventListener("change", () => $("pushRules").classList.toggle("off", !$("pushOn").checked));
-function renderDigest() {
+function renderChannels() {
+  $("pushRules").classList.toggle("off", !$("pushOn").checked);
   $("dgList").innerHTML = F.recips.length ? F.recips.map((m, i) => `<div class="recip"><span>${esc(m)}</span><button type="button" data-rm="${i}" aria-label="${esc(m)} entfernen">${icon.x}</button></div>`).join("")
     : '<p class="hint">Noch keine Empfänger.</p>';
   document.querySelectorAll("[data-days]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.days === F.days)));
@@ -812,21 +814,22 @@ function addRecipient() {
   const v = $("dgAdd").value.trim().toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) { toast("Bitte eine gültige E-Mail-Adresse eingeben.", "err"); return; }
   if (!F.recips.includes(v)) F.recips.push(v);
-  $("dgAdd").value = ""; renderDigest(); toast("Hinzugefügt. Zum Übernehmen unten speichern.");
+  $("dgAdd").value = ""; renderChannels(); toast("Hinzugefügt. Zum Übernehmen unten speichern.");
 }
-function renderBefr() {
-  const on = !!document.querySelector("[data-excl=befristet]")?.checked;
-  $("befrRow").hidden = !on; $("befrHint").hidden = !on || !$("befrMin").value;
-}
-$("exclChecks").addEventListener("change", renderBefr);
-$("befrMin").addEventListener("change", renderBefr);
+(function buildStatic() {
+  wireCrit("s"); wireCrit("n");
+  const times = []; for (let h = 5; h <= 22; h++) for (const m of ["00", "30"]) times.push(`${String(h).padStart(2, "0")}:${m}`);
+  $("dgTime").innerHTML = times.map((t) => `<option value="${t}">${t} Uhr</option>`).join("");
+  const hours = [...Array(24).keys()];
+  opts("quietFrom", hours, (h) => `${h}:00`, "nie", null);
+  opts("quietTo", hours, (h) => `${h}:00`, "–", null);
+})();
+$("cs-search").addEventListener("change", renderSummary);
+$("cs-notify").addEventListener("change", renderChannels);
 $("dgAddBtn").addEventListener("click", addRecipient);
-$("featMode").addEventListener("click", (e) => { const b = e.target.closest("[data-fmode]"); if (!b) return; F.fmode = b.dataset.fmode; renderModes(); renderSummary(); });
-$("pushFeatMode").addEventListener("click", (e) => { const b = e.target.closest("[data-pmode]"); if (!b) return; F.pmode = b.dataset.pmode; renderModes(); renderSummary(); });
 $("dgAdd").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); addRecipient(); } });
-$("dgList").addEventListener("click", (e) => { const b = e.target.closest("[data-rm]"); if (!b) return; F.recips.splice(+b.dataset.rm, 1); renderDigest(); toast("Entfernt. Zum Übernehmen unten speichern."); });
-$("dgDays").addEventListener("click", (e) => { const b = e.target.closest("[data-days]"); if (!b) return; F.days = b.dataset.days; renderDigest(); });
-$("dgOn").addEventListener("change", renderDigest);
+$("dgList").addEventListener("click", (e) => { const b = e.target.closest("[data-rm]"); if (!b) return; F.recips.splice(+b.dataset.rm, 1); renderChannels(); toast("Entfernt. Zum Übernehmen unten speichern."); });
+$("dgDays").addEventListener("click", (e) => { const b = e.target.closest("[data-days]"); if (!b) return; F.days = b.dataset.days; renderChannels(); });
 $("dgNow").addEventListener("click", async () => {
   const c = readForm(); const p = validate(c); if (p) { toast(p, "err"); return; }
   if (!c.digest.to.length) { toast("Bitte zuerst einen Empfänger hinzufügen.", "err"); return; }
@@ -835,7 +838,7 @@ $("dgNow").addEventListener("click", async () => {
   await saveConfig(c, "Briefing von Hand angefordert", "Gespeichert. Das Briefing kommt in ein, zwei Minuten.");
   setTimeout(() => ($("dgNow").disabled = false), 60000);
 });
-buildStatic();
+
 async function saveConfig(c, message, okText) {
   try {
     S.configSha = await writeJson("config.json", c, S.configSha, message);
@@ -1001,7 +1004,7 @@ let installEvt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("installBtn").hidden = false; $("installHint").hidden = true; });
 $("installBtn").addEventListener("click", async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("installBtn").hidden = true; });
 if (window.matchMedia("(display-mode: standalone)").matches) { $("installHint").textContent = "Läuft als App."; }
-const APP_VERSION = "10 · 17.10.2026";
+const APP_VERSION = "11 · 17.10.2026";
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").then((reg) => { reg.update().catch(() => {}); }).catch(() => {});
   let reloaded = false;
