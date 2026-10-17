@@ -195,14 +195,11 @@ details.adv[open], details.adv-inner[open] { display: grid; gap: 14px }
 .sortbtn { border: 0; background: none; padding: 6px 8px; border-radius: 8px; font-size: 14px; color: var(--muted); cursor: pointer }
 .sortbtn[aria-pressed="true"] { color: var(--accent); font-weight: 700; background: var(--accent-soft) }
 .meta b { font-weight: 700; color: var(--fg) }
-.mini { position: relative; height: 112px; overflow: hidden; border-radius: 10px; background: var(--sunk); margin-top: 8px; cursor: pointer; border: 1px solid var(--line); display: block; width: 100%; padding: 0 }
-.mini img { position: absolute; width: 256px; height: 256px; max-width: none; pointer-events: none; user-select: none }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .mini img { filter: brightness(.8) contrast(1.05) } }
-:root[data-theme="dark"] .mini img { filter: brightness(.8) contrast(1.05) }
-.mini .pin { position: absolute; left: 50%; top: 50%; width: 18px; height: 18px; margin: -9px 0 0 -9px; border-radius: 50%; background: var(--accent); border: 3px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.4) }
-.mini .pin::after { content: ""; position: absolute; inset: -12px; border-radius: 50%; border: 2px solid var(--accent); opacity: .35 }
-.mini .lbl { position: absolute; right: 6px; bottom: 5px; font-size: 11px; background: color-mix(in srgb, var(--surface) 85%, transparent); color: var(--fg); padding: 2px 7px; border-radius: 6px }
-.mini .attr { position: absolute; left: 6px; bottom: 5px; font-size: 9px; color: #555; background: rgba(255,255,255,.7); padding: 0 4px; border-radius: 3px }
+.mini { position: relative; height: 128px; border-radius: 10px; background: var(--sunk); margin-top: 8px; border: 1px solid var(--line); overflow: hidden; z-index: 0 }
+.mini .leaflet-control-zoom a { width: 30px; height: 30px; line-height: 28px; font-size: 18px }
+.mini .lbl { position: absolute; left: 6px; bottom: 6px; z-index: 500; font-size: 11px; background: var(--surface); color: var(--fg); padding: 3px 8px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,.2); pointer-events: none }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .mini .leaflet-tile-pane { filter: brightness(.8) contrast(1.05) } }
+:root[data-theme="dark"] .mini .leaflet-tile-pane { filter: brightness(.8) contrast(1.05) }
 .tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 4px }
 .tag { font-size: 12px; background: var(--sunk); border-radius: 999px; padding: 2px 9px; color: var(--fg) }
 
@@ -494,27 +491,43 @@ function pubLabel(x) {
   return `<b>Inseriert ${esc(rel)}</b>` + (gap > 2 * 3600e3 ? ` · gefunden ${esc(ago(x.first_seen))}` : "");
 }
 const TILE = "https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.pixelkarte-grau/default/current/3857";
+const MINI_ZOOM = 14;
 function miniMap(x) {
   if (x.lat == null || x.lon == null) return "";
-  const z = 16, n = 2 ** z * 256;
-  const px = (x.lon + 180) / 360 * n;
-  const r = x.lat * Math.PI / 180;
-  const py = (1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * n;
-  let imgs = "";
-  for (let tx = Math.floor((px - 420) / 256); tx <= Math.floor((px + 420) / 256); tx++)
-    for (let ty = Math.floor((py - 60) / 256); ty <= Math.floor((py + 60) / 256); ty++)
-      imgs += `<img alt="" loading="lazy" decoding="async" onerror="this.style.visibility='hidden'" src="${TILE}/${z}/${tx}/${ty}.jpeg" style="left:calc(50% + ${Math.round(tx * 256 - px)}px);top:calc(50% + ${Math.round(ty * 256 - py)}px)">`;
-  return `<button type="button" class="mini" data-mapkey="${esc(keyOf(x))}" aria-label="Auf der Karte zeigen">${imgs}<span class="pin"></span><span class="lbl">Auf Karte zeigen ›</span><span class="attr">© swisstopo</span></button>`;
+  return `<div class="mini" data-mapkey="${esc(keyOf(x))}" data-lat="${x.lat}" data-lon="${x.lon}" role="button" aria-label="Auf der Karte zeigen">
+    <span class="lbl">Grosse Karte ›</span></div>`;
+}
+const minis = new Map();
+const miniObserver = "IntersectionObserver" in window ? new IntersectionObserver((entries) => {
+  entries.forEach((e) => { if (e.isIntersecting) { initMini(e.target); miniObserver.unobserve(e.target); } });
+}, { rootMargin: "200px" }) : null;
+function initMini(el) {
+  if (el.dataset.ready || typeof L === "undefined") return;
+  el.dataset.ready = "1";
+  const ll = [+el.dataset.lat, +el.dataset.lon];
+  const m = L.map(el, { center: ll, zoom: MINI_ZOOM, zoomControl: false, attributionControl: false, dragging: false,
+    touchZoom: "center", scrollWheelZoom: false, doubleClickZoom: "center", boxZoom: false, keyboard: false });
+  L.tileLayer(TILE + "/{z}/{x}/{y}.jpeg", { maxZoom: 19, minZoom: 10 }).addTo(m);
+  L.control.zoom({ position: "topright", zoomInTitle: "Näher", zoomOutTitle: "Weiter weg" }).addTo(m);
+  L.circleMarker(ll, { radius: 7, color: "#fff", weight: 3, fillColor: accent(), fillOpacity: 1, interactive: false }).addTo(m);
+  m.on("click", () => showOnMap(el.dataset.mapkey));
+  minis.set(el, m);
+}
+function mountMinis() {
+  minis.forEach((m) => m.remove()); minis.clear();
+  document.querySelectorAll(".mini[data-lat]").forEach((el) => (miniObserver ? miniObserver.observe(el) : initMini(el)));
 }
 function showOnMap(k) {
   const x = S.hits.find((h) => keyOf(h) === k); if (!x || x.lat == null) return;
   S.seen.add(k); saveSeen();
+  S.focus = [x.lat, x.lon];
   showTab("map");
-  setTimeout(() => {
+  const go = () => {
     S.map.invalidateSize();
     S.map.setView([x.lat, x.lon], 17, { animate: false });
     const m = S.markers && S.markers[k]; if (m) m.openPopup();
-  }, 120);
+  };
+  setTimeout(go, 80); setTimeout(() => { go(); S.focus = null; }, 350);
 }
 function filtered() {
   return sortHits(S.hits).filter((x) => {
@@ -566,6 +579,7 @@ function renderHits() {
         </div>
       </div></article>`;
   }).join("");
+  mountMinis();
 }
 let marksQueue = Promise.resolve();
 function setMark(k, val) {
@@ -586,8 +600,7 @@ function setMark(k, val) {
 $("hitList").addEventListener("click", (e) => {
   const card = e.target.closest(".card"); if (!card) return;
   const k = card.dataset.key;
-  const mp = e.target.closest("[data-mapkey]");
-  if (mp) { showOnMap(mp.dataset.mapkey); return; }
+  if (e.target.closest(".mini")) return;   // die kleine Karte kümmert sich selbst um Tippen und Zoomen
   const mb = e.target.closest("[data-mark]");
   if (mb) { setMark(k, mb.dataset.mark); return; }
   if (e.target.closest("[data-open]")) { S.seen.add(k); saveSeen(); setTimeout(renderHits, 400); }
@@ -622,7 +635,7 @@ function drawAreas() {
   S.map.pm.getGeomanLayers().forEach((l) => l.remove());
   const g = L.geoJSON(S.config.areas, { style: { color: accent(), weight: 2, fillOpacity: 0.12 } });
   g.eachLayer((l) => { l.addTo(S.map); l.on("pm:edit", () => (S.areasDirty = true)); });
-  try { S.map.fitBounds(g.getBounds(), { padding: [24, 24] }); } catch {}
+  if (!S.focus) { try { S.map.fitBounds(g.getBounds(), { padding: [24, 24] }); } catch {} }
   S.areasDirty = false;
 }
 function renderMarkers() {
@@ -1070,7 +1083,7 @@ let installEvt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("installBtn").hidden = false; $("installHint").hidden = true; });
 $("installBtn").addEventListener("click", async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("installBtn").hidden = true; });
 if (window.matchMedia("(display-mode: standalone)").matches) { $("installHint").textContent = "Läuft als App."; }
-const APP_VERSION = "13 · 17.10.2026";
+const APP_VERSION = "14 · 17.10.2026";
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").then((reg) => { reg.update().catch(() => {}); }).catch(() => {});
   let reloaded = false;
