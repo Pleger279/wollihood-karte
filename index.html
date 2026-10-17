@@ -195,6 +195,14 @@ details.adv[open], details.adv-inner[open] { display: grid; gap: 14px }
 .sortbtn { border: 0; background: none; padding: 6px 8px; border-radius: 8px; font-size: 14px; color: var(--muted); cursor: pointer }
 .sortbtn[aria-pressed="true"] { color: var(--accent); font-weight: 700; background: var(--accent-soft) }
 .meta b { font-weight: 700; color: var(--fg) }
+.mini { position: relative; height: 112px; overflow: hidden; border-radius: 10px; background: var(--sunk); margin-top: 8px; cursor: pointer; border: 1px solid var(--line); display: block; width: 100%; padding: 0 }
+.mini img { position: absolute; width: 256px; height: 256px; max-width: none; pointer-events: none; user-select: none }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .mini img { filter: brightness(.8) contrast(1.05) } }
+:root[data-theme="dark"] .mini img { filter: brightness(.8) contrast(1.05) }
+.mini .pin { position: absolute; left: 50%; top: 50%; width: 18px; height: 18px; margin: -9px 0 0 -9px; border-radius: 50%; background: var(--accent); border: 3px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.4) }
+.mini .pin::after { content: ""; position: absolute; inset: -12px; border-radius: 50%; border: 2px solid var(--accent); opacity: .35 }
+.mini .lbl { position: absolute; right: 6px; bottom: 5px; font-size: 11px; background: color-mix(in srgb, var(--surface) 85%, transparent); color: var(--fg); padding: 2px 7px; border-radius: 6px }
+.mini .attr { position: absolute; left: 6px; bottom: 5px; font-size: 9px; color: #555; background: rgba(255,255,255,.7); padding: 0 4px; border-radius: 3px }
 .tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 4px }
 .tag { font-size: 12px; background: var(--sunk); border-radius: 999px; padding: 2px 9px; color: var(--fg) }
 
@@ -485,6 +493,29 @@ function pubLabel(x) {
   const gap = new Date(x.first_seen) - new Date(x.published);
   return `<b>Inseriert ${esc(rel)}</b>` + (gap > 2 * 3600e3 ? ` · gefunden ${esc(ago(x.first_seen))}` : "");
 }
+const TILE = "https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.pixelkarte-grau/default/current/3857";
+function miniMap(x) {
+  if (x.lat == null || x.lon == null) return "";
+  const z = 16, n = 2 ** z * 256;
+  const px = (x.lon + 180) / 360 * n;
+  const r = x.lat * Math.PI / 180;
+  const py = (1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * n;
+  let imgs = "";
+  for (let tx = Math.floor((px - 420) / 256); tx <= Math.floor((px + 420) / 256); tx++)
+    for (let ty = Math.floor((py - 60) / 256); ty <= Math.floor((py + 60) / 256); ty++)
+      imgs += `<img alt="" loading="lazy" decoding="async" onerror="this.style.visibility='hidden'" src="${TILE}/${z}/${tx}/${ty}.jpeg" style="left:calc(50% + ${Math.round(tx * 256 - px)}px);top:calc(50% + ${Math.round(ty * 256 - py)}px)">`;
+  return `<button type="button" class="mini" data-mapkey="${esc(keyOf(x))}" aria-label="Auf der Karte zeigen">${imgs}<span class="pin"></span><span class="lbl">Auf Karte zeigen ›</span><span class="attr">© swisstopo</span></button>`;
+}
+function showOnMap(k) {
+  const x = S.hits.find((h) => keyOf(h) === k); if (!x || x.lat == null) return;
+  S.seen.add(k); saveSeen();
+  showTab("map");
+  setTimeout(() => {
+    S.map.invalidateSize();
+    S.map.setView([x.lat, x.lon], 17, { animate: false });
+    const m = S.markers && S.markers[k]; if (m) m.openPopup();
+  }, 120);
+}
 function filtered() {
   return sortHits(S.hits).filter((x) => {
     const m = S.marks[keyOf(x)];
@@ -528,6 +559,7 @@ function renderHits() {
         <div class="meta">${esc(x.portal || "")} · ${pubLabel(x)}${x.pushed ? " · Push gesendet" : x.push_skipped ? " · kein Push (" + esc(x.push_skipped) + ")" : ""}</div>
         ${x.features && x.features.length ? `<div class="tags">${x.features.filter((k) => FEATURES[k]).map((k) => `<span class="tag">${esc(FEATURES[k])}</span>`).join("")}</div>` : ""}
         ${x.notes && x.notes.length ? `<div class="notes">${esc(x.notes.join(" · "))}</div>` : ""}
+        ${miniMap(x)}
         <div class="actions">
           <button class="btn ${m === "fav" ? "on" : ""}" type="button" data-mark="${m === "fav" ? "" : "fav"}">${m === "fav" ? icon.star : icon.starO} ${m === "fav" ? "Gemerkt" : "Merken"}</button>
           <a class="btn primary" href="${esc(x.url)}" target="_blank" rel="noopener" data-open>${icon.open} Öffnen</a>
@@ -554,6 +586,8 @@ function setMark(k, val) {
 $("hitList").addEventListener("click", (e) => {
   const card = e.target.closest(".card"); if (!card) return;
   const k = card.dataset.key;
+  const mp = e.target.closest("[data-mapkey]");
+  if (mp) { showOnMap(mp.dataset.mapkey); return; }
   const mb = e.target.closest("[data-mark]");
   if (mb) { setMark(k, mb.dataset.mark); return; }
   if (e.target.closest("[data-open]")) { S.seen.add(k); saveSeen(); setTimeout(renderHits, 400); }
@@ -594,12 +628,13 @@ function drawAreas() {
 function renderMarkers() {
   if (!S.hitLayer) return;
   S.hitLayer.clearLayers();
+  S.markers = {};
   S.hits.forEach((x) => {
     const m = S.marks[keyOf(x)];
     if (x.lat == null) return;
     const c = m === "fav" ? getComputedStyle(document.documentElement).getPropertyValue("--star").trim() : accent();
-    L.circleMarker([x.lat, x.lon], { radius: 8, color: "#fff", weight: 2, fillColor: c, fillOpacity: 0.95, pmIgnore: true })
-      .bindPopup(`<b>${esc(chf(x.rent))} · ${esc(rooms(x.rooms))}</b><br>${esc(x.street || "")}<br><a href="${esc(x.url)}" target="_blank" rel="noopener">Inserat öffnen</a>`)
+    S.markers[keyOf(x)] = L.circleMarker([x.lat, x.lon], { radius: 8, color: "#fff", weight: 2, fillColor: c, fillOpacity: 0.95, pmIgnore: true })
+      .bindPopup(`${x.image ? `<img src="${esc(x.image)}" alt="" style="width:200px;height:112px;object-fit:cover;border-radius:6px;display:block;margin-bottom:6px" referrerpolicy="no-referrer">` : ""}<b>${esc(chf(x.rent))} · ${esc(rooms(x.rooms))}${x.m2 ? " · " + esc(x.m2) + " m²" : ""}</b><br>${esc(x.street || "")}<br><a href="${esc(x.url)}" target="_blank" rel="noopener">Inserat öffnen</a>`, { maxWidth: 220 })
       .addTo(S.hitLayer);
   });
 }
@@ -1035,7 +1070,7 @@ let installEvt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("installBtn").hidden = false; $("installHint").hidden = true; });
 $("installBtn").addEventListener("click", async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("installBtn").hidden = true; });
 if (window.matchMedia("(display-mode: standalone)").matches) { $("installHint").textContent = "Läuft als App."; }
-const APP_VERSION = "12 · 17.10.2026";
+const APP_VERSION = "13 · 17.10.2026";
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").then((reg) => { reg.update().catch(() => {}); }).catch(() => {});
   let reloaded = false;
