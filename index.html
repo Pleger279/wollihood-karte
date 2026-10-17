@@ -1,0 +1,383 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Wollihood</title>
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,750&family=Atkinson+Hyperlegible:wght@400;700&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@geoman-io/leaflet-geoman-free@2.17.0/dist/leaflet-geoman.css">
+<style>
+/* Layout: eine Spalte am Handy, ab Tablet Karte links und Kriterien rechts. Seegrün als einziger Akzent. */
+:root {
+  --bg: #F3F5F2; --surface: #FFFFFF; --fg: #18211C; --muted: #5C6760; --line: #D9DFDA;
+  --accent: #2F6B4F; --accent-ink: #FFFFFF; --ok: #2F7A4A; --bad: #A6392C; --warn: #8A6A12;
+  --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --body: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #121815; --surface: #1A221E; --fg: #E6ECE8; --muted: #9AA69F; --line: #2C3832;
+  --accent: #6FBF95; --accent-ink: #0E1512; --ok: #6FBF95; --bad: #E58A7D; --warn: #D9B65A; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #121815; --surface: #1A221E; --fg: #E6ECE8; --muted: #9AA69F; --line: #2C3832;
+  --accent: #6FBF95; --accent-ink: #0E1512; --ok: #6FBF95; --bad: #E58A7D; --warn: #D9B65A; color-scheme: dark }
+
+* { box-sizing: border-box }
+html, body { margin: 0 }
+body { background: var(--bg); color: var(--fg); font: 16px/1.5 var(--body);
+  padding: env(safe-area-inset-top, 0px) max(16px, env(safe-area-inset-right, 0px)) 96px max(16px, env(safe-area-inset-left, 0px)) }
+h1, h2 { font-family: var(--display); margin: 0; text-wrap: balance }
+h1 { font-size: 30px; font-weight: 750; letter-spacing: -.02em }
+h2 { font-size: 19px; font-weight: 600 }
+.wrap { max-width: 1180px; margin: 0 auto; display: grid; gap: 20px; padding-block: 20px }
+header { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: baseline; justify-content: space-between }
+.sub { color: var(--muted); font-size: 14px }
+.grid { display: grid; gap: 20px; grid-template-columns: minmax(0, 1fr) }
+@media (min-width: 900px) { .grid { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr) } }
+section { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: grid; gap: 14px; min-width: 0 }
+#map { height: 62vh; min-height: 340px; border-radius: 8px; border: 1px solid var(--line) }
+label { display: grid; gap: 4px; font-size: 14px; font-weight: 700 }
+label small, .hint { font-weight: 400; color: var(--muted); font-size: 13px }
+input[type=text], input[type=number], input[type=email], input[type=password], textarea {
+  font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; width: 100%; min-width: 0 }
+textarea { min-height: 96px; resize: vertical; font-size: 14px }
+input:focus-visible, textarea:focus-visible, button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
+.row { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 12px }
+.check { display: flex; gap: 10px; align-items: center; font-weight: 400 }
+.check input { width: 20px; height: 20px; accent-color: var(--accent) }
+button { font: 700 15px var(--body); border-radius: 8px; padding: 10px 16px; cursor: pointer; border: 1px solid var(--line); background: var(--surface); color: var(--fg) }
+button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent) }
+button:disabled { opacity: .5; cursor: default }
+.savebar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 1000; background: var(--surface); border-top: 1px solid var(--line);
+  padding: 12px max(16px, env(safe-area-inset-right, 0px)) calc(12px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)) }
+.savebar .in { max-width: 1180px; margin: 0 auto; display: flex; gap: 12px; align-items: center; justify-content: space-between }
+#msg { font-size: 14px; color: var(--muted); min-width: 0 }
+#msg.err { color: var(--bad) } #msg.ok { color: var(--ok) }
+.chips { display: flex; flex-wrap: wrap; gap: 6px }
+.chip { font-size: 12px; padding: 3px 9px; border-radius: 999px; border: 1px solid var(--line); white-space: nowrap }
+.chip.ok { color: var(--ok); border-color: currentColor } .chip.bad { color: var(--bad); border-color: currentColor }
+.src { display: grid; gap: 2px; font-size: 14px; padding: 8px 0; border-top: 1px solid var(--line) }
+.src:first-child { border-top: 0 }
+.src .m { color: var(--muted); font-size: 13px; overflow-wrap: anywhere }
+.hits { display: grid; gap: 10px }
+.hit { display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: 12px; align-items: start; text-decoration: none; color: inherit }
+.hit img, .hit .ph { width: 76px; height: 56px; object-fit: cover; border-radius: 5px; background: var(--bg) }
+.hit b { font-variant-numeric: tabular-nums }
+.hit .m { color: var(--muted); font-size: 13px }
+.tools { display: flex; flex-wrap: wrap; gap: 8px }
+#setup[hidden], [hidden] { display: none !important }
+.leaflet-container { font: 14px var(--body) }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Wollihood</h1>
+      <div class="sub">Suchgebiet und Kriterien für die stündliche Wohnungssuche</div>
+    </div>
+    <div class="chips" id="statusChips"><span class="chip">noch nicht verbunden</span></div>
+  </header>
+
+  <section id="setup" hidden>
+    <h2>Einmal verbinden</h2>
+    <p class="hint">Damit diese Seite die Kriterien im Repo speichern kann, braucht sie einen GitHub-Schlüssel.
+      Er bleibt nur in diesem Browser gespeichert.</p>
+    <ol class="hint">
+      <li>Öffne <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">neuen Schlüssel erstellen</a>.</li>
+      <li>Name «Wollihood Karte», Ablauf z.&nbsp;B. 1 Jahr. Bei «Repository access» nur <b>wollihood</b> wählen.</li>
+      <li>Unter «Permissions → Contents» <b>Read and write</b> wählen, erstellen, Schlüssel kopieren.</li>
+    </ol>
+    <label for="tokenInput">GitHub-Schlüssel
+      <input id="tokenInput" type="password" autocomplete="off" placeholder="github_pat_…">
+    </label>
+    <label for="repoInput">Repo
+      <input id="repoInput" type="text" value="Pleger279/wollihood">
+    </label>
+    <div><button class="primary" id="connectBtn" type="button">Verbinden</button></div>
+  </section>
+
+  <div class="grid" id="main" hidden>
+    <section>
+      <h2>Suchgebiet</h2>
+      <p class="hint">Fläche einzeichnen mit dem Fünfeck-Werkzeug links. Mehrere Flächen sind möglich.
+        Bearbeiten mit dem Stift, löschen mit dem Papierkorb. Punkte zeigen die letzten Treffer.</p>
+      <div id="map"></div>
+    </section>
+
+    <div style="display:grid;gap:20px;min-width:0">
+      <section>
+        <h2>Kriterien</h2>
+        <label class="check" for="active"><input type="checkbox" id="active"> Suche aktiv</label>
+        <div class="row">
+          <label for="roomsMin">Zimmer ab<input id="roomsMin" type="number" step="0.5" min="1"></label>
+          <label for="roomsMax">Zimmer bis<input id="roomsMax" type="number" step="0.5" min="1"></label>
+          <label for="rentMax">Miete max. (CHF)<input id="rentMax" type="number" step="50" min="0"></label>
+        </div>
+        <label class="check" for="unkPrice"><input type="checkbox" id="unkPrice"> Inserate ohne erkennbaren Preis trotzdem melden</label>
+        <label class="check" for="unkRooms"><input type="checkbox" id="unkRooms"> Inserate ohne erkennbare Zimmerzahl trotzdem melden</label>
+        <label for="plz">PLZ, wenn die Adresse fehlt <small>Kommagetrennt. Gilt nur, wenn ein Inserat keine genaue Adresse hat.</small>
+          <input id="plz" type="text"></label>
+        <label for="excl">Ausschliessen, wenn im Text <small>Eine Zeile pro Begriff</small>
+          <textarea id="excl"></textarea></label>
+        <label for="titleExcl">Ausschliessen, wenn im Titel <small>Für Parkplätze, Büros und Ähnliches</small>
+          <textarea id="titleExcl"></textarea></label>
+      </section>
+
+      <section>
+        <h2>Quellen und Meldungen</h2>
+        <label class="check" for="srcMail"><input type="checkbox" id="srcMail"> Suchabo-Mails der Portale</label>
+        <label class="check" for="srcFlatfox"><input type="checkbox" id="srcFlatfox"> Flatfox direkt</label>
+        <label class="check" for="srcPages"><input type="checkbox" id="srcPages"> Genossenschafts- und Stiftungsseiten</label>
+        <label for="pages">Beobachtete Seiten <small>Eine Zeile pro Seite: Name | Adresse</small>
+          <textarea id="pages" style="min-height:130px"></textarea></label>
+        <label for="areaKw">Stichworte für diese Seiten <small>Neue Zeilen werden nur gemeldet, wenn eines davon vorkommt</small>
+          <textarea id="areaKw"></textarea></label>
+        <label for="digestTo">Tagesmail an<input id="digestTo" type="email"></label>
+        <div class="row">
+          <label for="quietFrom">Leise ab (Uhr)<input id="quietFrom" type="number" min="0" max="23"></label>
+          <label for="quietTo">Leise bis (Uhr)<input id="quietTo" type="number" min="0" max="23"></label>
+        </div>
+      </section>
+
+      <section>
+        <h2>Zustand</h2>
+        <div id="health" class="hint">Lade …</div>
+        <h2>Letzte Treffer</h2>
+        <div id="hits" class="hits hint">Lade …</div>
+        <div class="tools">
+          <button type="button" id="reloadBtn">Neu laden</button>
+          <button type="button" id="logoutBtn">Schlüssel entfernen</button>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<div class="savebar" id="savebar" hidden>
+  <div class="in">
+    <div id="msg">Änderungen werden erst beim Speichern übernommen.</div>
+    <button class="primary" id="saveBtn" type="button">Speichern</button>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@geoman-io/leaflet-geoman-free@2.17.0/dist/leaflet-geoman.min.js"></script>
+<script>
+const $ = (id) => document.getElementById(id);
+const store = {
+  get(k) { try { return localStorage.getItem(k) } catch { return null } },
+  set(k, v) { try { localStorage.setItem(k, v) } catch {} },
+  del(k) { try { localStorage.removeItem(k) } catch {} },
+};
+let token = store.get("wh_token");
+let repo = store.get("wh_repo") || "Pleger279/wollihood";
+let config = null, configSha = null, map = null, hitLayer = null;
+
+function b64decode(s) {
+  const bin = atob(s.replace(/\n/g, ""));
+  return new TextDecoder().decode(Uint8Array.from(bin, (c) => c.charCodeAt(0)));
+}
+function b64encode(str) {
+  const bytes = new TextEncoder().encode(str);
+  let bin = ""; bytes.forEach((b) => (bin += String.fromCharCode(b)));
+  return btoa(bin);
+}
+async function gh(path, opts = {}) {
+  const r = await fetch(`https://api.github.com/repos/${repo}/contents/${path}`, {
+    ...opts,
+    headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json",
+               "X-GitHub-Api-Version": "2022-11-28", ...(opts.headers || {}) },
+    cache: "no-store",
+  });
+  if (!r.ok) {
+    const t = await r.text().catch(() => "");
+    const err = new Error(r.status === 401 ? "Schlüssel ungültig oder abgelaufen."
+      : r.status === 404 ? `Datei ${path} nicht gefunden – stimmt der Repo-Name, und hat der Schlüssel Zugriff?`
+      : r.status === 409 ? "Die Datei wurde inzwischen geändert. Bitte neu laden und nochmals speichern."
+      : `GitHub meldet ${r.status}. ${t.slice(0, 120)}`);
+    err.status = r.status; throw err;
+  }
+  return r.json();
+}
+async function readJson(path) {
+  const d = await gh(path);
+  return { data: JSON.parse(b64decode(d.content)), sha: d.sha };
+}
+function msg(text, cls = "") { const m = $("msg"); m.textContent = text; m.className = cls; }
+
+function initMap() {
+  map = L.map("map", { zoomControl: true }).setView([47.345, 8.53], 14);
+  L.tileLayer("https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.pixelkarte-grau/default/current/3857/{z}/{x}/{y}.jpeg", {
+    maxZoom: 19, attribution: '© <a href="https://www.swisstopo.admin.ch/" target="_blank" rel="noopener">swisstopo</a>',
+  }).addTo(map);
+  map.pm.setLang("de");
+  map.pm.addControls({
+    position: "topleft", drawMarker: false, drawCircleMarker: false, drawPolyline: false, drawCircle: false,
+    drawText: false, cutPolygon: false, rotateMode: false, drawRectangle: true, drawPolygon: true,
+    editMode: true, dragMode: true, removalMode: true,
+  });
+  map.pm.setPathOptions({ color: getComputedStyle(document.documentElement).getPropertyValue("--accent").trim() || "#2F6B4F", weight: 2, fillOpacity: 0.12 });
+  map.on("pm:create pm:remove", () => msg("Fläche geändert – zum Übernehmen speichern."));
+  hitLayer = L.layerGroup().addTo(map);
+}
+
+function drawAreas(areas) {
+  map.pm.getGeomanLayers().forEach((l) => l.remove());
+  const color = getComputedStyle(document.documentElement).getPropertyValue("--accent").trim() || "#2F6B4F";
+  const layer = L.geoJSON(areas, { style: { color, weight: 2, fillOpacity: 0.12 } });
+  layer.eachLayer((l) => { l.addTo(map); l.on("pm:edit pm:dragend", () => msg("Fläche geändert – zum Übernehmen speichern.")); });
+  try { map.fitBounds(layer.getBounds(), { padding: [20, 20] }); } catch {}
+}
+function collectAreas() {
+  const features = [];
+  map.pm.getGeomanLayers().forEach((l) => {
+    if (l instanceof L.Polygon) {
+      const f = l.toGeoJSON(6);
+      f.properties = f.properties || {};
+      features.push(f);
+    }
+  });
+  return { type: "FeatureCollection", features };
+}
+
+const lines = (t) => t.split("\n").map((s) => s.trim()).filter(Boolean);
+function fillForm(c) {
+  $("active").checked = c.active !== false;
+  $("roomsMin").value = c.rooms_min ?? ""; $("roomsMax").value = c.rooms_max ?? ""; $("rentMax").value = c.rent_max ?? "";
+  $("unkPrice").checked = !!c.include_unknown_price; $("unkRooms").checked = !!c.include_unknown_rooms;
+  $("plz").value = (c.plz_fallback || []).join(", ");
+  $("excl").value = (c.exclude_keywords || []).join("\n");
+  $("titleExcl").value = (c.title_exclude_keywords || []).join("\n");
+  $("areaKw").value = (c.area_keywords || []).join("\n");
+  const s = c.sources || {};
+  $("srcMail").checked = s.mail_alerts !== false; $("srcFlatfox").checked = s.flatfox !== false; $("srcPages").checked = s.watch_pages !== false;
+  $("pages").value = (c.watch_pages || []).map((p) => `${p.name} | ${p.url}`).join("\n");
+  $("digestTo").value = c.digest_to || "";
+  $("quietFrom").value = c.quiet_hours?.from ?? ""; $("quietTo").value = c.quiet_hours?.to ?? "";
+  drawAreas(c.areas);
+}
+function readForm() {
+  const num = (id) => { const v = parseFloat($(id).value); return Number.isFinite(v) ? v : null; };
+  const c = structuredClone(config);
+  c.active = $("active").checked;
+  c.rooms_min = num("roomsMin"); c.rooms_max = num("roomsMax"); c.rent_max = num("rentMax");
+  c.include_unknown_price = $("unkPrice").checked; c.include_unknown_rooms = $("unkRooms").checked;
+  c.plz_fallback = $("plz").value.split(/[,\s]+/).map((s) => s.trim()).filter(Boolean);
+  c.exclude_keywords = lines($("excl").value);
+  c.title_exclude_keywords = lines($("titleExcl").value);
+  c.area_keywords = lines($("areaKw").value);
+  c.sources = { mail_alerts: $("srcMail").checked, flatfox: $("srcFlatfox").checked, watch_pages: $("srcPages").checked };
+  const oldPages = Object.fromEntries((config.watch_pages || []).map((p) => [p.url, p]));
+  c.watch_pages = lines($("pages").value).map((ln) => {
+    const [name, url] = ln.includes("|") ? ln.split("|").map((s) => s.trim()) : [ln, ln];
+    return { ...(oldPages[url] || {}), name: name || url, url };
+  }).filter((p) => /^https?:\/\//.test(p.url));
+  c.digest_to = $("digestTo").value.trim();
+  const qf = num("quietFrom"), qt = num("quietTo");
+  c.quiet_hours = qf === null || qt === null ? {} : { from: qf, to: qt };
+  c.areas = collectAreas();
+  return c;
+}
+function validate(c) {
+  if (!c.areas.features.length) return "Bitte mindestens eine Fläche einzeichnen.";
+  if (c.rooms_min && c.rooms_max && c.rooms_min > c.rooms_max) return "«Zimmer ab» ist grösser als «Zimmer bis».";
+  if (!c.rent_max) return "Bitte eine maximale Miete angeben.";
+  return null;
+}
+
+const fmtTime = (iso) => iso ? new Date(iso).toLocaleString("de-CH", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "–";
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const chf = (v) => v ? "CHF " + v.toLocaleString("de-CH").replace(/[’,]/g, "'") : "Preis ?";
+const rooms = (v) => v == null ? "? Zi." : `${v} Zi.`;
+
+function renderHealth(h) {
+  const chips = $("statusChips");
+  if (!h || !h.last_run) { chips.innerHTML = '<span class="chip">noch kein Lauf</span>'; $("health").textContent = "Noch kein Lauf. Der erste startet nach dem Speichern oder zur nächsten vollen Stunde."; return; }
+  const src = Object.entries(h.sources || {});
+  const bad = src.filter(([, v]) => !v.ok);
+  chips.innerHTML = `<span class="chip">letzter Lauf ${esc(fmtTime(h.last_run))}</span>` +
+    (h.paused ? '<span class="chip bad">pausiert</span>' : "") +
+    `<span class="chip ${bad.length ? "bad" : "ok"}">${src.length - bad.length}/${src.length} Quellen ok</span>` +
+    (h.push && !h.push.ok ? '<span class="chip bad">Push gestört</span>' : "");
+  $("health").innerHTML = src.map(([name, v]) =>
+    `<div class="src"><div><span class="chip ${v.ok ? "ok" : "bad"}">${v.ok ? "ok" : "Problem"}</span> <b>${esc(name)}</b></div><div class="m">${esc(v.msg)}</div></div>`).join("") +
+    (h.push && !h.push.ok ? `<div class="src"><div><span class="chip bad">Problem</span> <b>Push</b></div><div class="m">${esc(h.push.msg)}</div></div>` : "");
+}
+function renderHits(list) {
+  hitLayer.clearLayers();
+  if (!list || !list.length) { $("hits").textContent = "Noch keine Treffer."; return; }
+  const color = getComputedStyle(document.documentElement).getPropertyValue("--accent").trim() || "#2F6B4F";
+  $("hits").innerHTML = list.slice(0, 15).map((x) => `
+    <a class="hit" href="${esc(x.url)}" target="_blank" rel="noopener">
+      ${x.image ? `<img src="${esc(x.image)}" alt="" loading="lazy">` : '<div class="ph"></div>'}
+      <div><b>${esc(rooms(x.rooms))} · ${esc(chf(x.rent))}</b>
+        <div>${esc(x.street || x.title || "")}</div>
+        <div class="m">${esc(x.portal || "")} · ${esc(fmtTime(x.first_seen))}</div></div>
+    </a>`).join("");
+  list.forEach((x) => {
+    if (x.lat == null) return;
+    L.circleMarker([x.lat, x.lon], { radius: 7, color, weight: 2, fillColor: color, fillOpacity: 0.7, pmIgnore: true })
+      .bindPopup(`<b>${esc(rooms(x.rooms))} · ${esc(chf(x.rent))}</b><br>${esc(x.street || "")}<br><a href="${esc(x.url)}" target="_blank" rel="noopener">Inserat öffnen</a>`)
+      .addTo(hitLayer);
+  });
+}
+
+async function load() {
+  msg("Lade Kriterien …");
+  try {
+    const { data, sha } = await readJson("config.json");
+    config = data; configSha = sha;
+    fillForm(config);
+    msg("Änderungen werden erst beim Speichern übernommen.");
+  } catch (e) {
+    msg(e.message, "err");
+    if (e.status === 401) showSetup();
+    return;
+  }
+  try { renderHealth((await readJson("state/health.json")).data); } catch { renderHealth(null); }
+  try { renderHits((await readJson("state/recent.json")).data); } catch { renderHits([]); }
+}
+
+async function save() {
+  const c = readForm();
+  const problem = validate(c);
+  if (problem) { msg(problem, "err"); return; }
+  $("saveBtn").disabled = true; msg("Speichere …");
+  try {
+    const body = { message: "Kriterien angepasst", content: b64encode(JSON.stringify(c, null, 2) + "\n"), sha: configSha, branch: "main" };
+    const r = await gh("config.json", { method: "PUT", body: JSON.stringify(body), headers: { "Content-Type": "application/json" } });
+    configSha = r.content.sha; config = c;
+    msg("Gespeichert. Die Suche läuft in ein, zwei Minuten mit den neuen Kriterien.", "ok");
+  } catch (e) { msg(e.message, "err"); }
+  finally { $("saveBtn").disabled = false; }
+}
+
+function showSetup() { $("setup").hidden = false; $("main").hidden = true; $("savebar").hidden = true; $("repoInput").value = repo; }
+function showMain() {
+  $("setup").hidden = true; $("main").hidden = false; $("savebar").hidden = false;
+  if (!map) initMap();
+  setTimeout(() => map.invalidateSize(), 50);
+  load();
+}
+
+$("connectBtn").addEventListener("click", () => {
+  const t = $("tokenInput").value.trim();
+  if (!t) { $("tokenInput").focus(); return; }
+  token = t; repo = $("repoInput").value.trim() || repo;
+  store.set("wh_token", token); store.set("wh_repo", repo);
+  showMain();
+});
+$("saveBtn").addEventListener("click", save);
+$("reloadBtn").addEventListener("click", load);
+$("logoutBtn").addEventListener("click", () => { store.del("wh_token"); token = null; showSetup(); });
+document.addEventListener("input", (e) => { if (e.target.closest("#main")) msg("Noch nicht gespeichert."); });
+
+token ? showMain() : showSetup();
+</script>
+</body>
+</html>
