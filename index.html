@@ -573,7 +573,7 @@ function renderHits() {
       <div class="body">
         <div class="price">${esc(chf(x.rent))} <small>· ${esc(rooms(x.rooms))}${x.m2 ? " · " + esc(x.m2) + " m²" : ""}</small></div>
         <div class="addr">${esc(place)}</div>
-        <div class="meta">${esc(x.portal || "")} · ${pubLabel(x)}${x.pushed ? " · Push gesendet" : x.push_skipped ? " · kein Push (" + esc(x.push_skipped) + ")" : ""}</div>
+        <div class="meta">${esc(x.portal || "")} · ${pubLabel(x)}${x.also_urls && x.also_urls.length ? ` · <a href="${esc(x.also_urls[0])}" target="_blank" rel="noopener">${x.also_urls.length + 1}× inseriert</a>` : ""}${x.pushed ? " · Push gesendet" : x.push_skipped ? " · kein Push (" + esc(x.push_skipped) + ")" : ""}</div>
         ${x.features && x.features.length ? `<div class="tags">${x.features.filter((k) => FEATURES[k]).map((k) => `<span class="tag">${esc(FEATURES[k])}</span>`).join("")}</div>` : ""}
         ${x.notes && x.notes.length ? `<div class="notes">${esc(x.notes.join(" · "))}</div>` : ""}
         ${miniMap(x)}
@@ -1104,7 +1104,7 @@ let installEvt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("installBtn").hidden = false; $("installHint").hidden = true; });
 $("installBtn").addEventListener("click", async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("installBtn").hidden = true; });
 if (window.matchMedia("(display-mode: standalone)").matches) { $("installHint").textContent = "Läuft als App."; }
-const APP_VERSION = "15 · 17.10.2026";
+const APP_VERSION = "16 · 17.10.2026";
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").then((reg) => { reg.update().catch(() => {}); }).catch(() => {});
   let reloaded = false;
