@@ -228,7 +228,6 @@ details.adv[open], details.adv-inner[open] { display: grid; gap: 14px }
       <button class="chip" type="button" data-filter="new" aria-pressed="true">Neu</button>
       <button class="chip" type="button" data-filter="fav" aria-pressed="false">Gemerkt</button>
       <button class="chip" type="button" data-filter="all" aria-pressed="false">Alle</button>
-      <button class="chip" type="button" data-filter="no" aria-pressed="false">Aussortiert</button>
     </div>
     <div id="hitList" class="view"></div>
     <button class="btn" id="allSeenBtn" type="button" hidden>Alle als gelesen markieren</button>
@@ -491,14 +490,13 @@ const icon = {
 
 // ---------- Treffer ----------
 function saveSeen() { store.set("wh_seen", JSON.stringify([...S.seen].slice(-500))); }
-function isNew(x) { const k = keyOf(x); return !S.seen.has(k) && S.marks[k] !== "no"; }
+function isNew(x) { return !S.seen.has(keyOf(x)); }
 function filtered() {
   return S.hits.filter((x) => {
     const m = S.marks[keyOf(x)];
     if (S.filter === "new") return isNew(x);
     if (S.filter === "fav") return m === "fav";
-    if (S.filter === "no") return m === "no";
-    return m !== "no";
+    return true;
   });
 }
 function renderHits() {
@@ -507,7 +505,7 @@ function renderHits() {
   document.querySelectorAll("[data-filter]").forEach((b) => {
     const f = b.dataset.filter;
     b.setAttribute("aria-pressed", String(f === S.filter));
-    b.textContent = { new: `Neu${newN ? " · " + newN : ""}`, fav: `Gemerkt${favN ? " · " + favN : ""}`, all: "Alle", no: "Aussortiert" }[f];
+    b.textContent = { new: `Neu${newN ? " · " + newN : ""}`, fav: `Merkliste${favN ? " · " + favN : ""}`, all: "Alle" }[f];
   });
   $("newCount").hidden = !newN; $("newCount").textContent = newN;
   $("allSeenBtn").hidden = !(S.filter === "new" && newN > 1);
@@ -515,9 +513,8 @@ function renderHits() {
   if (!list.length) {
     const msg = {
       new: ["Nichts Neues", "Sobald eine passende Wohnung auftaucht, erscheint sie hier und du bekommst eine Push-Meldung."],
-      fav: ["Noch nichts gemerkt", "Tippe bei einem Treffer auf «Merken», dann findest du ihn hier wieder."],
-      all: ["Noch keine Treffer", "Die Suche läuft stündlich. Treffer der letzten Wochen erscheinen hier."],
-      no: ["Nichts aussortiert", "Was du mit «Nein» wegklickst, landet hier."],
+      fav: ["Die Merkliste ist leer", "Tippe bei einem Treffer auf «Merken», dann landet er hier, auch auf Leonies Handy."],
+      all: ["Noch keine Treffer", "Die Suche läuft alle 30 Minuten. Treffer der letzten Wochen erscheinen hier."],
     }[S.filter];
     $("hitList").innerHTML = `<div class="empty"><b>${msg[0]}</b>${msg[1]}</div>`;
     return;
@@ -530,7 +527,7 @@ function renderHits() {
       : "";
     return `<article class="card" data-key="${esc(k)}">
       <a class="photo ${x.image ? "" : "noimg"}" data-label="kein Bild" href="${esc(x.url)}" target="_blank" rel="noopener" data-open>${photo}
-        ${isNew(x) ? '<span class="badge">Neu</span>' : ""}${m === "fav" ? `<span class="badge fav">Gemerkt</span>` : ""}</a>
+        ${isNew(x) ? '<span class="badge">Neu</span>' : ""}${m === "fav" ? `<span class="badge fav">Merkliste</span>` : ""}</a>
       <div class="body">
         <div class="price">${esc(chf(x.rent))} <small>· ${esc(rooms(x.rooms))}${x.m2 ? " · " + esc(x.m2) + " m²" : ""}</small></div>
         <div class="addr">${esc(place)}</div>
@@ -538,10 +535,7 @@ function renderHits() {
         ${x.features && x.features.length ? `<div class="tags">${x.features.filter((k) => FEATURES[k]).map((k) => `<span class="tag">${esc(FEATURES[k])}</span>`).join("")}</div>` : ""}
         ${x.notes && x.notes.length ? `<div class="notes">${esc(x.notes.join(" · "))}</div>` : ""}
         <div class="actions">
-          ${m === "no"
-            ? `<button class="btn" type="button" data-mark="">${icon.undo} Zurückholen</button>`
-            : `<button class="btn ${m === "fav" ? "on" : ""}" type="button" data-mark="${m === "fav" ? "" : "fav"}">${m === "fav" ? icon.star : icon.starO} ${m === "fav" ? "Gemerkt" : "Merken"}</button>
-               <button class="btn" type="button" data-mark="no">${icon.x} Nein</button>`}
+          <button class="btn ${m === "fav" ? "on" : ""}" type="button" data-mark="${m === "fav" ? "" : "fav"}">${m === "fav" ? icon.star : icon.starO} ${m === "fav" ? "Gemerkt" : "Merken"}</button>
           <a class="btn primary" href="${esc(x.url)}" target="_blank" rel="noopener" data-open>${icon.open} Öffnen</a>
         </div>
       </div></article>`;
@@ -604,7 +598,7 @@ function renderMarkers() {
   S.hitLayer.clearLayers();
   S.hits.forEach((x) => {
     const m = S.marks[keyOf(x)];
-    if (x.lat == null || m === "no") return;
+    if (x.lat == null) return;
     const c = m === "fav" ? getComputedStyle(document.documentElement).getPropertyValue("--star").trim() : accent();
     L.circleMarker([x.lat, x.lon], { radius: 8, color: "#fff", weight: 2, fillColor: c, fillOpacity: 0.95, pmIgnore: true })
       .bindPopup(`<b>${esc(chf(x.rent))} · ${esc(rooms(x.rooms))}</b><br>${esc(x.street || "")}<br><a href="${esc(x.url)}" target="_blank" rel="noopener">Inserat öffnen</a>`)
