@@ -1,5 +1,5 @@
 // Hält die App-Hülle offline bereit und zeigt Push-Meldungen an.
-const CACHE = "wollihood-v7";
+const CACHE = "wollihood-v8";
 const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icons/icon-192.png", "./icons/icon-512.png", "./icons/badge-96.png"];
 
 self.addEventListener("install", (e) => {

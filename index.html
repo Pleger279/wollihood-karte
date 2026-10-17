@@ -279,6 +279,10 @@ details.adv[open], details.adv-inner[open] { display: grid; gap: 14px }
 
     <div class="panel">
       <div class="ftitle">Muss haben</div>
+      <div class="seg" id="featMode">
+        <button type="button" class="opt" data-fmode="all">Alle angekreuzten</button>
+        <button type="button" class="opt" data-fmode="any">Mindestens eines</button>
+      </div>
       <div class="checks" id="featChecks"></div>
       <p class="hint">Hat ein Inserat zu wenig Text, um das zu prüfen, kommt es trotzdem, mit dem Hinweis «Ausstattung ungeprüft».</p>
     </div>
@@ -329,6 +333,10 @@ details.adv[open], details.adv-inner[open] { display: grid; gap: 14px }
         </div>
         <label class="f" for="pushM2"><small>Nur ab Fläche</small><select class="field" id="pushM2"></select></label>
         <div class="ftitle sm">Nur mit</div>
+        <div class="seg" id="pushFeatMode">
+          <button type="button" class="opt" data-pmode="all">Alle angekreuzten</button>
+          <button type="button" class="opt" data-pmode="any">Mindestens eines</button>
+        </div>
         <div class="checks" id="pushFeat"></div>
         <div class="ftitle sm">Push bei Treffern aus</div>
         <label class="switch" for="pushMail">Portal-Abos (Homegate, ImmoScout …) <input type="checkbox" id="pushMail"></label>
@@ -622,7 +630,11 @@ const EXCL = { befristet: "Befristete Verträge", moebliert: "Möbliert", unterm
 const ROOMS = [1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5, 5.5, 6, 7];
 const RENTS = [1000, 1250, 1500, 1750, 2000, 2250, 2500, 2750, 3000, 3250, 3500, 3750, 4000, 4500, 5000, 6000];
 const M2 = [30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 140, 160, 200];
-const F = { rooms: [null, null], types: new Set(), recips: [], days: "daily" };
+const F = { rooms: [null, null], types: new Set(), recips: [], days: "daily", fmode: "all", pmode: "all" };
+function renderModes() {
+  document.querySelectorAll("[data-fmode]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.fmode === F.fmode)));
+  document.querySelectorAll("[data-pmode]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.pmode === F.pmode)));
+}
 
 function opts(sel, values, fmt, anyLabel, current) {
   const list = current != null && !values.includes(current) ? [...values, current].sort((a, b) => a - b) : values;
@@ -676,14 +688,14 @@ function renderSummary() {
   if (c.rooms_min != null) parts.push(c.rooms_min === c.rooms_max ? `${c.rooms_min} Zi.` : `${c.rooms_min}–${c.rooms_max >= 7 ? "7+" : c.rooms_max} Zi.`);
   if (c.rent_min || c.rent_max) parts.push(c.rent_min && c.rent_max ? `CHF ${fmtN(c.rent_min)}–${fmtN(c.rent_max)}` : c.rent_max ? `bis CHF ${fmtN(c.rent_max)}` : `ab CHF ${fmtN(c.rent_min)}`);
   if (c.m2_min || c.m2_max) parts.push(c.m2_min && c.m2_max ? `${c.m2_min}–${c.m2_max} m²` : c.m2_min ? `ab ${c.m2_min} m²` : `bis ${c.m2_max} m²`);
-  c.features_required.forEach((k) => parts.push(FEATURES[k]));
+  if (c.features_required.length) parts.push(c.features_required.map((k) => FEATURES[k]).join(c.features_mode === "any" ? " oder " : " · "));
   const p = c.push, pp = [];
   if (!p.enabled) pp.push("aus");
   else {
     if (p.rent_max) pp.push(`bis CHF ${fmtN(p.rent_max)}`);
     if (p.rooms_min) pp.push(`ab ${p.rooms_min} Zi.`);
     if (p.m2_min) pp.push(`ab ${p.m2_min} m²`);
-    p.features.forEach((k) => pp.push(FEATURES[k]));
+    if (p.features.length) pp.push(p.features.map((k) => FEATURES[k]).join(p.features_mode === "any" ? " oder " : " · "));
   }
   $("critSummary").innerHTML = esc((c.active ? "" : "Pausiert · ") + parts.join(" · ")) +
     `<span class="sw-sub">Push und Briefing: ${esc(pp.length ? pp.join(" · ") : "bei jedem Treffer")}</span>` +
@@ -702,6 +714,7 @@ function fillForm() {
   opts("m2Min", M2, (v) => `${v} m²`, "beliebig", c.m2_min ?? null);
   opts("m2Max", M2, (v) => `${v} m²`, "beliebig", c.m2_max ?? null);
   document.querySelectorAll("[data-feat]").forEach((el) => (el.checked = (c.features_required || []).includes(el.dataset.feat)));
+  F.fmode = c.features_mode === "any" ? "any" : "all"; F.pmode = c.push?.features_mode === "any" ? "any" : "all"; renderModes();
   document.querySelectorAll("[data-excl]").forEach((el) => (el.checked = (c.exclude_groups || []).includes(el.dataset.excl)));
   $("unkPrice").checked = !!c.include_unknown_price; $("unkRooms").checked = !!c.include_unknown_rooms;
   $("plz").value = (c.plz_fallback || []).join(", ");
@@ -738,6 +751,7 @@ function readForm() {
   c.rent_min = sel("rentMin"); c.rent_max = sel("rentMax");
   c.m2_min = sel("m2Min"); c.m2_max = sel("m2Max");
   c.features_required = [...document.querySelectorAll("[data-feat]:checked")].map((el) => el.dataset.feat);
+  c.features_mode = F.fmode;
   c.exclude_groups = [...document.querySelectorAll("[data-excl]:checked")].map((el) => el.dataset.excl);
   c.include_unknown_price = $("unkPrice").checked; c.include_unknown_rooms = $("unkRooms").checked;
   c.plz_fallback = $("plz").value.split(/[,\s]+/).map((s) => s.trim()).filter(Boolean);
@@ -757,7 +771,7 @@ function readForm() {
   const qf = sel("quietFrom"), qt = sel("quietTo");
   c.quiet_hours = qf === null || qt === null ? {} : { from: qf, to: qt };
   c.push = { enabled: $("pushOn").checked, rent_max: sel("pushRent"), rooms_min: sel("pushRooms"), m2_min: sel("pushM2"),
-    features: [...document.querySelectorAll("[data-pfeat]:checked")].map((el) => el.dataset.pfeat),
+    features: [...document.querySelectorAll("[data-pfeat]:checked")].map((el) => el.dataset.pfeat), features_mode: F.pmode,
     mail_alerts: $("pushMail").checked, flatfox: $("pushFlatfox").checked, pages: $("pushPages").checked,
     allow_incomplete: $("pushIncomplete").checked };
   c.areas = collectAreas();
@@ -785,6 +799,8 @@ function addRecipient() {
   $("dgAdd").value = ""; renderDigest(); toast("Hinzugefügt. Zum Übernehmen unten speichern.");
 }
 $("dgAddBtn").addEventListener("click", addRecipient);
+$("featMode").addEventListener("click", (e) => { const b = e.target.closest("[data-fmode]"); if (!b) return; F.fmode = b.dataset.fmode; renderModes(); renderSummary(); });
+$("pushFeatMode").addEventListener("click", (e) => { const b = e.target.closest("[data-pmode]"); if (!b) return; F.pmode = b.dataset.pmode; renderModes(); renderSummary(); });
 $("dgAdd").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); addRecipient(); } });
 $("dgList").addEventListener("click", (e) => { const b = e.target.closest("[data-rm]"); if (!b) return; F.recips.splice(+b.dataset.rm, 1); renderDigest(); toast("Entfernt. Zum Übernehmen unten speichern."); });
 $("dgDays").addEventListener("click", (e) => { const b = e.target.closest("[data-days]"); if (!b) return; F.days = b.dataset.days; renderDigest(); });
@@ -963,7 +979,7 @@ let installEvt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("installBtn").hidden = false; $("installHint").hidden = true; });
 $("installBtn").addEventListener("click", async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("installBtn").hidden = true; });
 if (window.matchMedia("(display-mode: standalone)").matches) { $("installHint").textContent = "Läuft als App."; }
-const APP_VERSION = "7 · 17.10.2026";
+const APP_VERSION = "8 · 17.10.2026";
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").then((reg) => { reg.update().catch(() => {}); }).catch(() => {});
   let reloaded = false;
