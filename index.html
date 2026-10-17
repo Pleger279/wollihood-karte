@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="de-CH">
+<html lang="de">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -152,6 +152,36 @@ textarea.field { min-height: 110px; resize: vertical; font-size: 15px }
 .setup { max-width: 520px; margin: 0 auto; display: grid; gap: 14px }
 .setup ol { margin: 0; padding-left: 20px; color: var(--muted); font-size: 14px; display: grid; gap: 6px }
 
+
+/* Kriterien im Stil der Portale */
+.summary { background: var(--accent-soft); color: var(--fg); border-radius: 12px; padding: 10px 14px; font-size: 14px; font-weight: 700 }
+.ftitle { font: 600 16px var(--display); display: flex; justify-content: space-between; align-items: baseline; gap: 8px }
+.fval { font: 400 14px var(--body); color: var(--muted) }
+.sw-sub { display: block; font-size: 13px; color: var(--muted); font-weight: 400 }
+.seg { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px }
+.opt { border: 1.5px solid var(--line); background: var(--surface); border-radius: 10px; padding: 11px 8px; font-size: 15px; cursor: pointer; min-height: 46px }
+.opt[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--fg); font-weight: 700 }
+.rooms { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px }
+.rooms button { border: 1.5px solid var(--line); background: var(--surface); border-radius: 10px; min-height: 44px; font-size: 15px; cursor: pointer; font-variant-numeric: tabular-nums; padding: 0 }
+.rooms button.in { background: var(--accent-soft); border-color: var(--accent-soft) }
+.rooms button.end { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 700 }
+.checks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px }
+.check { display: flex; gap: 8px; align-items: center; border: 1.5px solid var(--line); border-radius: 10px; padding: 10px 8px; font-size: 14px; min-width: 0; hyphens: auto; overflow-wrap: anywhere; cursor: pointer; min-height: 48px; line-height: 1.25 }
+.check input { appearance: none; width: 22px; height: 22px; flex: none; border: 2px solid var(--muted); border-radius: 6px; margin: 0; display: grid; place-items: center; cursor: pointer; background: var(--surface) }
+.check input:checked { background: var(--accent); border-color: var(--accent) }
+.check input:checked::after { content: ""; width: 6px; height: 11px; border: solid var(--accent-ink); border-width: 0 2.5px 2.5px 0; transform: translateY(-1px) rotate(45deg) }
+.check:has(input:checked) { border-color: var(--accent); background: var(--accent-soft) }
+select.field { appearance: none; background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+  background-position: calc(100% - 18px) 52%, calc(100% - 13px) 52%; background-size: 5px 5px; background-repeat: no-repeat; padding-right: 32px }
+details.adv summary, details.adv-inner summary { cursor: pointer; font: 600 16px var(--display); list-style: none; display: flex; justify-content: space-between }
+details.adv-inner summary { font: 400 14px var(--body); color: var(--accent) }
+details summary::-webkit-details-marker { display: none }
+details.adv summary::after { content: "+"; color: var(--muted); font-size: 20px; line-height: 1 }
+details.adv[open] summary::after { content: "–" }
+details.adv[open], details.adv-inner[open] { display: grid; gap: 14px }
+.tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 4px }
+.tag { font-size: 12px; background: var(--sunk); border-radius: 999px; padding: 2px 9px; color: var(--fg) }
+
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important } }
 </style>
 </head>
@@ -205,42 +235,89 @@ textarea.field { min-height: 110px; resize: vertical; font-size: 15px }
 
   <!-- Kriterien -->
   <section class="view" id="v-criteria" hidden>
+    <div class="summary" id="critSummary"></div>
+
     <div class="panel">
-      <label class="switch" for="active">Suche aktiv <input type="checkbox" id="active"></label>
-      <div class="row3">
-        <label class="f" for="roomsMin">Zimmer ab<input class="field" id="roomsMin" type="number" inputmode="decimal" step="0.5" min="1"></label>
-        <label class="f" for="roomsMax">bis<input class="field" id="roomsMax" type="number" inputmode="decimal" step="0.5" min="1"></label>
-        <label class="f" for="rentMax">Max. CHF<input class="field" id="rentMax" type="number" inputmode="numeric" step="50" min="0"></label>
+      <label class="switch" for="active"><span><b>Suche aktiv</b><small class="sw-sub">Aus = keine Meldungen, nichts wird gesucht</small></span><input type="checkbox" id="active"></label>
+    </div>
+
+    <div class="panel">
+      <div class="ftitle">Objektart</div>
+      <div class="seg" id="objTypes">
+        <button type="button" class="opt" data-type="APARTMENT">Wohnung</button>
+        <button type="button" class="opt" data-type="HOUSE">Haus</button>
       </div>
-      <label class="switch" for="unkPrice">Ohne erkennbaren Preis trotzdem melden <input type="checkbox" id="unkPrice"></label>
-      <label class="switch" for="unkRooms">Ohne erkennbare Zimmerzahl trotzdem melden <input type="checkbox" id="unkRooms"></label>
+    </div>
+
+    <div class="panel">
+      <div class="ftitle">Zimmer <span class="fval" id="roomsVal"></span></div>
+      <div class="rooms" id="roomChips"></div>
+      <p class="hint">Erst das Minimum, dann das Maximum antippen.</p>
+    </div>
+
+    <div class="panel">
+      <div class="ftitle">Miete pro Monat <span class="fval">brutto</span></div>
+      <div class="row2">
+        <label class="f" for="rentMin"><small>von</small><select class="field" id="rentMin"></select></label>
+        <label class="f" for="rentMax"><small>bis</small><select class="field" id="rentMax"></select></label>
+      </div>
+      <div class="ftitle" style="margin-top:4px">Wohnfläche</div>
+      <div class="row2">
+        <label class="f" for="m2Min"><small>von</small><select class="field" id="m2Min"></select></label>
+        <label class="f" for="m2Max"><small>bis</small><select class="field" id="m2Max"></select></label>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="ftitle">Muss haben</div>
+      <div class="checks" id="featChecks"></div>
+      <p class="hint">Hat ein Inserat zu wenig Text, um das zu prüfen, kommt es trotzdem, mit dem Hinweis «Ausstattung ungeprüft».</p>
+    </div>
+
+    <div class="panel">
+      <div class="ftitle">Nicht anzeigen</div>
+      <div class="checks" id="exclChecks"></div>
+    </div>
+
+    <div class="panel">
+      <div class="ftitle">Unvollständige Inserate</div>
+      <label class="switch" for="unkPrice">Ohne Preisangabe trotzdem melden <input type="checkbox" id="unkPrice"></label>
+      <label class="switch" for="unkRooms">Ohne Zimmerzahl trotzdem melden <input type="checkbox" id="unkRooms"></label>
+    </div>
+
+    <details class="panel adv">
+      <summary>Erweitert</summary>
+      <label class="f" for="excl">Eigene Ausschluss-Begriffe<small>Ein Begriff pro Zeile, irgendwo im Inserat</small>
+        <textarea class="field" id="excl"></textarea></label>
+      <label class="f" for="titleExcl">Ausschluss im Titel<small>Für Parkplätze, Büros und Ähnliches</small>
+        <textarea class="field" id="titleExcl"></textarea></label>
       <label class="f" for="plz">PLZ, wenn die Adresse fehlt<small>Kommagetrennt</small>
         <input class="field" id="plz" type="text" inputmode="numeric"></label>
-    </div>
+    </details>
+
     <div class="panel">
-      <label class="f" for="excl">Aussortieren, wenn im Text<small>Ein Begriff pro Zeile</small>
-        <textarea class="field" id="excl"></textarea></label>
-      <label class="f" for="titleExcl">Aussortieren, wenn im Titel<small>Für Parkplätze, Büros und Ähnliches</small>
-        <textarea class="field" id="titleExcl"></textarea></label>
-    </div>
-    <div class="panel">
-      <h2>Quellen</h2>
+      <div class="ftitle">Quellen</div>
       <label class="switch" for="srcMail">Suchabo-Mails der Portale <input type="checkbox" id="srcMail"></label>
       <label class="switch" for="srcFlatfox">Flatfox direkt <input type="checkbox" id="srcFlatfox"></label>
       <label class="switch" for="srcPages">Genossenschaftsseiten <input type="checkbox" id="srcPages"></label>
-      <label class="f" for="pages">Beobachtete Seiten<small>Pro Zeile: Name | Adresse</small>
-        <textarea class="field" id="pages"></textarea></label>
-      <label class="f" for="areaKw">Stichworte für diese Seiten<small>Neue Einträge werden nur gemeldet, wenn eines vorkommt</small>
-        <textarea class="field" id="areaKw"></textarea></label>
+      <details class="adv-inner">
+        <summary>Seiten und Stichworte bearbeiten</summary>
+        <label class="f" for="pages">Beobachtete Seiten<small>Pro Zeile: Name | Adresse</small>
+          <textarea class="field" id="pages"></textarea></label>
+        <label class="f" for="areaKw">Stichworte für diese Seiten<small>Neue Einträge werden nur gemeldet, wenn eines vorkommt</small>
+          <textarea class="field" id="areaKw"></textarea></label>
+      </details>
     </div>
+
     <div class="panel">
-      <h2>Meldungen</h2>
-      <label class="f" for="digestTo">Tagesmail an<input class="field" id="digestTo" type="email" autocomplete="email"></label>
+      <div class="ftitle">Meldungen</div>
+      <label class="f" for="digestTo"><small>Tagesmail an</small><input class="field" id="digestTo" type="email" autocomplete="email"></label>
       <div class="row2">
-        <label class="f" for="quietFrom">Leise ab<input class="field" id="quietFrom" type="number" inputmode="numeric" min="0" max="23"></label>
-        <label class="f" for="quietTo">bis (Uhr)<input class="field" id="quietTo" type="number" inputmode="numeric" min="0" max="23"></label>
+        <label class="f" for="quietFrom"><small>Leise ab</small><select class="field" id="quietFrom"></select></label>
+        <label class="f" for="quietTo"><small>bis</small><select class="field" id="quietTo"></select></label>
       </div>
     </div>
+
     <div class="savebar">
       <button class="btn primary" type="button" data-save>Kriterien speichern</button>
     </div>
@@ -399,6 +476,7 @@ function renderHits() {
         <div class="price">${esc(chf(x.rent))} <small>· ${esc(rooms(x.rooms))}${x.m2 ? " · " + esc(x.m2) + " m²" : ""}</small></div>
         <div class="addr">${esc(place)}</div>
         <div class="meta">${esc(x.portal || "")} · ${esc(ago(x.first_seen))}</div>
+        ${x.features && x.features.length ? `<div class="tags">${x.features.filter((k) => FEATURES[k]).map((k) => `<span class="tag">${esc(FEATURES[k])}</span>`).join("")}</div>` : ""}
         ${x.notes && x.notes.length ? `<div class="notes">${esc(x.notes.join(" · "))}</div>` : ""}
         <div class="actions">
           ${m === "no"
@@ -483,10 +561,80 @@ function collectAreas() {
 
 // ---------- Kriterien ----------
 const lines = (t) => t.split("\n").map((s) => s.trim()).filter(Boolean);
+const FEATURES = { balkon: "Balkon/Terrasse", lift: "Lift", garten: "Garten", haustiere: "Haustiere erlaubt",
+  waschturm: "Eigene Waschmaschine", altbau: "Altbau", neubau: "Neubau", aussicht: "Seesicht/Aussicht",
+  rollstuhl: "Rollstuhlgängig", parkplatz: "Parkplatz" };
+const EXCL = { befristet: "Befristete Verträge", moebliert: "Möbliert", untermiete: "Untermiete", alter: "Alterswohnungen", wg: "WG-Zimmer" };
+const ROOMS = [1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5, 5.5, 6, 7];
+const RENTS = [1000, 1250, 1500, 1750, 2000, 2250, 2500, 2750, 3000, 3250, 3500, 3750, 4000, 4500, 5000, 6000];
+const M2 = [30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 140, 160, 200];
+const F = { rooms: [null, null], types: new Set() };
+
+function opts(sel, values, fmt, anyLabel, current) {
+  const list = current != null && !values.includes(current) ? [...values, current].sort((a, b) => a - b) : values;
+  $(sel).innerHTML = `<option value="">${anyLabel}</option>` + list.map((v) => `<option value="${v}">${fmt(v)}</option>`).join("");
+  $(sel).value = current ?? "";
+}
+function buildStatic() {
+  $("featChecks").innerHTML = Object.entries(FEATURES).map(([k, l]) =>
+    `<label class="check" for="ft-${k}"><input type="checkbox" id="ft-${k}" data-feat="${k}">${l}</label>`).join("");
+  $("exclChecks").innerHTML = Object.entries(EXCL).map(([k, l]) =>
+    `<label class="check" for="ex-${k}"><input type="checkbox" id="ex-${k}" data-excl="${k}">${l}</label>`).join("");
+  $("roomChips").innerHTML = ROOMS.map((r) => `<button type="button" data-room="${r}">${r === 7 ? "7+" : r}</button>`).join("");
+  const hours = [...Array(24).keys()];
+  opts("quietFrom", hours, (h) => `${h}:00`, "nie", null);
+  opts("quietTo", hours, (h) => `${h}:00`, "–", null);
+}
+function renderRooms() {
+  const [a, b] = F.rooms;
+  document.querySelectorAll("[data-room]").forEach((el) => {
+    const v = +el.dataset.room;
+    el.classList.toggle("end", v === a || v === b);
+    el.classList.toggle("in", a != null && b != null && v > a && v < b);
+  });
+  $("roomsVal").textContent = a == null ? "beliebig" : a === b ? `${a}` : `${a} – ${b === 7 ? "7+" : b}`;
+  renderSummary();
+}
+$("roomChips").addEventListener("click", (e) => {
+  const el = e.target.closest("[data-room]"); if (!el) return;
+  const v = +el.dataset.room; let [a, b] = F.rooms;
+  if (a == null || (a !== b)) { a = b = v; }        // neue Auswahl beginnt
+  else if (v === a) { a = b = null; }               // gleiches Feld nochmals: zurücksetzen
+  else if (v < a) { b = a; a = v; } else { b = v; }
+  F.rooms = [a, b]; renderRooms();
+});
+$("objTypes").addEventListener("click", (e) => {
+  const el = e.target.closest("[data-type]"); if (!el) return;
+  const t = el.dataset.type;
+  if (F.types.has(t) && F.types.size > 1) F.types.delete(t); else F.types.add(t);
+  document.querySelectorAll("[data-type]").forEach((b) => b.setAttribute("aria-pressed", String(F.types.has(b.dataset.type))));
+  renderSummary();
+});
+function renderSummary() {
+  if (!S.config) return;
+  const c = readForm();
+  const parts = [];
+  parts.push(c.object_types.length > 1 ? "Wohnung oder Haus" : c.object_types[0] === "HOUSE" ? "Haus" : "Wohnung");
+  if (c.rooms_min != null) parts.push(c.rooms_min === c.rooms_max ? `${c.rooms_min} Zi.` : `${c.rooms_min}–${c.rooms_max >= 7 ? "7+" : c.rooms_max} Zi.`);
+  if (c.rent_min || c.rent_max) parts.push(c.rent_min && c.rent_max ? `CHF ${fmtN(c.rent_min)}–${fmtN(c.rent_max)}` : c.rent_max ? `bis CHF ${fmtN(c.rent_max)}` : `ab CHF ${fmtN(c.rent_min)}`);
+  if (c.m2_min || c.m2_max) parts.push(c.m2_min && c.m2_max ? `${c.m2_min}–${c.m2_max} m²` : c.m2_min ? `ab ${c.m2_min} m²` : `bis ${c.m2_max} m²`);
+  c.features_required.forEach((k) => parts.push(FEATURES[k]));
+  $("critSummary").textContent = (c.active ? "" : "Pausiert · ") + parts.join(" · ");
+}
+const fmtN = (v) => Number(v).toLocaleString("de-CH");
 function fillForm() {
   const c = S.config;
   $("active").checked = c.active !== false;
-  $("roomsMin").value = c.rooms_min ?? ""; $("roomsMax").value = c.rooms_max ?? ""; $("rentMax").value = c.rent_max ?? "";
+  F.types = new Set(c.object_types && c.object_types.length ? c.object_types : ["APARTMENT"]);
+  document.querySelectorAll("[data-type]").forEach((b) => b.setAttribute("aria-pressed", String(F.types.has(b.dataset.type))));
+  const rmax = c.rooms_max != null && c.rooms_max >= 7 ? 7 : c.rooms_max;
+  F.rooms = [c.rooms_min ?? null, rmax ?? c.rooms_min ?? null];
+  opts("rentMin", RENTS, (v) => `CHF ${fmtN(v)}`, "beliebig", c.rent_min ?? null);
+  opts("rentMax", RENTS, (v) => `CHF ${fmtN(v)}`, "beliebig", c.rent_max ?? null);
+  opts("m2Min", M2, (v) => `${v} m²`, "beliebig", c.m2_min ?? null);
+  opts("m2Max", M2, (v) => `${v} m²`, "beliebig", c.m2_max ?? null);
+  document.querySelectorAll("[data-feat]").forEach((el) => (el.checked = (c.features_required || []).includes(el.dataset.feat)));
+  document.querySelectorAll("[data-excl]").forEach((el) => (el.checked = (c.exclude_groups || []).includes(el.dataset.excl)));
   $("unkPrice").checked = !!c.include_unknown_price; $("unkRooms").checked = !!c.include_unknown_rooms;
   $("plz").value = (c.plz_fallback || []).join(", ");
   $("excl").value = (c.exclude_keywords || []).join("\n");
@@ -497,12 +645,18 @@ function fillForm() {
   $("pages").value = (c.watch_pages || []).map((p) => `${p.name} | ${p.url}`).join("\n");
   $("digestTo").value = c.digest_to || "";
   $("quietFrom").value = c.quiet_hours?.from ?? ""; $("quietTo").value = c.quiet_hours?.to ?? "";
+  renderRooms();
 }
 function readForm() {
-  const num = (id) => { const v = parseFloat($(id).value); return Number.isFinite(v) ? v : null; };
+  const sel = (id) => { const v = parseFloat($(id).value); return Number.isFinite(v) ? v : null; };
   const c = structuredClone(S.config);
   c.active = $("active").checked;
-  c.rooms_min = num("roomsMin"); c.rooms_max = num("roomsMax"); c.rent_max = num("rentMax");
+  c.object_types = [...F.types];
+  c.rooms_min = F.rooms[0]; c.rooms_max = F.rooms[1] == null ? null : (F.rooms[1] >= 7 ? 99 : F.rooms[1]);
+  c.rent_min = sel("rentMin"); c.rent_max = sel("rentMax");
+  c.m2_min = sel("m2Min"); c.m2_max = sel("m2Max");
+  c.features_required = [...document.querySelectorAll("[data-feat]:checked")].map((el) => el.dataset.feat);
+  c.exclude_groups = [...document.querySelectorAll("[data-excl]:checked")].map((el) => el.dataset.excl);
   c.include_unknown_price = $("unkPrice").checked; c.include_unknown_rooms = $("unkRooms").checked;
   c.plz_fallback = $("plz").value.split(/[,\s]+/).map((s) => s.trim()).filter(Boolean);
   c.exclude_keywords = lines($("excl").value);
@@ -515,17 +669,19 @@ function readForm() {
     return { ...(old[url] || {}), name: name || url, url };
   }).filter((p) => /^https?:\/\//.test(p.url));
   c.digest_to = $("digestTo").value.trim();
-  const qf = num("quietFrom"), qt = num("quietTo");
+  const qf = sel("quietFrom"), qt = sel("quietTo");
   c.quiet_hours = qf === null || qt === null ? {} : { from: qf, to: qt };
   c.areas = collectAreas();
   return c;
 }
 function validate(c) {
   if (!c.areas.features.length) return "Bitte mindestens eine Fläche einzeichnen.";
-  if (c.rooms_min && c.rooms_max && c.rooms_min > c.rooms_max) return "«Zimmer ab» ist grösser als «bis».";
-  if (!c.rent_max) return "Bitte eine maximale Miete angeben.";
+  if (c.rent_min && c.rent_max && c.rent_min > c.rent_max) return "Die Mindestmiete ist höher als die Höchstmiete.";
+  if (c.m2_min && c.m2_max && c.m2_min > c.m2_max) return "Die Mindestfläche ist grösser als die Höchstfläche.";
   return null;
 }
+document.getElementById("v-criteria").addEventListener("change", renderSummary);
+buildStatic();
 async function saveConfig(c, message, okText) {
   try {
     S.configSha = await writeJson("config.json", c, S.configSha, message);
@@ -575,7 +731,7 @@ async function load() {
   $("refreshBtn").classList.add("spin");
   try {
     const cfg = await readJson("config.json");
-    S.config = cfg.data; S.configSha = cfg.sha; fillForm(); drawAreas();
+    S.config = cfg.data; S.configSha = cfg.sha; fillForm(); drawAreas(); renderSummary();
   } catch (e) {
     $("refreshBtn").classList.remove("spin");
     if (e.status === 401 || e.status === 404) { showSetup(e.message); return; }

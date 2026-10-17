@@ -1,5 +1,5 @@
 // Hält die App-Hülle offline bereit. Daten (GitHub-API) und Kartenkacheln gehen immer übers Netz.
-const CACHE = "wollihood-v1";
+const CACHE = "wollihood-v2";
 const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icons/icon-192.png", "./icons/icon-512.png"];
 
 self.addEventListener("install", (e) => {
