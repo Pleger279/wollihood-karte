@@ -203,6 +203,28 @@ details.adv[open], details.adv-inner[open] { display: grid; gap: 14px }
 .mini .lbl { position: absolute; left: 6px; bottom: 6px; z-index: 500; font-size: 11px; background: var(--surface); color: var(--fg); padding: 3px 8px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,.2); pointer-events: none }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .mini .leaflet-tile-pane { filter: brightness(.8) contrast(1.05) } }
 :root[data-theme="dark"] .mini .leaflet-tile-pane { filter: brightness(.8) contrast(1.05) }
+.votes { display: flex; align-items: center; gap: 8px; margin-top: 8px; flex-wrap: wrap }
+.vbtn { width: 46px; height: 42px; border-radius: 10px; border: 1.5px solid var(--line); background: var(--surface); color: var(--muted); display: grid; place-items: center; cursor: pointer; flex: none }
+.vbtn svg { width: 22px; height: 22px }
+.vbtn.up[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink) }
+.vbtn.down[aria-pressed="true"] { background: var(--bad); border-color: var(--bad); color: #fff }
+.other { font-size: 13px; color: var(--muted); display: inline-flex; align-items: center; gap: 4px; min-width: 0 }
+.other svg { width: 15px; height: 15px }
+.other.up { color: var(--ok) } .other.down { color: var(--bad) }
+.cbtn { margin-left: auto; border: 0; background: none; color: var(--accent); font-size: 14px; font-weight: 700; cursor: pointer; padding: 8px 4px; display: inline-flex; gap: 5px; align-items: center }
+.cbtn svg { width: 18px; height: 18px }
+.thread { display: grid; gap: 8px; margin-top: 4px; background: var(--sunk); border-radius: 10px; padding: 10px }
+.cmt { font-size: 14px; display: grid; gap: 1px }
+.cmt .who { font-size: 12px; color: var(--muted); display: flex; gap: 6px; align-items: center }
+.cmt .who b { color: var(--fg) }
+.cmt .del { border: 0; background: none; color: var(--muted); font-size: 12px; cursor: pointer; padding: 0 2px; text-decoration: underline }
+.cmt p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere }
+.cmt.mine { justify-self: end; text-align: right }
+.cmt.mine .who { justify-content: flex-end }
+.cform { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px }
+.cform textarea { min-height: 42px; height: 42px; font-size: 15px; resize: none }
+.badge.split { left: auto; right: 10px; background: var(--warn); color: #fff }
+.badge.match { left: auto; right: 10px; background: var(--ok); color: #fff }
 .tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 4px }
 .tag { font-size: 12px; background: var(--sunk); border-radius: 999px; padding: 2px 9px; color: var(--fg) }
 
@@ -240,14 +262,23 @@ details.adv[open], details.adv-inner[open] { display: grid; gap: 14px }
   <section class="view" id="v-hits" hidden>
     <div class="chips" role="group" aria-label="Filter">
       <button class="chip" type="button" data-filter="new" aria-pressed="true">Neu</button>
-      <button class="chip" type="button" data-filter="fav" aria-pressed="false">Gemerkt</button>
+      <button class="chip" type="button" data-filter="fav" aria-pressed="false">Merkliste</button>
+      <button class="chip" type="button" data-filter="both" aria-pressed="false">Beide dafür</button>
+      <button class="chip" type="button" data-filter="split" aria-pressed="false">Uneinig</button>
+      <button class="chip" type="button" data-filter="open" aria-pressed="false">Offen für mich</button>
       <button class="chip" type="button" data-filter="all" aria-pressed="false">Alle</button>
+      <button class="chip" type="button" data-filter="out" aria-pressed="false">Aussortiert</button>
     </div>
     <div class="sortrow" role="group" aria-label="Sortierung">
       <span class="hint">Sortieren:</span>
       <button class="sortbtn" type="button" data-sort="new">Neueste</button>
       <button class="sortbtn" type="button" data-sort="price">Günstigste</button>
       <button class="sortbtn" type="button" data-sort="size">Grösste</button>
+    </div>
+    <div class="panel whoami" id="whoPanel" hidden>
+      <div class="ftitle">Wer nutzt dieses Handy?</div>
+      <p class="hint">Damit eure Daumen und Kommentare richtig zugeordnet werden. Du kannst das unter Status jederzeit ändern.</p>
+      <div class="seg"><button type="button" class="opt" data-who="pascal">Pascal</button><button type="button" class="opt" data-who="leonie">Leonie</button></div>
     </div>
     <div id="hitList" class="view"></div>
     <button class="btn" id="allSeenBtn" type="button" hidden>Alle als gelesen markieren</button>
@@ -319,10 +350,7 @@ details.adv[open], details.adv-inner[open] { display: grid; gap: 14px }
           <label class="switch" for="pushFlatfox">Flatfox <input type="checkbox" id="pushFlatfox"></label>
           <label class="switch" for="pushPages">Genossenschaftsseiten <input type="checkbox" id="pushPages"></label>
           <label class="switch" for="pushIncomplete"><span>Auch wenn die Ausstattung nicht prüfbar ist<small class="sw-sub">Bei kurzen Inseraten ohne Beschreibung</small></span><input type="checkbox" id="pushIncomplete"></label>
-          <div class="row2">
-            <label class="f" for="quietFrom"><small>Leise ab</small><select class="field" id="quietFrom"></select></label>
-            <label class="f" for="quietTo"><small>bis</small><select class="field" id="quietTo"></select></label>
-          </div>
+          <p class="hint">Welche Mitteilungen du selbst bekommst und deine Nachtruhe stellst du unter Status → Meine Push-Mitteilungen ein.</p>
         </div>
       </div>
 
@@ -363,6 +391,31 @@ details.adv[open], details.adv-inner[open] { display: grid; gap: 14px }
     <button class="btn primary" id="runBtn" type="button">Jetzt suchen</button>
     <div class="panel"><h2>Quellen</h2><div id="sources"></div></div>
     <div class="panel"><h2>Genossenschaftsseiten</h2><div id="events"></div></div>
+    <div class="panel">
+      <h2>Ich bin</h2>
+      <div class="seg" id="whoStatus"><button type="button" class="opt" data-who="pascal">Pascal</button><button type="button" class="opt" data-who="leonie">Leonie</button></div>
+    </div>
+    <div class="panel" id="myPushPanel">
+      <h2>Meine Push-Mitteilungen</h2>
+      <p class="hint" id="myPushHint">Gilt für alle deine Geräte.</p>
+      <div class="ftitle sm">Neue Inserate</div>
+      <label class="switch" for="mp-hits">Neue Treffer <input type="checkbox" id="mp-hits" data-mp="hits"></label>
+      <label class="switch" for="mp-pages">Neues auf Genossenschaftsseiten <input type="checkbox" id="mp-pages" data-mp="pages"></label>
+      <div class="ftitle sm" id="mpOtherTitle">Reaktionen der anderen Person</div>
+      <label class="switch" for="mp-comment">Neuer Kommentar <input type="checkbox" id="mp-comment" data-mp="comment"></label>
+      <label class="switch" for="mp-match">«Ihr seid euch einig» (beide Daumen hoch) <input type="checkbox" id="mp-match" data-mp="match"></label>
+      <label class="switch" for="mp-up">Daumen hoch <input type="checkbox" id="mp-up" data-mp="up"></label>
+      <label class="switch" for="mp-down">Daumen runter <input type="checkbox" id="mp-down" data-mp="down"></label>
+      <div class="ftitle sm">Postfach und System</div>
+      <label class="switch" for="mp-mail">Neue Mail im Wollihood-Postfach <input type="checkbox" id="mp-mail" data-mp="mail"></label>
+      <label class="switch" for="mp-source">Eine Quelle ist gestört <input type="checkbox" id="mp-source" data-mp="source"></label>
+      <div class="ftitle sm">Nachtruhe (Mitteilungen kommen still)</div>
+      <div class="row2">
+        <label class="f" for="myQuietFrom"><small>ab</small><select class="field" id="myQuietFrom"></select></label>
+        <label class="f" for="myQuietTo"><small>bis</small><select class="field" id="myQuietTo"></select></label>
+      </div>
+      <button class="btn primary" id="myPushSave" type="button">Meine Einstellungen speichern</button>
+    </div>
     <div class="panel">
       <h2>Push auf diesem Gerät</h2>
       <p class="hint" id="wpState">Prüfe …</p>
@@ -539,20 +592,137 @@ function inSavedArea(x) {
 }
 function filtered() {
   return sortHits(S.hits).filter(inSavedArea).filter((x) => {
-    const m = S.marks[keyOf(x)];
+    const k = keyOf(x), m = S.marks[k], v = verdict(k);
+    if (S.filter === "out") return v === "out";
+    if (v === "out") return false;
     if (S.filter === "new") return isNew(x);
     if (S.filter === "fav") return m === "fav";
+    if (S.filter === "both") return v === "both";
+    if (S.filter === "split") return v === "split";
+    if (S.filter === "open") return !!S.person && !myVote(k);
     return true;
   });
 }
+// ---------- Bewertungen & Kommentare ----------
+const PEOPLE = { pascal: "Pascal", leonie: "Leonie" };
+const otherOf = (p) => (p === "pascal" ? "leonie" : "pascal");
+S.person = PEOPLE[store.get("wh_person")] ? store.get("wh_person") : null;
+S.social = {}; S.socialSha = null; S.people = {}; S.peopleSha = null; S.openThreads = new Set();
+const thumb = (dir) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"${dir === "down" ? ' style="transform:rotate(180deg)"' : ""}><path d="M7 10v11H4V10zM7 10l4-7a2 2 0 0 1 2 2v4h6a2 2 0 0 1 2 2.3l-1.4 7A2 2 0 0 1 17.6 21H7"/></svg>`;
+const bubble = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 5h16v11H9l-5 4z"/></svg>';
+const itemOf = (k) => S.social[k] || { votes: {}, comments: [] };
+function verdict(k) {
+  const v = itemOf(k).votes || {};
+  const a = v.pascal, b = v.leonie;
+  if (a === "down" && b === "down") return "out";
+  if (a === "up" && b === "up") return "both";
+  if (a && b && a !== b) return "split";
+  return "";
+}
+const myVote = (k) => (S.person ? (itemOf(k).votes || {})[S.person] : null);
+let socialQueue = Promise.resolve();
+function socialOp(label, apply) {
+  // sofort lokal anwenden, dann mit dem neusten Stand im Repo zusammenführen
+  apply(S.social); renderHits();
+  socialQueue = socialQueue.then(async () => {
+    for (let i = 0; i < 4; i++) {
+      try {
+        let cur = { data: { items: {} }, sha: null };
+        try { cur = await readJson("social.json"); } catch (e) { if (e.status !== 404) throw e; }
+        const items = cur.data.items || {};
+        apply(items);
+        S.socialSha = await writeJson("social.json", { items }, cur.sha, "Reaktion: " + label);
+        S.social = items; renderHits();
+        return;
+      } catch (e) {
+        if (!(e.status === 409 || e.status === 422) || i === 3) { toast("Nicht gespeichert: " + e.message, "err", 7000); return; }
+        await new Promise((r) => setTimeout(r, 400 * (i + 1)));
+      }
+    }
+  });
+}
+function needPerson() {
+  if (S.person) return false;
+  $("whoPanel").hidden = false; window.scrollTo(0, 0);
+  toast("Bitte zuerst oben wählen, wer dieses Handy nutzt.", "err");
+  return true;
+}
+function setVote(k, dir) {
+  if (needPerson()) return;
+  const me = S.person, label = (S.hits.find((h) => keyOf(h) === k) || {}).street || "Inserat";
+  const val = myVote(k) === dir ? null : dir;
+  S.seen.add(k); saveSeen();
+  socialOp(`${PEOPLE[me]} ${val === "up" ? "dafür" : val === "down" ? "dagegen" : "neutral"} (${label})`, (items) => {
+    const it = items[k] || (items[k] = { votes: {}, comments: [] });
+    it.votes = it.votes || {};
+    if (val) it.votes[me] = val; else delete it.votes[me];
+    it.updated = new Date().toISOString();
+  });
+}
+function addComment(k, text) {
+  if (needPerson()) return;
+  const me = S.person, t = text.trim(); if (!t) return;
+  const c = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), by: me, at: new Date().toISOString(), text: t.slice(0, 1000) };
+  S.openThreads.add(k);
+  socialOp(`Kommentar von ${PEOPLE[me]}`, (items) => {
+    const it = items[k] || (items[k] = { votes: {}, comments: [] });
+    it.comments = it.comments || [];
+    if (!it.comments.some((x) => x.id === c.id)) it.comments.push(c);
+    it.updated = c.at;
+  });
+}
+function deleteComment(k, id) {
+  socialOp(`Kommentar gelöscht`, (items) => {
+    const it = items[k]; if (!it) return;
+    it.comments = (it.comments || []).filter((x) => !(x.id === id && x.by === S.person));
+  });
+}
+function socialBlock(x) {
+  const k = keyOf(x), it = itemOf(k), mine = myVote(k);
+  const other = S.person ? otherOf(S.person) : null;
+  const ov = other ? (it.votes || {})[other] : null;
+  const n = (it.comments || []).length, open = S.openThreads.has(k);
+  const otherHtml = other
+    ? `<span class="other ${ov || ""}">${esc(PEOPLE[other])}: ${ov ? thumb(ov) : "offen"}</span>`
+    : `<span class="other">${Object.entries(it.votes || {}).map(([p, v]) => `${esc(PEOPLE[p] || p)} ${thumb(v)}`).join(" ") || "Noch nicht bewertet"}</span>`;
+  const thread = open ? `<div class="thread">
+      ${(it.comments || []).map((c) => `<div class="cmt ${c.by === S.person ? "mine" : ""}">
+        <div class="who"><b>${esc(PEOPLE[c.by] || c.by)}</b>${esc(ago(c.at))}${c.by === S.person ? ` <button type="button" class="del" data-del="${esc(c.id)}">löschen</button>` : ""}</div>
+        <p>${esc(c.text)}</p></div>`).join("") || '<p class="hint">Noch keine Kommentare.</p>'}
+      <div class="cform"><textarea class="field" rows="1" placeholder="${other ? "Antwort an " + esc(PEOPLE[other]) : "Kommentar"} …" data-cinput></textarea>
+        <button type="button" class="btn primary" data-csend>Senden</button></div>
+    </div>` : "";
+  return `<div class="votes">
+      <button type="button" class="vbtn up" data-vote="up" aria-pressed="${mine === "up"}" aria-label="Daumen hoch">${thumb("up")}</button>
+      <button type="button" class="vbtn down" data-vote="down" aria-pressed="${mine === "down"}" aria-label="Daumen runter">${thumb("down")}</button>
+      ${otherHtml}
+      <button type="button" class="cbtn" data-thread>${bubble} ${n ? n + " " : ""}Kommentar${n === 1 ? "" : "e"}</button>
+    </div>${thread}`;
+}
+function setPerson(p) {
+  S.person = p; store.set("wh_person", p);
+  $("whoPanel").hidden = true;
+  document.querySelectorAll("[data-who]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.who === p)));
+  renderHits(); renderMyPush(); syncDevicePerson();
+}
+document.addEventListener("click", (e) => { const b = e.target.closest("[data-who]"); if (b) setPerson(b.dataset.who); });
+
 function renderHits() {
-  const newN = S.hits.filter(inSavedArea).filter(isNew).length;
-  const favN = S.hits.filter((x) => S.marks[keyOf(x)] === "fav").length;
+  const pool = S.hits.filter(inSavedArea);
+  const live = pool.filter((x) => verdict(keyOf(x)) !== "out");
+  const cnt = {
+    new: live.filter(isNew).length, fav: live.filter((x) => S.marks[keyOf(x)] === "fav").length,
+    both: live.filter((x) => verdict(keyOf(x)) === "both").length, split: live.filter((x) => verdict(keyOf(x)) === "split").length,
+    open: S.person ? live.filter((x) => !myVote(keyOf(x))).length : 0, all: 0, out: pool.length - live.length,
+  };
+  const names = { new: "Neu", fav: "Merkliste", both: "Beide dafür", split: "Uneinig", open: "Offen für mich", all: "Alle", out: "Aussortiert" };
+  const newN = cnt.new;
   document.querySelectorAll("[data-filter]").forEach((b) => {
     const f = b.dataset.filter;
     b.setAttribute("aria-pressed", String(f === S.filter));
-    b.textContent = { new: `Neu${newN ? " · " + newN : ""}`, fav: `Merkliste${favN ? " · " + favN : ""}`, all: "Alle" }[f];
+    b.textContent = names[f] + (cnt[f] ? " · " + cnt[f] : "");
   });
+  $("whoPanel").hidden = !!S.person;
   $("newCount").hidden = !newN; $("newCount").textContent = newN;
   $("allSeenBtn").hidden = !(S.filter === "new" && newN > 1);
   const list = filtered();
@@ -561,6 +731,10 @@ function renderHits() {
       new: ["Nichts Neues", "Sobald eine passende Wohnung auftaucht, erscheint sie hier und du bekommst eine Push-Meldung."],
       fav: ["Die Merkliste ist leer", "Tippe bei einem Treffer auf «Merken», dann landet er hier, auch auf Leonies Handy."],
       all: ["Noch keine Treffer", "Die Suche läuft alle 30 Minuten. Treffer der letzten Wochen erscheinen hier."],
+      both: ["Noch keine gemeinsamen Favoriten", "Hier landen Wohnungen, bei denen ihr beide Daumen hoch gegeben habt."],
+      split: ["Keine offenen Diskussionen", "Hier landen Wohnungen, bei denen einer dafür und einer dagegen ist."],
+      open: [S.person ? "Alles bewertet" : "Wer bist du?", S.person ? "Du hast alle Treffer bewertet." : "Wähle oben, wer dieses Handy nutzt."],
+      out: ["Nichts aussortiert", "Haben beide Daumen runter gegeben, landet die Wohnung hier."],
     }[S.filter];
     $("hitList").innerHTML = `<div class="empty"><b>${msg[0]}</b>${msg[1]}</div>`;
     return;
@@ -573,7 +747,7 @@ function renderHits() {
       : "";
     return `<article class="card" data-key="${esc(k)}">
       <a class="photo ${x.image ? "" : "noimg"}" data-label="kein Bild" href="${esc(x.url)}" target="_blank" rel="noopener" data-open>${photo}
-        ${isNew(x) ? '<span class="badge">Neu</span>' : ""}${m === "fav" ? `<span class="badge fav">Merkliste</span>` : ""}</a>
+        ${isNew(x) ? '<span class="badge">Neu</span>' : ""}${m === "fav" ? `<span class="badge fav">Merkliste</span>` : verdict(k) === "both" ? '<span class="badge match">Beide dafür</span>' : verdict(k) === "split" ? '<span class="badge split">Uneinig</span>' : ""}</a>
       <div class="body">
         <div class="price">${esc(chf(x.rent))} <small>· ${esc(rooms(x.rooms))}${x.m2 ? " · " + esc(x.m2) + " m²" : ""}</small></div>
         <div class="addr">${esc(place)}</div>
@@ -581,6 +755,7 @@ function renderHits() {
         ${x.features && x.features.length ? `<div class="tags">${x.features.filter((k) => FEATURES[k]).map((k) => `<span class="tag">${esc(FEATURES[k])}</span>`).join("")}</div>` : ""}
         ${x.notes && x.notes.length ? `<div class="notes">${esc(x.notes.join(" · "))}</div>` : ""}
         ${miniMap(x)}
+        ${socialBlock(x)}
         <div class="actions">
           <button class="btn ${m === "fav" ? "on" : ""}" type="button" data-mark="${m === "fav" ? "" : "fav"}">${m === "fav" ? icon.star : icon.starO} ${m === "fav" ? "Gemerkt" : "Merken"}</button>
           <a class="btn primary" href="${esc(x.url)}" target="_blank" rel="noopener" data-open>${icon.open} Öffnen</a>
@@ -605,10 +780,20 @@ function setMark(k, val) {
     store.set("wh_marks", JSON.stringify(S.marks));
   });
 }
+$("hitList").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey && e.target.matches("[data-cinput]")) {
+    e.preventDefault(); const card = e.target.closest(".card"); addComment(card.dataset.key, e.target.value); e.target.value = "";
+  }
+});
 $("hitList").addEventListener("click", (e) => {
   const card = e.target.closest(".card"); if (!card) return;
   const k = card.dataset.key;
   if (e.target.closest(".mini")) return;   // die kleine Karte kümmert sich selbst um Tippen und Zoomen
+  const vb = e.target.closest("[data-vote]"); if (vb) { setVote(k, vb.dataset.vote); return; }
+  if (e.target.closest("[data-thread]")) { S.openThreads.has(k) ? S.openThreads.delete(k) : S.openThreads.add(k); renderHits();
+    if (S.openThreads.has(k)) setTimeout(() => document.querySelector(`.card[data-key="${CSS.escape(k)}"] [data-cinput]`)?.focus(), 50); return; }
+  if (e.target.closest("[data-csend]")) { const ta = card.querySelector("[data-cinput]"); addComment(k, ta.value); ta.value = ""; return; }
+  const del = e.target.closest("[data-del]"); if (del) { deleteComment(k, del.dataset.del); return; }
   const mb = e.target.closest("[data-mark]");
   if (mb) { setMark(k, mb.dataset.mark); return; }
   if (e.target.closest("[data-open]")) { S.seen.add(k); saveSeen(); setTimeout(renderHits, 400); }
@@ -889,7 +1074,6 @@ function fillForm() {
   $("pushOn").checked = p.enabled !== false;
   $("pushMail").checked = p.mail_alerts !== false; $("pushFlatfox").checked = p.flatfox !== false; $("pushPages").checked = p.pages !== false;
   $("pushIncomplete").checked = p.allow_incomplete !== false;
-  $("quietFrom").value = c.quiet_hours?.from ?? ""; $("quietTo").value = c.quiet_hours?.to ?? "";
   const d = c.digest || { enabled: true, to: [], time: "07:00", days: "daily", skip_empty: true };
   $("dgOn").checked = d.enabled !== false;
   F.recips = [...(d.to || [])]; F.days = d.days || "daily";
@@ -912,8 +1096,6 @@ function readForm() {
     const [name, url] = ln.includes("|") ? ln.split("|").map((s) => s.trim()) : [ln, ln];
     return { ...(old[url] || {}), name: name || url, url };
   }).filter((x) => /^https?:\/\//.test(x.url));
-  const qf = sel("quietFrom"), qt = sel("quietTo");
-  c.quiet_hours = qf === null || qt === null ? {} : { from: qf, to: qt };
   c.push = { enabled: $("pushOn").checked, mail_alerts: $("pushMail").checked, flatfox: $("pushFlatfox").checked,
     pages: $("pushPages").checked, allow_incomplete: $("pushIncomplete").checked, criteria: getCrit("n") };
   delete c.digest_to;
@@ -950,8 +1132,8 @@ function addRecipient() {
   const times = []; for (let h = 5; h <= 22; h++) for (const m of ["00", "30"]) times.push(`${String(h).padStart(2, "0")}:${m}`);
   $("dgTime").innerHTML = times.map((t) => `<option value="${t}">${t} Uhr</option>`).join("");
   const hours = [...Array(24).keys()];
-  opts("quietFrom", hours, (h) => `${h}:00`, "nie", null);
-  opts("quietTo", hours, (h) => `${h}:00`, "–", null);
+  opts("myQuietFrom", hours, (h) => `${h}:00`, "keine", null);
+  opts("myQuietTo", hours, (h) => `${h}:00`, "–", null);
 })();
 $("cs-search").addEventListener("change", renderSummary);
 $("cs-notify").addEventListener("change", renderChannels);
@@ -1025,8 +1207,12 @@ async function load() {
     if (e.status === 401 || e.status === 404) { showSetup(e.message); return; }
     toast(e.message, "err", 8000); return;
   }
-  const [hits, health, events, marks] = await Promise.allSettled([
-    readJson("state/recent.json"), readJson("state/health.json"), readJson("state/events.json"), readJson("marks.json")]);
+  const [hits, health, events, marks, social, people] = await Promise.allSettled([
+    readJson("state/recent.json"), readJson("state/health.json"), readJson("state/events.json"), readJson("marks.json"),
+    readJson("social.json"), readJson("people.json")]);
+  if (social.status === "fulfilled") { S.social = social.value.data.items || {}; S.socialSha = social.value.sha; }
+  if (people.status === "fulfilled") { S.people = people.value.data.people || {}; S.peopleSha = people.value.sha; }
+  renderMyPush(); syncDevicePerson();
   if (hits.status === "fulfilled") { S.hits = hits.value.data; store.set("wh_cache_hits", JSON.stringify(S.hits)); }
   if (health.status === "fulfilled") S.health = health.value.data;
   if (events.status === "fulfilled") S.events = events.value.data;
@@ -1094,11 +1280,22 @@ async function renderPush() {
   $("wpState").textContent = sub ? "Aktiv. Neue Treffer kommen direkt als Mitteilung auf dieses Gerät." : "Noch nicht aktiv. Nach dem Aktivieren brauchst du ntfy nicht mehr.";
   $("wpOn").hidden = !!sub; $("wpTest").hidden = !sub; $("wpOff").hidden = !sub;
 }
+async function syncDevicePerson() {
+  try {
+    if (!S.person) return;
+    const sub = await currentSub(); if (!sub) return;
+    const { data, sha } = await readSubs();
+    const d = data.devices.find((x) => (x.subscription || x).endpoint === sub.endpoint);
+    if (!d || d.person === S.person) return;
+    d.person = S.person;
+    await writeJson(SUBS_PATH, { ...data, updated: new Date().toISOString() }, sha, "Gerät zugeordnet");
+  } catch {}
+}
 async function saveDevice(sub, message) {
   const { data, sha } = await readSubs();
   const json = sub.toJSON();
   const devices = data.devices.filter((d) => (d.subscription || d).endpoint !== json.endpoint);
-  devices.push({ label: deviceLabel(), added: new Date().toISOString(), subscription: json });
+  devices.push({ label: deviceLabel(), person: S.person || undefined, added: new Date().toISOString(), subscription: json });
   await writeJson(SUBS_PATH, { ...data, devices, updated: new Date().toISOString() }, sha, message);
 }
 $("wpOn").addEventListener("click", async () => {
@@ -1130,12 +1327,46 @@ $("wpOff").addEventListener("click", async () => {
   renderPush();
 });
 
+
+// ---------- Meine Push-Mitteilungen ----------
+const MP_DEFAULT = { hits: true, pages: true, comment: true, match: true, up: true, down: false, mail: true, source: true };
+function renderMyPush() {
+  const p = S.person;
+  document.querySelectorAll("[data-who]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.who === p)));
+  $("myPushPanel").classList.toggle("off", !p);
+  $("myPushHint").textContent = p ? `Einstellungen für ${PEOPLE[p]}, gelten für alle deine Geräte.` : "Wähle oben zuerst, wer du bist.";
+  if (p) $("mpOtherTitle").textContent = `Reaktionen von ${PEOPLE[otherOf(p)]}`;
+  const me = (S.people[p] || {});
+  const prefs = { ...MP_DEFAULT, ...(me.push || {}) };
+  document.querySelectorAll("[data-mp]").forEach((el) => (el.checked = !!prefs[el.dataset.mp]));
+  $("myQuietFrom").value = me.quiet?.from ?? (S.config?.quiet_hours?.from ?? "");
+  $("myQuietTo").value = me.quiet?.to ?? (S.config?.quiet_hours?.to ?? "");
+}
+$("myPushSave").addEventListener("click", async () => {
+  if (!S.person) { toast("Bitte zuerst wählen, wer du bist.", "err"); return; }
+  const push = Object.fromEntries([...document.querySelectorAll("[data-mp]")].map((el) => [el.dataset.mp, el.checked]));
+  const qf = $("myQuietFrom").value, qt = $("myQuietTo").value;
+  const quiet = qf === "" || qt === "" ? null : { from: +qf, to: +qt };
+  $("myPushSave").disabled = true;
+  for (let i = 0; i < 3; i++) {
+    try {
+      let cur = { data: { people: {} }, sha: null };
+      try { cur = await readJson("people.json"); } catch (e) { if (e.status !== 404) throw e; }
+      const people = cur.data.people || {};
+      people[S.person] = { ...(people[S.person] || {}), push, quiet };
+      S.peopleSha = await writeJson("people.json", { people }, cur.sha, `Push-Einstellungen ${PEOPLE[S.person]}`);
+      S.people = people; toast("Gespeichert.", "ok"); break;
+    } catch (e) { if (!(e.status === 409 || e.status === 422) || i === 2) { toast(e.message, "err"); break; } }
+  }
+  $("myPushSave").disabled = false;
+});
+
 // Installation
 let installEvt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("installBtn").hidden = false; $("installHint").hidden = true; });
 $("installBtn").addEventListener("click", async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("installBtn").hidden = true; });
 if (window.matchMedia("(display-mode: standalone)").matches) { $("installHint").textContent = "Läuft als App."; }
-const APP_VERSION = "17 · 18.10.2026";
+const APP_VERSION = "18 · 18.10.2026";
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").then((reg) => { reg.update().catch(() => {}); }).catch(() => {});
   let reloaded = false;
