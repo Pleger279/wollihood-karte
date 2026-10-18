@@ -87,10 +87,12 @@ h2 { font: 20px/1.05 var(--display); letter-spacing: -.4px; text-transform: uppe
 .card { background: var(--surface); border: 3px solid var(--line); display: grid; grid-template-columns: minmax(0, 1fr); min-width: 0 }
 .card .photo { display: block; aspect-ratio: 16 / 9; background: var(--sunk); position: relative; max-width: 100%; border-bottom: 3px solid var(--line) }
 .card .photo img { width: 100%; height: 100%; object-fit: cover; display: block }
-.card .photo.noimg { aspect-ratio: auto; height: 46px }
-.card .photo.noimg::after { content: attr(data-label); position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
-  font: 700 10.5px var(--body); text-transform: uppercase; letter-spacing: .14em; color: var(--muted) }
-.card .photo.noimg:has(.stat, .fav, .split, .match)::after { content: none }
+.card .photo .ph { display: none }
+.card .photo.noimg { aspect-ratio: auto; min-height: 150px; background: var(--accent); color: #fff; text-decoration: none }
+.card .photo.noimg .ph { display: grid; align-content: end; gap: 4px; padding: 52px 14px 16px; min-height: 150px }
+.ph .q { font: 34px/.92 var(--display); text-transform: uppercase; letter-spacing: -1px; overflow-wrap: anywhere }
+.ph .r { font: 800 14px var(--body) }
+.ph .k { font: 700 10.5px var(--body); text-transform: uppercase; letter-spacing: .14em; opacity: .8 }
 .place { position: absolute; left: 10px; top: 10px; background: var(--surface); color: var(--fg); font: 800 10.5px var(--body); text-transform: uppercase; letter-spacing: .12em; padding: 4px 7px }
 .badge { position: absolute; right: 10px; top: 10px; background: var(--accent); color: var(--accent-ink); font: 800 10.5px var(--body); text-transform: uppercase; letter-spacing: .1em; padding: 4px 7px }
 .badge.new { right: auto; left: 10px; top: auto; bottom: 10px; background: var(--fg); color: var(--bg) }
@@ -99,9 +101,8 @@ h2 { font: 20px/1.05 var(--display); letter-spacing: -.4px; text-transform: uppe
 .badge.match { background: var(--ok); color: #fff }
 .badge.stat { background: var(--accent) }
 .badge.st-zusage { background: var(--ok) } .badge.st-absage { background: var(--bad) } .badge.st-besichtigung { background: var(--star); color: var(--star-ink) }
-.noimg .badge.new { top: 50%; bottom: auto; transform: translateY(-50%) }
-.noimg .place { top: 50%; transform: translateY(-50%); left: 64px }
-.noimg:not(:has(.new)) .place { left: 10px }
+.noimg .badge.new { top: 10px; bottom: auto; left: auto; right: 10px; background: #fff; color: var(--accent) }
+.noimg .place { display: none }
 
 .facts { display: grid; grid-template-columns: 1.3fr 1fr; border-bottom: 1px solid var(--line) }
 .facts .pr { padding: 10px 12px 12px; border-right: 1px solid var(--line); min-width: 0 }
@@ -234,6 +235,7 @@ textarea.field { min-height: 110px; resize: vertical; font-size: 15px }
 .arow { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 0 0 10px }
 .arow.one { grid-template-columns: 1fr }
 .hint.center { text-align: center; margin-top: 8px }
+.srclink { color: inherit; text-decoration: none; border-bottom: 2px solid var(--accent); display: inline-block; justify-self: start; width: fit-content }
 .advbody { display: grid; gap: 14px; margin-top: 14px }
 .advbody .ftitle.sm { margin-top: 10px }
 #map, .mini { position: relative; z-index: 0 }   /* Leaflet-Ebenen bleiben unter Kopfzeile, Speichern und Tableiste */
@@ -392,7 +394,6 @@ details.adv:not([open]) { display: block }
     <div class="stats" id="stats"></div>
     <button class="btn primary" id="runBtn" type="button">Jetzt suchen</button>
     <div class="panel"><h2>Quellen</h2><div id="sources"></div></div>
-    <div class="panel"><h2>Genossenschaftsseiten</h2><div id="events"></div></div>
     <p class="hint center" id="appVersion"></p>
   </section>
 
@@ -469,13 +470,6 @@ details.adv:not([open]) { display: block }
       <label class="switch" for="srcPages">Genossenschaftsseiten <input type="checkbox" id="srcPages"></label>
       <label class="f" for="pages">Beobachtete Seiten<small>Pro Zeile: Name | Adresse. PWG und ABZ werden Wohnung für Wohnung ausgelesen und wie alle Treffer geprüft. Bei anderen Seiten wird jede neue Zeile mit Zimmer- oder Preisangabe gemeldet.</small>
         <textarea class="field" id="pages"></textarea></label>
-      <div class="ftitle sm">Ausschliessen</div>
-      <label class="f" for="excl">Eigene Ausschluss-Begriffe<small>Ein Begriff pro Zeile, irgendwo im Inserat</small>
-        <textarea class="field" id="excl"></textarea></label>
-      <label class="f" for="titleExcl">Ausschluss im Titel<small>Für Parkplätze, Büros und Ähnliches</small>
-        <textarea class="field" id="titleExcl"></textarea></label>
-      <label class="f" for="plz">PLZ, wenn die Adresse fehlt<small>Kommagetrennt</small>
-        <input class="field" id="plz" type="text" inputmode="numeric"></label>
       <button class="btn primary" type="button" data-save>Erweitert speichern</button>
       <div class="ftitle sm">Dieses Gerät</div>
       <button class="btn" id="installBtn" type="button" hidden>Auf dem Startbildschirm installieren</button>
@@ -890,7 +884,8 @@ function renderHits() {
     const badge = st && st.value ? `<span class="badge stat st-${esc(st.value)}">${esc(statusLabel(st))}</span>`
       : fav ? '<span class="badge fav">Favorit</span>' : verdict(k) === "split" ? '<span class="badge split">Uneinig</span>' : "";
     return `<article class="card" data-key="${esc(k)}">
-      <a class="photo ${x.image ? "" : "noimg"}" data-label="kein Bild" href="${esc(x.url)}" target="_blank" rel="noopener" data-open>${photo}
+      <a class="photo ${x.image ? "" : "noimg"}" href="${esc(x.url)}" target="_blank" rel="noopener" data-open>${photo}
+        <span class="ph"><span class="k">${esc(x.plz || "")}${x.plz ? " · " : ""}kein Foto</span><span class="q">${esc(quarter || x.portal || "Wohnung")}</span><span class="r">${x.rooms != null ? esc(String(x.rooms)) + " Zimmer" : "Zimmerzahl fehlt"}</span></span>
         ${placeTag ? `<span class="place">${esc(placeTag)}</span>` : ""}${isNew(x) ? '<span class="badge new">Neu</span>' : ""}${badge}</a>
       <div class="facts">
         <div class="pr"><div class="cap">Miete ${x.rent_note === "netto" ? "netto" : "brutto"}</div><b class="${x.rent ? "" : "na"}">${x.rent ? esc(fmtN(x.rent)) : "auf Anfrage"}</b></div>
@@ -1171,13 +1166,12 @@ function critMarkup(p) {
     <div class="checks">${checks(EXCL, "excl")}</div>
     <label class="f" for="${p}Befr" data-befrrow><small>Befristete trotzdem, wenn die Dauer mindestens …</small>
       <select class="field" id="${p}Befr"><option value="">nie, alle befristeten ausblenden</option>${BEFR.map(([v, l]) => `<option value="${v}">${l}</option>`).join("")}</select></label>
+    ${p === "s" ? '<label class="f" for="exclWords">Weitere Wörter, die ausschliessen<small>Ein Wort pro Zeile, zum Beispiel «Parkplatz» oder «Büro»</small><textarea class="field" id="exclWords"></textarea></label>' : ""}
   </div>
-  <div class="panel">
+  ${p === "n" ? `<div class="panel">
     <div class="ftitle">Unvollständige Inserate</div>
-    <label class="switch" for="${p}UnkPrice">Ohne Preisangabe trotzdem <input type="checkbox" id="${p}UnkPrice"></label>
-    <label class="switch" for="${p}UnkRooms">Ohne Zimmerzahl trotzdem <input type="checkbox" id="${p}UnkRooms"></label>
-    ${p === "n" ? '<label class="switch" for="pushIncomplete"><span>Auch wenn die Ausstattung nicht prüfbar ist<small class="sw-sub">Bei kurzen Inseraten ohne Beschreibung</small></span><input type="checkbox" id="pushIncomplete"></label>' : ""}
-  </div>`;
+    <label class="switch" for="pushIncomplete"><span>Auch melden, wenn Angaben fehlen<small class="sw-sub">Miete, Zimmer, genaue Lage oder Ausstattung nicht im Inserat. Angezeigt werden solche Wohnungen immer.</small></span><input type="checkbox" id="pushIncomplete"></label>
+  </div>` : ""}`;
 }
 const root = (p) => $(p === "s" ? "critS" : "critN");
 function opts(sel, values, fmt, anyLabel, current) {
@@ -1208,7 +1202,6 @@ function setCrit(p, c) {
   r.querySelectorAll("[data-feat]").forEach((el) => (el.checked = migrateFeat(c).includes(el.dataset.feat)));
   r.querySelectorAll("[data-excl]").forEach((el) => (el.checked = (c.exclude_groups || []).includes(el.dataset.excl)));
   $(p + "Befr").value = c.befristet_min_months ? String(c.befristet_min_months) : "";
-  $(p + "UnkPrice").checked = !!c.include_unknown_price; $(p + "UnkRooms").checked = !!c.include_unknown_rooms;
   renderCrit(p);
 }
 function getCrit(p) {
@@ -1222,7 +1215,7 @@ function getCrit(p) {
     features_mode: "all",
     exclude_groups: [...r.querySelectorAll("[data-excl]:checked")].map((el) => el.dataset.excl),
     befristet_min_months: $(p + "Befr").value ? +$(p + "Befr").value : null,
-    include_unknown_price: $(p + "UnkPrice").checked, include_unknown_rooms: $(p + "UnkRooms").checked,
+    include_unknown_price: true, include_unknown_rooms: true,   // fehlende Angaben werden immer gezeigt
   };
 }
 function wireCrit(p) {
@@ -1276,9 +1269,7 @@ function fillForm() {
   setCrit("s", c);
   const p = c.push || {};
   setCrit("n", { ...Object.fromEntries(CRIT_KEYS.map((k) => [k, c[k]])), ...(p.criteria || {}) });
-  $("plz").value = (c.plz_fallback || []).join(", ");
-  $("excl").value = (c.exclude_keywords || []).join("\n");
-  $("titleExcl").value = (c.title_exclude_keywords || []).join("\n");
+  $("exclWords").value = [...new Set([...(c.exclude_keywords || []), ...(c.title_exclude_keywords || [])])].join("\n");
   const src = c.sources || {};
   $("srcMail").checked = src.mail_alerts !== false; $("srcFlatfox").checked = src.flatfox !== false; $("srcPages").checked = src.watch_pages !== false;
   $("pages").value = (c.watch_pages || []).map((x) => `${x.name} | ${x.url}`).join("\n");
@@ -1295,9 +1286,8 @@ function readForm() {
   const sel = (id) => { const v = parseFloat($(id).value); return Number.isFinite(v) ? v : null; };
   c.active = $("active").checked;
   Object.assign(c, getCrit("s"));
-  c.plz_fallback = $("plz").value.split(/[,\s]+/).map((s) => s.trim()).filter(Boolean);
-  c.exclude_keywords = lines($("excl").value);
-  c.title_exclude_keywords = lines($("titleExcl").value);
+  c.exclude_keywords = lines($("exclWords").value);
+  c.title_exclude_keywords = [];
   c.sources = { mail_alerts: $("srcMail").checked, flatfox: $("srcFlatfox").checked, watch_pages: $("srcPages").checked };
   const old = Object.fromEntries((S.config.watch_pages || []).map((x) => [x.url, x]));
   c.watch_pages = lines($("pages").value).map((ln) => {
@@ -1381,6 +1371,18 @@ document.querySelectorAll("[data-save]").forEach((b) => b.addEventListener("clic
 }));
 
 // ---------- Status ----------
+// Links zu den Quellen, damit man selbst nachschauen kann
+function sourceLink(name) {
+  if (name === "Abo-Mails") return "https://mail.google.com/mail/u/meierstadelmann@gmail.com/#label/Wollihood";
+  if (name === "Flatfox") {
+    const pts = (S.config?.areas?.features || []).flatMap((f) => (f.geometry?.type === "Polygon" ? f.geometry.coordinates[0] : (f.geometry?.coordinates || []).flatMap((p) => p[0])));
+    if (!pts.length) return "https://flatfox.ch/de/search/";
+    const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
+    return `https://flatfox.ch/de/search/?east=${Math.max(...xs).toFixed(4)}&north=${Math.max(...ys).toFixed(4)}&south=${Math.min(...ys).toFixed(4)}&west=${Math.min(...xs).toFixed(4)}`;
+  }
+  const page = (S.config?.watch_pages || []).find((p) => (p.name || p.url) === name);
+  return page ? page.url : null;
+}
 function renderStatus() {
   const h = S.health;
   const src = Object.entries(h?.sources || {});
@@ -1394,14 +1396,10 @@ function renderStatus() {
     <div class="stat"><b>${live.filter(isNew).length}</b><span>neu</span></div>
     <div class="stat"><b>${week}</b><span>7 Tage</span></div>
     <div class="stat"><b>${src.length - bad.length}/${src.length}</b><span>Quellen ok</span></div>`;
-  const rows = src.map(([name, v]) => `<div class="src"><span class="s ${v.ok ? "" : "bad"}"></span><b>${esc(name)}</b><div class="m">${esc(v.msg)} · ${esc(ago(v.at))}</div></div>`);
+  const rows = src.map(([name, v]) => { const u = sourceLink(name); return `<div class="src"><span class="s ${v.ok ? "" : "bad"}"></span>${u ? `<a class="srclink" href="${esc(u)}" target="_blank" rel="noopener"><b>${esc(name)}</b> ↗</a>` : `<b>${esc(name)}</b>`}<div class="m">${esc(v.msg)} · ${esc(ago(v.at))}</div></div>`; });
   if (h?.last_digest) rows.push(`<div class="src"><span class="s"></span><b>Briefing</b><div class="m">zuletzt ${esc(ago(h.last_digest))}</div></div>`);
   if (h?.push) rows.push(`<div class="src"><span class="s ${h.push.ok ? "" : "bad"}"></span><b>Push-Meldungen</b><div class="m">${h.push.ok ? "funktionieren" : esc(h.push.msg)}</div></div>`);
   $("sources").innerHTML = rows.join("") || '<p class="hint">Noch kein Lauf.</p>';
-  const ev = [...S.events].reverse().slice(0, 10);
-  $("events").innerHTML = ev.length ? ev.map((e) => `<div class="ev"><a href="${esc(e.url)}" target="_blank" rel="noopener"><b>${esc(e.name)}</b></a> · <span class="hint">${esc(ago(e.at))}</span>
-      <ul>${e.lines.map((l) => `<li>${esc(l)}</li>`).join("")}</ul></div>`).join("")
-    : '<p class="hint">Keine neuen Einträge in den letzten zwei Wochen.</p>';
 }
 $("runBtn").addEventListener("click", async () => {
   const c = structuredClone(S.config); c.requested_at = new Date().toISOString();
@@ -1582,7 +1580,7 @@ let installEvt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("installBtn").hidden = false; $("installHint").hidden = true; });
 $("installBtn").addEventListener("click", async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("installBtn").hidden = true; });
 if (window.matchMedia("(display-mode: standalone)").matches) { $("installHint").textContent = "Läuft als App."; }
-const APP_VERSION = "31 · 18.10.2026";
+const APP_VERSION = "32 · 18.10.2026";
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").then((reg) => { reg.update().catch(() => {}); }).catch(() => {});
   let reloaded = false;
