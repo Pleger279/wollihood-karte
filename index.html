@@ -467,10 +467,8 @@ details.adv:not([open]) { display: block }
       <label class="switch" for="srcMail">Suchabo-Mails der Portale <input type="checkbox" id="srcMail"></label>
       <label class="switch" for="srcFlatfox">Flatfox direkt <input type="checkbox" id="srcFlatfox"></label>
       <label class="switch" for="srcPages">Genossenschaftsseiten <input type="checkbox" id="srcPages"></label>
-      <label class="f" for="pages">Beobachtete Seiten<small>Pro Zeile: Name | Adresse</small>
+      <label class="f" for="pages">Beobachtete Seiten<small>Pro Zeile: Name | Adresse. PWG und ABZ werden Wohnung für Wohnung ausgelesen und wie alle Treffer geprüft. Bei anderen Seiten wird jede neue Zeile mit Zimmer- oder Preisangabe gemeldet.</small>
         <textarea class="field" id="pages"></textarea></label>
-      <label class="f" for="areaKw">Stichworte für diese Seiten<small>Neue Einträge werden nur gemeldet, wenn eines vorkommt</small>
-        <textarea class="field" id="areaKw"></textarea></label>
       <div class="ftitle sm">Ausschliessen</div>
       <label class="f" for="excl">Eigene Ausschluss-Begriffe<small>Ein Begriff pro Zeile, irgendwo im Inserat</small>
         <textarea class="field" id="excl"></textarea></label>
@@ -1281,7 +1279,6 @@ function fillForm() {
   $("plz").value = (c.plz_fallback || []).join(", ");
   $("excl").value = (c.exclude_keywords || []).join("\n");
   $("titleExcl").value = (c.title_exclude_keywords || []).join("\n");
-  $("areaKw").value = (c.area_keywords || []).join("\n");
   const src = c.sources || {};
   $("srcMail").checked = src.mail_alerts !== false; $("srcFlatfox").checked = src.flatfox !== false; $("srcPages").checked = src.watch_pages !== false;
   $("pages").value = (c.watch_pages || []).map((x) => `${x.name} | ${x.url}`).join("\n");
@@ -1301,7 +1298,6 @@ function readForm() {
   c.plz_fallback = $("plz").value.split(/[,\s]+/).map((s) => s.trim()).filter(Boolean);
   c.exclude_keywords = lines($("excl").value);
   c.title_exclude_keywords = lines($("titleExcl").value);
-  c.area_keywords = lines($("areaKw").value);
   c.sources = { mail_alerts: $("srcMail").checked, flatfox: $("srcFlatfox").checked, watch_pages: $("srcPages").checked };
   const old = Object.fromEntries((S.config.watch_pages || []).map((x) => [x.url, x]));
   c.watch_pages = lines($("pages").value).map((ln) => {
@@ -1586,7 +1582,7 @@ let installEvt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("installBtn").hidden = false; $("installHint").hidden = true; });
 $("installBtn").addEventListener("click", async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("installBtn").hidden = true; });
 if (window.matchMedia("(display-mode: standalone)").matches) { $("installHint").textContent = "Läuft als App."; }
-const APP_VERSION = "30 · 18.10.2026";
+const APP_VERSION = "31 · 18.10.2026";
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").then((reg) => { reg.update().catch(() => {}); }).catch(() => {});
   let reloaded = false;
