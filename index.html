@@ -206,6 +206,9 @@ textarea.field { min-height: 110px; resize: vertical; font-size: 15px }
 .src:first-child { border-top: 0; padding-top: 0 }
 .src .s { width: 10px; height: 10px; margin-top: 6px; background: var(--ok) }
 .src .s.bad { background: var(--bad) }
+.src .s.warn { background: var(--warn) }
+.src.sub { padding-left: 22px; border-top-style: dashed }
+.src.sub b { font-size: 15px }
 .src .m { grid-column: 2; color: var(--muted); font-size: 13px; overflow-wrap: anywhere }
 .stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border: 3px solid var(--line) }
 .stat { padding: 10px 12px; border-right: 1px solid var(--line) }
@@ -1427,7 +1430,13 @@ function renderStatus() {
     <div class="stat"><b>${live.filter(isNew).length}</b><span>neu</span></div>
     <div class="stat"><b>${week}</b><span>7 Tage</span></div>
     <div class="stat"><b>${src.length - bad.length}/${src.length}</b><span>Quellen ok</span></div>`;
-  const rows = src.map(([name, v]) => { const u = sourceLink(name); return `<div class="src"><span class="s ${v.ok ? "" : "bad"}"></span>${u ? `<a class="srclink" href="${esc(u)}" target="_blank" rel="noopener"><b>${esc(name)}</b> ↗</a>` : `<b>${esc(name)}</b>`}<div class="m">${esc(v.msg)} · ${esc(ago(v.at))}</div></div>`; });
+  const srcRow = (name, level, msg, u, sub) => `<div class="src${sub ? " sub" : ""}"><span class="s ${level === "ok" ? "" : level}"></span>${u ? `<a class="srclink" href="${esc(u)}" target="_blank" rel="noopener"><b>${esc(name)}</b> ↗</a>` : `<b>${esc(name)}</b>`}<div class="m">${esc(msg)}</div></div>`;
+  const nl = Object.entries(h?.newsletters || {});
+  const rows = [];
+  src.forEach(([name, v]) => {
+    rows.push(srcRow(name, v.ok ? "ok" : "bad", `${v.msg} · ${ago(v.at)}`, sourceLink(name)));
+    if (name === "Abo-Mails") nl.forEach(([n, x]) => rows.push(srcRow(n, x.level, x.level === "bad" ? x.msg : (x.last ? `letzte Mail ${ago(x.last)} · ` : "") + x.msg.replace(/^seit \d+ Tagen keine Mail · /, ""), x.url, true)));
+  });
   if (h?.last_digest) rows.push(`<div class="src"><span class="s"></span><b>Briefing</b><div class="m">zuletzt ${esc(ago(h.last_digest))}</div></div>`);
   if (h?.push) rows.push(`<div class="src"><span class="s ${h.push.ok ? "" : "bad"}"></span><b>Push-Meldungen</b><div class="m">${h.push.ok ? "funktionieren" : esc(h.push.msg)}</div></div>`);
   $("sources").innerHTML = rows.join("") || '<p class="hint">Noch kein Lauf.</p>';
@@ -1611,7 +1620,7 @@ let installEvt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("installBtn").hidden = false; $("installHint").hidden = true; });
 $("installBtn").addEventListener("click", async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("installBtn").hidden = true; });
 if (window.matchMedia("(display-mode: standalone)").matches) { $("installHint").textContent = "Läuft als App."; }
-const APP_VERSION = "33 · 18.10.2026";
+const APP_VERSION = "34 · 18.10.2026";
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").then((reg) => { reg.update().catch(() => {}); }).catch(() => {});
   let reloaded = false;
