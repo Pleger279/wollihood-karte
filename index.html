@@ -230,6 +230,9 @@ textarea.field { min-height: 110px; resize: vertical; font-size: 15px }
 .summary .sw-sub { color: rgba(255,255,255,.85) }
 .sumlabel { display: block; font: 700 10.5px var(--body); text-transform: uppercase; letter-spacing: .14em; opacity: .85; margin-bottom: 4px }
 .tabs2 { background: var(--bg); margin-bottom: 6px }
+.arow { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 0 0 10px }
+.arow .btn { font-size: 11px; padding-inline: 6px }
+#areaHint { margin: 8px 0 10px }
 .editing { font: 700 10.5px var(--body); text-transform: uppercase; letter-spacing: .14em; color: var(--muted); margin: 2px 0 8px }
 .editing b { color: var(--fg) }
 .tabs2 { gap: 0 !important; border: 2px solid var(--line) }
@@ -336,11 +339,19 @@ details.adv[open], details.adv-inner[open] { display: grid; gap: 14px }
 
   <!-- Karte -->
   <section class="view" id="v-map" hidden>
-    <p class="hint">Suchgebiet mit dem Fünfeck links einzeichnen, mit dem Stift anpassen, mit dem Papierkorb löschen. Grüne Punkte sind deine Treffer.</p>
+    <div class="seg tabs2" id="areaTabs" role="tablist">
+      <button type="button" class="opt" data-amode="search" aria-pressed="true">Suche</button>
+      <button type="button" class="opt" data-amode="push" aria-pressed="false">Push &amp; Briefing</button>
+    </div>
+    <p class="hint" id="areaHint"></p>
+    <div class="arow" id="pushAreaBtns" hidden>
+      <button class="btn" type="button" id="paCopy">Suchgebiet übernehmen</button>
+      <button class="btn" type="button" id="paReset">Gleich wie Suche</button>
+    </div>
     <div id="map"></div>
     <div class="toast" id="areaState" hidden></div>
     <div class="savebar">
-      <button class="btn primary" type="button" data-save>Suchgebiet speichern</button>
+      <button class="btn primary" type="button" data-save>Gebiet speichern</button>
     </div>
   </section>
 
@@ -972,21 +983,57 @@ function ensureMap() {
   S.map.pm.setPathOptions({ color: accent(), weight: 2, fillOpacity: 0.12 });
   S.map.on("pm:create", (e) => { markAreaDirty(); e.layer.on(EDIT_EVENTS, markAreaDirty); });
   S.map.on("pm:remove", markAreaDirty);
-  S.map.on("pm:globaleditmodetoggled", (e) => { if (!e.enabled && S.areasDirty) toast("Zum Übernehmen unten «Suchgebiet speichern» tippen."); });
+  S.map.on("pm:globaleditmodetoggled", (e) => { if (!e.enabled && S.areasDirty) toast("Zum Übernehmen unten «Gebiet speichern» tippen."); });
+  S.refLayer = L.layerGroup().addTo(S.map);
   S.hitLayer = L.layerGroup().addTo(S.map);
   drawAreas(); renderMarkers();
   setTimeout(() => S.map.invalidateSize(), 60);
 }
+// Zwei Gebiete: Suche (was gesucht wird) und Push & Briefing (was gemeldet wird; leer = wie Suche)
+S.amode = "search"; S.work = null;
+const hasFeat = (fc) => !!(fc && fc.features && fc.features.length);
+const pushAreasOf = (c) => (hasFeat(c?.push?.areas) ? c.push.areas : null);
 function drawAreas(force = false) {
   if (!S.map || !S.config) return;
   if (S.areasDirty && !force) return;   // ungespeicherte Änderungen nicht überschreiben
-  S.map.pm.getGeomanLayers().forEach((l) => l.remove());
-  const g = L.geoJSON(S.config.areas, { style: { color: accent(), weight: 2, fillOpacity: 0.12 } });
-  g.eachLayer((l) => { l.addTo(S.map); l.on(EDIT_EVENTS, markAreaDirty); });
-  if (!S.focus) { try { S.map.fitBounds(g.getBounds(), { padding: [24, 24] }); } catch {} }
+  S.work = { search: S.config.areas, push: pushAreasOf(S.config) };
+  paintAreas(true);
   S.areasDirty = false; S.areasDrawn = true;
   $("areaState").hidden = true;
 }
+function paintAreas(fit) {
+  S.map.pm.getGeomanLayers().forEach((l) => l.remove());
+  S.refLayer.clearLayers();
+  const mine = S.amode === "push" ? S.work.push : S.work.search;
+  const other = S.amode === "push" ? S.work.search : S.work.push;
+  if (other) L.geoJSON(other, { pmIgnore: true, interactive: false,
+    style: { color: "#7a7a7a", weight: 2, dashArray: "6 6", fillOpacity: S.amode === "push" ? 0.06 : 0 } }).addTo(S.refLayer);
+  const g = L.geoJSON(mine || { type: "FeatureCollection", features: [] }, { style: { color: accent(), weight: 3, fillOpacity: 0.14 } });
+  g.eachLayer((l) => { l.addTo(S.map); l.on(EDIT_EVENTS, markAreaDirty); });
+  if (fit && !S.focus) { try { S.map.fitBounds((mine && hasFeat(mine) ? g : L.geoJSON(S.work.search)).getBounds(), { padding: [24, 24] }); } catch {} }
+  renderAreaUi(); renderMarkers();
+}
+function renderAreaUi() {
+  document.querySelectorAll("[data-amode]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.amode === S.amode)));
+  $("pushAreaBtns").hidden = S.amode !== "push";
+  const own = S.work && hasFeat(S.work.push);
+  $("areaHint").textContent = S.amode === "search"
+    ? "Suchgebiet: Nur hier wird gesucht. Mit dem Fünfeck links zeichnen, mit dem Stift anpassen, mit dem Papierkorb löschen." + (own ? " Gestrichelt: dein Push-Gebiet." : "")
+    : own ? "Push-Gebiet: Nur Wohnungen hier lösen Push und Briefing aus. Gestrichelt: das Suchgebiet; ausserhalb davon wird nicht gesucht."
+      : "Kein eigenes Push-Gebiet: Es gilt das Suchgebiet (gestrichelt). Zeichne eine Fläche oder übernimm das Suchgebiet als Startpunkt.";
+}
+function grabWork() {
+  if (!S.map || !S.work) return;
+  const fc = collectFromMap();
+  if (S.amode === "push") S.work.push = hasFeat(fc) ? fc : null; else S.work.search = fc;
+}
+function setAreaMode(m) {
+  if (!S.map || !S.work || m === S.amode) return;
+  grabWork(); S.amode = m; paintAreas(false);
+}
+document.querySelectorAll("[data-amode]").forEach((b) => b.addEventListener("click", () => setAreaMode(b.dataset.amode)));
+$("paCopy").addEventListener("click", () => { if (!S.work) return; S.work.push = JSON.parse(JSON.stringify(S.work.search)); paintAreas(false); markAreaDirty(); });
+$("paReset").addEventListener("click", () => { if (!S.work) return; S.work.push = null; paintAreas(false); markAreaDirty(); });
 function renderMarkers() {
   if (!S.hitLayer) return;
   S.hitLayer.clearLayers();
@@ -994,22 +1041,39 @@ function renderMarkers() {
   S.hits.forEach((x) => {
     const m = isFav(keyOf(x)) ? "fav" : "";
     if (x.lat == null || !inSavedArea(x)) return;
-    const c = m === "fav" ? getComputedStyle(document.documentElement).getPropertyValue("--star").trim() : accent();
+    const outPush = S.amode === "push" && S.work && hasFeat(S.work.push) && !inAreas(x.lat, x.lon, S.work.push);
+    const c = outPush ? "#9a9a9a" : m === "fav" ? getComputedStyle(document.documentElement).getPropertyValue("--star").trim() : accent();
     S.markers[keyOf(x)] = L.circleMarker([x.lat, x.lon], { radius: 8, color: "#fff", weight: 2, fillColor: c, fillOpacity: 0.95, pmIgnore: true })
       .bindPopup(`${x.image ? `<img src="${esc(x.image)}" alt="" style="width:200px;height:112px;object-fit:cover;border-radius:6px;display:block;margin-bottom:6px" referrerpolicy="no-referrer">` : ""}<b>${esc(chf(x.rent))} · ${esc(rooms(x.rooms))}${x.m2 ? " · " + esc(x.m2) + " m²" : ""}</b><br>${esc(x.street || "")}<br><a href="${esc(x.url)}" target="_blank" rel="noopener">Inserat öffnen</a>`, { maxWidth: 220 })
       .addTo(S.hitLayer);
   });
 }
-function collectAreas() {
-  if (!S.map || !S.areasDrawn) return S.config.areas;
+function collectFromMap() {
   const features = [];
   S.map.pm.getGeomanLayers().forEach((l) => { if (l instanceof L.Polygon) { const f = l.toGeoJSON(6); f.properties = f.properties || {}; features.push(f); } });
   return { type: "FeatureCollection", features };
 }
+function collectAreas() {
+  if (!S.map || !S.areasDrawn) return S.config.areas;
+  grabWork(); return S.work.search;
+}
+function collectPushAreas() {
+  if (!S.map || !S.areasDrawn) return pushAreasOf(S.config);
+  grabWork(); return S.work.push;
+}
+// Liegt das Push-Gebiet (teilweise) ausserhalb des Suchgebiets?
+function pushOutside(search, push) {
+  if (!hasFeat(push)) return false;
+  return push.features.some((f) => {
+    const g = f.geometry || {}; const polys = g.type === "Polygon" ? [g.coordinates] : g.type === "MultiPolygon" ? g.coordinates : [];
+    return polys.some((p) => p[0].some(([lon, lat]) => !inAreas(lat, lon, search)));
+  });
+}
 function markAreaDirty() {
   S.areasDirty = true;
-  $("areaState").textContent = "Suchgebiet geändert, noch nicht gespeichert.";
+  $("areaState").textContent = "Gebiet geändert, noch nicht gespeichert.";
   $("areaState").className = "toast err"; $("areaState").hidden = false;
+  if (S.amode === "push" && S.work) { grabWork(); renderMarkers(); renderAreaUi(); }
 }
 const EDIT_EVENTS = "pm:edit pm:markerdragend pm:vertexadded pm:vertexremoved pm:dragend pm:rotateend";
 // Punkt in Fläche (wie im Suchskript), damit die Liste sofort zum gespeicherten Gebiet passt
@@ -1238,6 +1302,8 @@ function readForm() {
   if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(typed) && !F.recips.includes(typed)) { F.recips.push(typed); $("dgAdd").value = ""; setTimeout(renderChannels); }
   c.digest = { enabled: $("dgOn").checked, to: [...F.recips], time: $("dgTime").value, days: F.days, skip_empty: $("dgSkip").checked };
   c.areas = collectAreas();
+  const pa = collectPushAreas();
+  if (pa) c.push.areas = pa;
   return c;
 }
 function validate(c) {
@@ -1289,6 +1355,7 @@ async function saveConfig(c, message, okText) {
   try {
     S.configSha = await writeJson("config.json", c, S.configSha, message);
     S.config = c; S.areasDirty = false; $("areaState").hidden = true;
+    if (pushOutside(c.areas, c.push && c.push.areas)) toast("Hinweis: Ein Teil des Push-Gebiets liegt ausserhalb des Suchgebiets. Dort wird nicht gesucht.", "", 8000);
     renderHits(); renderMarkers();
     toast(okText, "ok", 6000);
     return true;
@@ -1359,7 +1426,7 @@ async function load() {
   applyDeep(true);
 }
 function showTab(t) {
-  if (S.tab === "map" && t !== "map" && S.areasDirty) toast("Achtung: Das geänderte Suchgebiet ist noch nicht gespeichert.", "err", 6000);
+  if (S.tab === "map" && t !== "map" && S.areasDirty) toast("Achtung: Das geänderte Gebiet ist noch nicht gespeichert.", "err", 6000);
   S.tab = t; store.set("wh_tab", t);
   ["hits", "map", "criteria", "status"].forEach((n) => ($("v-" + n).hidden = n !== t));
   document.querySelectorAll(".tab").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.tab === t)));
@@ -1502,7 +1569,7 @@ let installEvt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("installBtn").hidden = false; $("installHint").hidden = true; });
 $("installBtn").addEventListener("click", async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("installBtn").hidden = true; });
 if (window.matchMedia("(display-mode: standalone)").matches) { $("installHint").textContent = "Läuft als App."; }
-const APP_VERSION = "24 · 18.10.2026";
+const APP_VERSION = "25 · 18.10.2026";
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").then((reg) => { reg.update().catch(() => {}); }).catch(() => {});
   let reloaded = false;
