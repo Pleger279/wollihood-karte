@@ -227,7 +227,9 @@ textarea.field { min-height: 110px; resize: vertical; font-size: 15px }
 .summary { background: var(--accent); color: #fff; padding: 12px 14px; font: 800 14px/1.35 var(--body) }
 .summary .sw-sub { color: rgba(255,255,255,.85) }
 .sumlabel { display: block; font: 700 10.5px var(--body); text-transform: uppercase; letter-spacing: .14em; opacity: .85; margin-bottom: 4px }
-.tabs2 { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 74px); z-index: 6; background: var(--bg); padding-block: 6px }
+.tabs2 { background: var(--bg); margin-bottom: 6px }
+.editing { font: 700 10.5px var(--body); text-transform: uppercase; letter-spacing: .14em; color: var(--muted); margin: 2px 0 8px }
+.editing b { color: var(--fg) }
 .tabs2 { gap: 0 !important; border: 2px solid var(--line) }
 .tabs2 .opt { border: 0 !important; border-right: 1px solid var(--line) !important }
 .tabs2 .opt:last-child { border-right: 0 !important }
@@ -862,7 +864,7 @@ function renderHits() {
         <div class="addr">${esc(x.street || x.title || place)}</div>
         <div class="meta">${esc(x.portal || "")} · ${pubLabel(x)}${x.also_urls && x.also_urls.length ? ` · <a href="${esc(x.also_urls[0])}" target="_blank" rel="noopener">${x.also_urls.length + 1}× inseriert</a>` : ""}${x.pushed ? " · Push gesendet" : x.push_skipped ? " · kein Push (" + esc(x.push_skipped) + ")" : ""}</div>
         ${x.notes && x.notes.length ? `<div class="notes">${esc(x.notes.join(" · "))}</div>` : ""}
-        ${x.swap || (x.features && x.features.length) ? `<div class="tags">${x.swap ? '<span class="tag swap">Tausch</span>' : ""}${(x.features || []).filter((k) => FEATURES[k]).map((k) => `<span class="tag">${esc(FEATURES[k])}</span>`).join("")}</div>` : ""}
+        ${x.swap || featKeys(x.features).length ? `<div class="tags">${x.swap ? '<span class="tag swap">Tausch</span>' : ""}${featKeys(x.features).map((k) => `<span class="tag">${esc(featShort(k))}</span>`).join("")}</div>` : ""}
         ${x.swap && x.swap_wants ? `<div class="wants"><b>Sucht:</b> ${esc(x.swap_wants)}</div>` : ""}
         ${socialBlock(x)}
         ${fav ? statusBlock(k) : ""}
@@ -995,9 +997,15 @@ function inAreas(lat, lon, areas) {
 
 // ---------- Kriterien ----------
 const lines = (t) => t.split("\n").map((s) => s.trim()).filter(Boolean);
-const FEATURES = { balkon: "Balkon/Terrasse", lift: "Lift", garten: "Garten", haustiere: "Haustiere erlaubt",
+const FEATURES = { aussen: "Aussenraum (Balkon, Terrasse, Sitzplatz oder Garten)", garten: "Garten", lift: "Lift", haustiere: "Haustiere erlaubt",
   waschturm: "Eigene Waschmaschine", altbau: "Altbau", neubau: "Neubau", aussicht: "Seesicht",
   rollstuhl: "Rollstuhlgängig", parkplatz: "Parkplatz" };
+const FEATURE_ALIAS = { balkon: "aussen" };
+const featKeys = (list) => [...new Set((list || []).map((k) => FEATURE_ALIAS[k] || k))].filter((k) => FEATURES[k]);
+const featShort = (k) => (k === "aussen" ? "Aussenraum" : FEATURES[k]);
+// alte Einstellung «Balkon oder Garten» → Aussenraum
+const migrateFeat = (c) => (c.features_mode === "any" && (c.features_required || []).length && (c.features_required || []).every((k) => ["balkon", "garten", "aussen"].includes(k))
+  ? ["aussen"] : featKeys(c.features_required));
 const EXCL = { befristet: "Befristete Verträge", moebliert: "Möbliert", untermiete: "Untermiete", alter: "Alterswohnungen", wg: "WG-Zimmer", tausch: "Tauschwohnungen" };
 const ROOMS = [1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5, 5.5, 6, 7];
 const RENTS = [1000, 1250, 1500, 1750, 2000, 2250, 2500, 2750, 3000, 3250, 3500, 3750, 4000, 4500, 5000, 6000];
@@ -1013,6 +1021,7 @@ function critMarkup(p) {
   const checks = (obj, attr) => Object.entries(obj).map(([k, l]) =>
     `<label class="check" for="${p}-${attr}-${k}"><input type="checkbox" id="${p}-${attr}-${k}" data-${attr}="${k}">${l}</label>`).join("");
   return `
+  <div class="editing">Du bearbeitest: <b>${p === "s" ? "Suche" : "Push &amp; Briefing"}</b></div>
   <div class="panel">
     <div class="ftitle">Objektart</div>
     <div class="seg">
@@ -1039,12 +1048,8 @@ function critMarkup(p) {
   </div>
   <div class="panel">
     <div class="ftitle">Muss haben</div>
-    <div class="seg">
-      <button type="button" class="opt" data-fmode="all">Alle angekreuzten</button>
-      <button type="button" class="opt" data-fmode="any">Mindestens eines</button>
-    </div>
     <div class="checks">${checks(FEATURES, "feat")}</div>
-    <p class="hint">Hat ein Inserat zu wenig Text, um das zu prüfen, kommt es trotzdem, mit dem Hinweis «Ausstattung ungeprüft».</p>
+    <p class="hint">Jedes Häkchen muss erfüllt sein. Hat ein Inserat zu wenig Text, um das zu prüfen, kommt es trotzdem, mit dem Hinweis «Ausstattung ungeprüft».</p>
   </div>
   <div class="panel">
     <div class="ftitle">Nicht anzeigen</div>
@@ -1073,7 +1078,6 @@ function renderCrit(p) {
   });
   r.querySelector("[data-roomsval]").textContent = a == null ? "beliebig" : a === b ? `${a}` : `${a} – ${b === 7 ? "7+" : b}`;
   r.querySelectorAll("[data-type]").forEach((el) => el.setAttribute("aria-pressed", String(st.types.has(el.dataset.type))));
-  r.querySelectorAll("[data-fmode]").forEach((el) => el.setAttribute("aria-pressed", String(el.dataset.fmode === st.fmode)));
   r.querySelector("[data-befrrow]").hidden = !r.querySelector("[data-excl=befristet]").checked;
 }
 function setCrit(p, c) {
@@ -1081,12 +1085,11 @@ function setCrit(p, c) {
   st.types = new Set(c.object_types && c.object_types.length ? c.object_types : ["APARTMENT"]);
   const rmax = c.rooms_max != null && c.rooms_max >= 7 ? 7 : c.rooms_max;
   st.rooms = [c.rooms_min ?? null, rmax ?? c.rooms_min ?? null];
-  st.fmode = c.features_mode === "any" ? "any" : "all";
   opts(p + "RentMin", RENTS, (v) => `CHF ${fmtN(v)}`, "beliebig", c.rent_min ?? null);
   opts(p + "RentMax", RENTS, (v) => `CHF ${fmtN(v)}`, "beliebig", c.rent_max ?? null);
   opts(p + "M2Min", M2, (v) => `${v} m²`, "beliebig", c.m2_min ?? null);
   opts(p + "M2Max", M2, (v) => `${v} m²`, "beliebig", c.m2_max ?? null);
-  r.querySelectorAll("[data-feat]").forEach((el) => (el.checked = (c.features_required || []).includes(el.dataset.feat)));
+  r.querySelectorAll("[data-feat]").forEach((el) => (el.checked = migrateFeat(c).includes(el.dataset.feat)));
   r.querySelectorAll("[data-excl]").forEach((el) => (el.checked = (c.exclude_groups || []).includes(el.dataset.excl)));
   $(p + "Befr").value = c.befristet_min_months ? String(c.befristet_min_months) : "";
   $(p + "UnkPrice").checked = !!c.include_unknown_price; $(p + "UnkRooms").checked = !!c.include_unknown_rooms;
@@ -1100,7 +1103,7 @@ function getCrit(p) {
     rooms_min: st.rooms[0], rooms_max: st.rooms[1] == null ? null : (st.rooms[1] >= 7 ? 99 : st.rooms[1]),
     rent_min: sel(p + "RentMin"), rent_max: sel(p + "RentMax"), m2_min: sel(p + "M2Min"), m2_max: sel(p + "M2Max"),
     features_required: [...r.querySelectorAll("[data-feat]:checked")].map((el) => el.dataset.feat),
-    features_mode: st.fmode,
+    features_mode: "all",
     exclude_groups: [...r.querySelectorAll("[data-excl]:checked")].map((el) => el.dataset.excl),
     befristet_min_months: $(p + "Befr").value ? +$(p + "Befr").value : null,
     include_unknown_price: $(p + "UnkPrice").checked, include_unknown_rooms: $(p + "UnkRooms").checked,
@@ -1119,9 +1122,7 @@ function wireCrit(p) {
     }
     const t = e.target.closest("[data-type]");
     if (t) { const k = t.dataset.type; if (st.types.has(k) && st.types.size > 1) st.types.delete(k); else st.types.add(k); }
-    const fm = e.target.closest("[data-fmode]");
-    if (fm) st.fmode = fm.dataset.fmode;
-    if (room || t || fm) { renderCrit(p); renderSummary(); }
+    if (room || t) { renderCrit(p); renderSummary(); }
   });
   r.addEventListener("change", () => { renderCrit(p); renderSummary(); });
 }
@@ -1131,7 +1132,7 @@ function critParts(c) {
   if (c.rooms_min != null) parts.push(c.rooms_min === c.rooms_max ? `${c.rooms_min} Zi.` : `${c.rooms_min}–${c.rooms_max >= 7 ? "7+" : c.rooms_max} Zi.`);
   if (c.rent_min || c.rent_max) parts.push(c.rent_min && c.rent_max ? `CHF ${fmtN(c.rent_min)}–${fmtN(c.rent_max)}` : c.rent_max ? `bis CHF ${fmtN(c.rent_max)}` : `ab CHF ${fmtN(c.rent_min)}`);
   if (c.m2_min || c.m2_max) parts.push(c.m2_min && c.m2_max ? `${c.m2_min}–${c.m2_max} m²` : c.m2_min ? `ab ${c.m2_min} m²` : `bis ${c.m2_max} m²`);
-  if (c.features_required.length) parts.push(c.features_required.map((k) => FEATURES[k]).join(c.features_mode === "any" ? " oder " : " + "));
+  if (c.features_required.length) parts.push(featKeys(c.features_required).map(featShort).join(" + "));
   if (c.exclude_groups.includes("befristet") && c.befristet_min_months) parts.push(`befristet ab ${(BEFR.find(([v]) => v === c.befristet_min_months) || [0, c.befristet_min_months + " Mt."])[1]}`);
   if (!c.exclude_groups.includes("befristet")) parts.push("auch befristete");
   return parts;
@@ -1466,7 +1467,7 @@ let installEvt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("installBtn").hidden = false; $("installHint").hidden = true; });
 $("installBtn").addEventListener("click", async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("installBtn").hidden = true; });
 if (window.matchMedia("(display-mode: standalone)").matches) { $("installHint").textContent = "Läuft als App."; }
-const APP_VERSION = "22 · 18.10.2026";
+const APP_VERSION = "23 · 18.10.2026";
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").then((reg) => { reg.update().catch(() => {}); }).catch(() => {});
   let reloaded = false;
