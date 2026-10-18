@@ -170,7 +170,7 @@ h2 { font: 20px/1.05 var(--display); letter-spacing: -.4px; text-transform: uppe
 .empty b { display: block; font: 22px/1.05 var(--display); letter-spacing: -.5px; text-transform: uppercase; color: var(--fg); margin-bottom: 8px }
 
 /* Karte */
-#map { height: calc(100dvh - 240px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); min-height: 320px; border: 3px solid var(--line) }
+#map { height: calc(100dvh - 400px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); min-height: 280px; border: 3px solid var(--line) }
 .leaflet-container { font: 14px var(--body); background: var(--sunk) }
 .leaflet-bar, .leaflet-bar a { border-radius: 0 !important }
 .leaflet-touch .leaflet-bar { border: 2px solid #0A0A0A }
@@ -231,6 +231,7 @@ textarea.field { min-height: 110px; resize: vertical; font-size: 15px }
 .sumlabel { display: block; font: 700 10.5px var(--body); text-transform: uppercase; letter-spacing: .14em; opacity: .85; margin-bottom: 4px }
 .tabs2 { background: var(--bg); margin-bottom: 6px }
 .arow { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 0 0 10px }
+.arow.one { grid-template-columns: 1fr }
 .arow .btn { font-size: 11px; padding-inline: 6px }
 #areaHint { margin: 8px 0 10px }
 .editing { font: 700 10.5px var(--body); text-transform: uppercase; letter-spacing: .14em; color: var(--muted); margin: 2px 0 8px }
@@ -348,9 +349,12 @@ details.adv[open], details.adv-inner[open] { display: grid; gap: 14px }
       <button class="btn" type="button" id="paCopy">Suchgebiet übernehmen</button>
       <button class="btn" type="button" id="paReset">Gleich wie Suche</button>
     </div>
+    <div class="arow one" id="searchAreaBtns" hidden>
+      <button class="btn" type="button" id="saCopy">Push-Gebiet übernehmen</button>
+    </div>
     <div id="map"></div>
-    <div class="toast" id="areaState" hidden></div>
     <div class="savebar">
+      <div class="toast" id="areaState" hidden></div>
       <button class="btn primary" type="button" data-save>Gebiet speichern</button>
     </div>
   </section>
@@ -1017,6 +1021,8 @@ function renderAreaUi() {
   document.querySelectorAll("[data-amode]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.amode === S.amode)));
   $("pushAreaBtns").hidden = S.amode !== "push";
   const own = S.work && hasFeat(S.work.push);
+  $("searchAreaBtns").hidden = S.amode !== "search" || !own;
+  fitMap();
   $("areaHint").textContent = S.amode === "search"
     ? "Suchgebiet: Nur hier wird gesucht. Mit dem Fünfeck links zeichnen, mit dem Stift anpassen, mit dem Papierkorb löschen." + (own ? " Gestrichelt: dein Push-Gebiet." : "")
     : own ? "Push-Gebiet: Nur Wohnungen hier lösen Push und Briefing aus. Gestrichelt: das Suchgebiet; ausserhalb davon wird nicht gesucht."
@@ -1033,6 +1039,18 @@ function setAreaMode(m) {
 }
 document.querySelectorAll("[data-amode]").forEach((b) => b.addEventListener("click", () => setAreaMode(b.dataset.amode)));
 $("paCopy").addEventListener("click", () => { if (!S.work) return; S.work.push = JSON.parse(JSON.stringify(S.work.search)); paintAreas(false); markAreaDirty(); });
+$("saCopy").addEventListener("click", () => { if (!S.work || !hasFeat(S.work.push)) return; grabWork(); S.work.search = JSON.parse(JSON.stringify(S.work.push)); paintAreas(false); markAreaDirty(); toast("Übernommen. Zum Übernehmen unten «Gebiet speichern» tippen."); });
+// Karte genau zwischen Knöpfen oben und «Gebiet speichern» einpassen
+function fitMap() {
+  const el = $("map"); if (!el || $("v-map").hidden) return;
+  const top = el.getBoundingClientRect().top + window.scrollY;
+  const bar = document.querySelector("#v-map .savebar");
+  const tab = $("tabbar") ? $("tabbar").getBoundingClientRect().height : 60;
+  const h = Math.max(260, Math.floor(window.innerHeight - top - (bar ? bar.offsetHeight : 56) - tab - 30));
+  el.style.height = h + "px";
+  if (S.map) S.map.invalidateSize();
+}
+window.addEventListener("resize", () => fitMap());
 $("paReset").addEventListener("click", () => { if (!S.work) return; S.work.push = null; paintAreas(false); markAreaDirty(); });
 function renderMarkers() {
   if (!S.hitLayer) return;
@@ -1074,6 +1092,7 @@ function markAreaDirty() {
   $("areaState").textContent = "Gebiet geändert, noch nicht gespeichert.";
   $("areaState").className = "toast err"; $("areaState").hidden = false;
   if (S.amode === "push" && S.work) { grabWork(); renderMarkers(); renderAreaUi(); }
+  fitMap();
 }
 const EDIT_EVENTS = "pm:edit pm:markerdragend pm:vertexadded pm:vertexremoved pm:dragend pm:rotateend";
 // Punkt in Fläche (wie im Suchskript), damit die Liste sofort zum gespeicherten Gebiet passt
@@ -1354,7 +1373,7 @@ $("dgNow").addEventListener("click", async () => {
 async function saveConfig(c, message, okText) {
   try {
     S.configSha = await writeJson("config.json", c, S.configSha, message);
-    S.config = c; S.areasDirty = false; $("areaState").hidden = true;
+    S.config = c; S.areasDirty = false; $("areaState").hidden = true; fitMap();
     if (pushOutside(c.areas, c.push && c.push.areas)) toast("Hinweis: Ein Teil des Push-Gebiets liegt ausserhalb des Suchgebiets. Dort wird nicht gesucht.", "", 8000);
     renderHits(); renderMarkers();
     toast(okText, "ok", 6000);
@@ -1430,7 +1449,7 @@ function showTab(t) {
   S.tab = t; store.set("wh_tab", t);
   ["hits", "map", "criteria", "status"].forEach((n) => ($("v-" + n).hidden = n !== t));
   document.querySelectorAll(".tab").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.tab === t)));
-  if (t === "map") ensureMap();
+  if (t === "map") { ensureMap(); setTimeout(fitMap, 0); }
   if (t === "status") renderPush();
   window.scrollTo(0, 0);
 }
@@ -1569,7 +1588,7 @@ let installEvt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("installBtn").hidden = false; $("installHint").hidden = true; });
 $("installBtn").addEventListener("click", async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("installBtn").hidden = true; });
 if (window.matchMedia("(display-mode: standalone)").matches) { $("installHint").textContent = "Läuft als App."; }
-const APP_VERSION = "25 · 18.10.2026";
+const APP_VERSION = "26 · 18.10.2026";
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").then((reg) => { reg.update().catch(() => {}); }).catch(() => {});
   let reloaded = false;
