@@ -1046,7 +1046,7 @@ function fitMap() {
   const head = document.querySelector(".appbar") ? document.querySelector(".appbar").getBoundingClientRect().height : 0;
   const bar = document.querySelector("#v-search .savebar");
   const tab = $("tabbar") ? $("tabbar").getBoundingClientRect().height : 60;
-  const h = Math.max(280, Math.floor(window.innerHeight - head - (bar ? bar.offsetHeight : 56) - tab - 40));
+  const h = Math.max(220, Math.floor((window.innerHeight - head - (bar ? bar.offsetHeight : 56) - tab - 40) * 2 / 3));
   el.style.height = h + "px";
   if (S.map) S.map.invalidateSize();
 }
@@ -1583,7 +1583,7 @@ let installEvt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("installBtn").hidden = false; $("installHint").hidden = true; });
 $("installBtn").addEventListener("click", async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("installBtn").hidden = true; });
 if (window.matchMedia("(display-mode: standalone)").matches) { $("installHint").textContent = "Läuft als App."; }
-const APP_VERSION = "28 · 18.10.2026";
+const APP_VERSION = "29 · 18.10.2026";
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").then((reg) => { reg.update().catch(() => {}); }).catch(() => {});
   let reloaded = false;
