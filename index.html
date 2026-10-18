@@ -233,6 +233,12 @@ textarea.field { min-height: 110px; resize: vertical; font-size: 15px }
 .tabs2 { background: var(--bg); margin-bottom: 6px }
 .arow { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 0 0 10px }
 .arow.one { grid-template-columns: 1fr }
+.hint.center { text-align: center; margin-top: 8px }
+.advbody { display: grid; gap: 14px; margin-top: 14px }
+.advbody .ftitle.sm { margin-top: 10px }
+#map, .mini { position: relative; z-index: 0 }   /* Leaflet-Ebenen bleiben unter Kopfzeile, Speichern und Tableiste */
+.copyrow { padding: 10px }
+#areaPanel #map { margin: 0 -14px -14px; border-left: 0; border-right: 0; border-bottom: 0 }
 .arow .btn { font-size: 11px; padding-inline: 6px }
 #areaHint { margin: 8px 0 10px }
 .editing { font: 700 10.5px var(--body); text-transform: uppercase; letter-spacing: .14em; color: var(--muted); margin: 2px 0 8px }
@@ -335,95 +341,45 @@ details.adv:not([open]) { display: block }
     </div>
     <div class="panel whoami" id="whoPanel" hidden>
       <div class="ftitle">Wer nutzt dieses Handy?</div>
-      <p class="hint">Damit eure Daumen und Kommentare richtig zugeordnet werden. Du kannst das unter Status jederzeit ändern.</p>
+      <p class="hint">Damit eure Daumen und Kommentare richtig zugeordnet werden. Du kannst das unter Einstellungen jederzeit ändern.</p>
       <div class="seg"><button type="button" class="opt" data-who="pascal">Pascal</button><button type="button" class="opt" data-who="leonie">Leonie</button></div>
     </div>
     <div id="hitList" class="view"></div>
     <button class="btn" id="allSeenBtn" type="button" hidden>Alle als gelesen markieren</button>
   </section>
 
-  <!-- Karte -->
-  <section class="view" id="v-map" hidden>
-    <div class="seg tabs2" id="areaTabs" role="tablist">
-      <button type="button" class="opt" data-amode="search" aria-pressed="true">App-Suche</button>
-      <button type="button" class="opt" data-amode="push" aria-pressed="false">Push &amp; Briefing</button>
+  <!-- Suche: Gebiet + Kriterien, je für «Anzeigen» und «Push & Mail» -->
+  <section class="view" id="v-search" hidden>
+    <div class="seg tabs2" id="searchTabs" role="tablist">
+      <button type="button" class="opt" data-stab="show" aria-pressed="true">Anzeigen</button>
+      <button type="button" class="opt" data-stab="notify" aria-pressed="false">Push &amp; Mail</button>
     </div>
-    <p class="hint" id="areaHint"></p>
-    <div class="arow one" id="pushAreaBtns" hidden>
-      <button class="btn" type="button" id="paCopy">App-Suchgebiet übernehmen</button>
-    </div>
-    <div class="arow one" id="searchAreaBtns" hidden>
-      <button class="btn" type="button" id="saCopy">Push-Gebiet übernehmen</button>
-    </div>
-    <div id="map"></div>
-    <div class="savebar">
-      <div class="toast" id="areaState" hidden></div>
-      <button class="btn primary" type="button" data-save>Gebiet speichern</button>
-    </div>
-  </section>
+    <div class="summary" id="sumShowBox"><span class="sumlabel">Angezeigt werden</span><span id="sumSearch"></span></div>
+    <div class="summary" id="sumNotifyBox" hidden><span class="sumlabel">Push &amp; Mail bei</span><span id="sumNotify"></span><span class="sw-sub" id="sumNotifyDiff"></span></div>
+    <p class="hint" id="modeHint"></p>
 
-  <!-- Kriterien -->
-  <section class="view" id="v-criteria" hidden>
-    <div class="seg tabs2" id="critTabs" role="tablist">
-      <button type="button" class="opt" data-ctab="search" aria-pressed="true">App-Suche</button>
-      <button type="button" class="opt" data-ctab="notify" aria-pressed="false">Push &amp; Briefing</button>
+    <div class="panel" id="areaPanel">
+      <div class="ftitle">Gebiet</div>
+      <p class="hint" id="areaHint"></p>
+      <div class="arow one" id="pushAreaBtns" hidden>
+        <button class="btn" type="button" id="paCopy">Gebiet von «Anzeigen» übernehmen</button>
+      </div>
+      <div class="arow one" id="searchAreaBtns" hidden>
+        <button class="btn" type="button" id="saCopy">Gebiet von «Push &amp; Mail» übernehmen</button>
+      </div>
+      <div id="map"></div>
     </div>
 
-    <!-- Suche -->
     <div class="view" id="cs-search">
-      <div class="summary"><span class="sumlabel">In der App erscheinen</span><span id="sumSearch"></span></div>
-      <div class="panel">
-        <label class="switch" for="active"><span><b>Suche aktiv</b><small class="sw-sub">Aus = nichts wird gesucht, keine Meldungen</small></span><input type="checkbox" id="active"></label>
-      </div>
+      <div class="panel copyrow"><button class="btn" id="copyCritBack" type="button">Kriterien von «Push &amp; Mail» übernehmen</button></div>
       <div class="view" id="critS"></div>
-      <details class="panel adv">
-        <summary>Erweitert</summary>
-        <label class="f" for="excl">Eigene Ausschluss-Begriffe<small>Ein Begriff pro Zeile, irgendwo im Inserat</small>
-          <textarea class="field" id="excl"></textarea></label>
-        <label class="f" for="titleExcl">Ausschluss im Titel<small>Für Parkplätze, Büros und Ähnliches</small>
-          <textarea class="field" id="titleExcl"></textarea></label>
-        <label class="f" for="plz">PLZ, wenn die Adresse fehlt<small>Kommagetrennt</small>
-          <input class="field" id="plz" type="text" inputmode="numeric"></label>
-      </details>
-      <div class="panel">
-        <div class="ftitle">Quellen</div>
-        <label class="switch" for="srcMail">Suchabo-Mails der Portale <input type="checkbox" id="srcMail"></label>
-        <label class="switch" for="srcFlatfox">Flatfox direkt <input type="checkbox" id="srcFlatfox"></label>
-        <label class="switch" for="srcPages">Genossenschaftsseiten <input type="checkbox" id="srcPages"></label>
-        <details class="adv-inner">
-          <summary>Seiten und Stichworte bearbeiten</summary>
-          <label class="f" for="pages">Beobachtete Seiten<small>Pro Zeile: Name | Adresse</small>
-            <textarea class="field" id="pages"></textarea></label>
-          <label class="f" for="areaKw">Stichworte für diese Seiten<small>Neue Einträge werden nur gemeldet, wenn eines vorkommt</small>
-            <textarea class="field" id="areaKw"></textarea></label>
-        </details>
-      </div>
     </div>
 
-    <!-- Push & Briefing -->
     <div class="view" id="cs-notify" hidden>
-      <div class="summary"><span class="sumlabel">Push und Briefing bei</span><span id="sumNotify"></span><span class="sw-sub" id="sumNotifyDiff"></span></div>
-      <div class="panel">
-        <p class="hint">Diese Kriterien gelten für Push-Mitteilungen und das tägliche Briefing. Gemeldet wird nur, was auch in der App-Suche erscheint. Setz sie also gleich streng oder strenger.</p>
-        <button class="btn" id="copyCrit" type="button">Kriterien der App-Suche übernehmen</button>
-      </div>
+      <div class="panel copyrow"><button class="btn" id="copyCrit" type="button">Kriterien von «Anzeigen» übernehmen</button></div>
       <div class="view" id="critN"></div>
-
-      <div class="panel">
-        <div class="ftitle">Push-Mitteilungen</div>
-        <label class="switch" for="pushOn"><span><b>Push aktiv</b></span><input type="checkbox" id="pushOn"></label>
-        <div id="pushRules" class="pushrules">
-          <div class="ftitle sm">Treffer aus diesen Quellen melden</div>
-          <label class="switch" for="pushMail">Portal-Abos (Homegate, ImmoScout …) <input type="checkbox" id="pushMail"></label>
-          <label class="switch" for="pushFlatfox">Flatfox <input type="checkbox" id="pushFlatfox"></label>
-          <label class="switch" for="pushPages">Genossenschaftsseiten <input type="checkbox" id="pushPages"></label>
-          <label class="switch" for="pushIncomplete"><span>Auch wenn die Ausstattung nicht prüfbar ist<small class="sw-sub">Bei kurzen Inseraten ohne Beschreibung</small></span><input type="checkbox" id="pushIncomplete"></label>
-          <p class="hint">Welche Mitteilungen du selbst bekommst und deine Nachtruhe stellst du unter Status → Meine Push-Mitteilungen ein.</p>
-        </div>
-      </div>
-
       <div class="panel" id="digestPanel">
-        <div class="ftitle">Tägliches Briefing</div>
+        <div class="ftitle">Tägliches Briefing (Mail)</div>
         <p class="hint">Eine Mail mit allen neuen Wohnungen seit dem letzten Briefing, mit Foto und Link.</p>
         <label class="switch" for="dgOn"><span><b>Briefing aktiv</b></span><input type="checkbox" id="dgOn"></label>
         <div id="dgRules" class="pushrules">
@@ -449,6 +405,7 @@ details.adv:not([open]) { display: block }
     </div>
 
     <div class="savebar">
+      <div class="toast" id="areaState" hidden></div>
       <button class="btn primary" type="button" data-save>Speichern</button>
     </div>
   </section>
@@ -459,6 +416,11 @@ details.adv:not([open]) { display: block }
     <button class="btn primary" id="runBtn" type="button">Jetzt suchen</button>
     <div class="panel"><h2>Quellen</h2><div id="sources"></div></div>
     <div class="panel"><h2>Genossenschaftsseiten</h2><div id="events"></div></div>
+    <p class="hint center" id="appVersion"></p>
+  </section>
+
+  <!-- Einstellungen -->
+  <section class="view" id="v-settings" hidden>
     <div class="panel">
       <h2>Ich bin</h2>
       <div class="seg" id="whoStatus"><button type="button" class="opt" data-who="pascal">Pascal</button><button type="button" class="opt" data-who="leonie">Leonie</button></div>
@@ -494,13 +456,33 @@ details.adv:not([open]) { display: block }
         <button class="btn" id="wpOff" type="button" hidden>Abmelden</button>
       </div>
     </div>
-    <div class="panel">
-      <h2>App</h2>
+    <details class="panel adv" id="advPanel">
+      <summary>Erweitert</summary>
+      <div class="advbody">
+      <p class="hint">Gilt für euch beide.</p>
+      <label class="switch" for="active"><span><b>Suche aktiv</b><small class="sw-sub">Aus = nichts wird gesucht, keine Push-Mitteilungen</small></span><input type="checkbox" id="active"></label>
+      <div class="ftitle sm">Quellen</div>
+      <label class="switch" for="srcMail">Suchabo-Mails der Portale <input type="checkbox" id="srcMail"></label>
+      <label class="switch" for="srcFlatfox">Flatfox direkt <input type="checkbox" id="srcFlatfox"></label>
+      <label class="switch" for="srcPages">Genossenschaftsseiten <input type="checkbox" id="srcPages"></label>
+      <label class="f" for="pages">Beobachtete Seiten<small>Pro Zeile: Name | Adresse</small>
+        <textarea class="field" id="pages"></textarea></label>
+      <label class="f" for="areaKw">Stichworte für diese Seiten<small>Neue Einträge werden nur gemeldet, wenn eines vorkommt</small>
+        <textarea class="field" id="areaKw"></textarea></label>
+      <div class="ftitle sm">Ausschliessen</div>
+      <label class="f" for="excl">Eigene Ausschluss-Begriffe<small>Ein Begriff pro Zeile, irgendwo im Inserat</small>
+        <textarea class="field" id="excl"></textarea></label>
+      <label class="f" for="titleExcl">Ausschluss im Titel<small>Für Parkplätze, Büros und Ähnliches</small>
+        <textarea class="field" id="titleExcl"></textarea></label>
+      <label class="f" for="plz">PLZ, wenn die Adresse fehlt<small>Kommagetrennt</small>
+        <input class="field" id="plz" type="text" inputmode="numeric"></label>
+      <button class="btn primary" type="button" data-save>Erweitert speichern</button>
+      <div class="ftitle sm">Dieses Gerät</div>
       <button class="btn" id="installBtn" type="button" hidden>Auf dem Startbildschirm installieren</button>
       <p class="hint" id="installHint">In Chrome: Menü ⋮ → «App installieren» oder «Zum Startbildschirm hinzufügen».</p>
-      <button class="btn" id="logoutBtn" type="button">Schlüssel auf diesem Gerät entfernen</button>
-      <p class="hint" id="appVersion"></p>
-    </div>
+      <button class="btn" id="logoutBtn" type="button">GitHub-Schlüssel auf diesem Gerät entfernen</button>
+      </div>
+    </details>
   </section>
 
   <div class="toast" id="toast" hidden></div>
@@ -511,14 +493,14 @@ details.adv:not([open]) { display: block }
     <span class="pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 11 12 4l9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg></span>Treffer
     <span class="count" id="newCount" hidden></span>
   </button>
-  <button class="tab" role="tab" data-tab="map" aria-selected="false">
-    <span class="pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2z"/><path d="M9 4v14M15 6v14"/></svg></span>Gebiet
-  </button>
-  <button class="tab" role="tab" data-tab="criteria" aria-selected="false">
-    <span class="pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg></span>Kriterien
+  <button class="tab" role="tab" data-tab="search" aria-selected="false">
+    <span class="pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg></span>Suche
   </button>
   <button class="tab" role="tab" data-tab="status" aria-selected="false">
     <span class="pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3-7 4 14 3-7h4"/></svg></span>Status
+  </button>
+  <button class="tab" role="tab" data-tab="settings" aria-selected="false">
+    <span class="pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg></span>Einstellungen
   </button>
 </nav>
 
@@ -647,7 +629,7 @@ function showOnMap(k) {
   const x = S.hits.find((h) => keyOf(h) === k); if (!x || x.lat == null) return;
   S.seen.add(k); saveSeen();
   S.focus = [x.lat, x.lon];
-  showTab("map");
+  setSearchMode("show"); showTab("search");
   const go = () => {
     S.map.invalidateSize();
     S.map.setView([x.lat, x.lon], 17, { animate: false });
@@ -992,7 +974,7 @@ function ensureMap() {
   S.map.pm.setPathOptions({ color: accent(), weight: 2, fillOpacity: 0.12 });
   S.map.on("pm:create", (e) => { markAreaDirty(); e.layer.on(EDIT_EVENTS, markAreaDirty); });
   S.map.on("pm:remove", markAreaDirty);
-  S.map.on("pm:globaleditmodetoggled", (e) => { if (!e.enabled && S.areasDirty) toast("Zum Übernehmen unten «Gebiet speichern» tippen."); });
+  S.map.on("pm:globaleditmodetoggled", (e) => { if (!e.enabled && S.areasDirty) toast("Zum Übernehmen unten «Speichern» tippen."); });
   S.refLayer = L.layerGroup().addTo(S.map);
   S.hitLayer = L.layerGroup().addTo(S.map);
   drawAreas(); renderMarkers();
@@ -1024,15 +1006,14 @@ function paintAreas(fit) {
   renderAreaUi(); renderMarkers();
 }
 function renderAreaUi() {
-  document.querySelectorAll("[data-amode]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.amode === S.amode)));
   $("pushAreaBtns").hidden = S.amode !== "push";
   const own = S.work && hasFeat(S.work.push);
   $("searchAreaBtns").hidden = S.amode !== "search";
   fitMap();
   $("areaHint").textContent = S.amode === "search"
-    ? "App-Suchgebiet: Nur hier wird gesucht, diese Wohnungen erscheinen in der App. Mit dem Fünfeck links zeichnen, mit dem Stift anpassen, mit dem Radiergummi löschen. Gestrichelt: das Push-Gebiet."
-    : own ? "Push-Gebiet: Nur Wohnungen hier lösen Push und Briefing aus. Gestrichelt: das App-Suchgebiet; ausserhalb davon wird nicht gesucht."
-      : "Noch kein Push-Gebiet: Zeichne eine Fläche oder übernimm das App-Suchgebiet. Solange keine Fläche da ist, gilt das App-Suchgebiet.";
+    ? "Mit dem Fünfeck links zeichnen, mit dem Stift anpassen, mit dem Radiergummi löschen. Gestrichelt: das Gebiet von «Push & Mail»."
+    : own ? "Gestrichelt: das Gebiet von «Anzeigen». Ausserhalb davon wird nicht gesucht."
+      : "Noch keine Fläche: Zeichne eine oder übernimm das Gebiet von «Anzeigen». Bis dahin gilt dieses.";
 }
 function grabWork() {
   if (!S.map || !S.work) return;
@@ -1043,16 +1024,29 @@ function setAreaMode(m) {
   if (!S.map || !S.work || m === S.amode) return;
   grabWork(); S.amode = m; paintAreas(false);
 }
-document.querySelectorAll("[data-amode]").forEach((b) => b.addEventListener("click", () => setAreaMode(b.dataset.amode)));
-$("paCopy").addEventListener("click", () => { if (!S.work) return; grabWork(); S.work.push = JSON.parse(JSON.stringify(S.work.search)); paintAreas(true); markAreaDirty(); toast("App-Suchgebiet übernommen. Zum Übernehmen unten «Gebiet speichern» tippen."); });
-$("saCopy").addEventListener("click", () => { if (!S.work) return; grabWork(); if (!hasFeat(S.work.push)) { toast("Es gibt noch kein Push-Gebiet.", "err"); return; } S.work.search = JSON.parse(JSON.stringify(S.work.push)); paintAreas(true); markAreaDirty(); toast("Push-Gebiet übernommen. Zum Übernehmen unten «Gebiet speichern» tippen."); });
+// Umschalter Anzeigen | Push & Mail (Gebiet und Kriterien zusammen)
+function setSearchMode(m) {
+  F.ctab = m === "notify" ? "notify" : "search";
+  $("cs-search").hidden = m === "notify"; $("cs-notify").hidden = m !== "notify";
+  $("sumShowBox").hidden = m === "notify"; $("sumNotifyBox").hidden = m !== "notify";
+  document.querySelectorAll("[data-stab]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.stab === m)));
+  $("modeHint").textContent = m === "notify"
+    ? "Push-Mitteilungen und das tägliche Briefing per Mail kommen nur für Wohnungen, die auch angezeigt werden. Gebiet und Kriterien hier also gleich oder enger setzen."
+    : "Nur in diesem Gebiet und mit diesen Kriterien wird gesucht. Das erscheint in der Trefferliste.";
+  if (S.map && S.work) setAreaMode(m === "notify" ? "push" : "search"); else S.amode = m === "notify" ? "push" : "search";
+  renderAreaUi();
+}
+$("searchTabs").addEventListener("click", (e) => { const b = e.target.closest("[data-stab]"); if (b) setSearchMode(b.dataset.stab); });
+$("paCopy").addEventListener("click", () => { if (!S.work) return; grabWork(); S.work.push = JSON.parse(JSON.stringify(S.work.search)); paintAreas(true); markAreaDirty(); toast("Gebiet von «Anzeigen» übernommen. Unten «Speichern» tippen."); });
+$("saCopy").addEventListener("click", () => { if (!S.work) return; grabWork(); if (!hasFeat(S.work.push)) { toast("«Push & Mail» hat noch kein eigenes Gebiet.", "err"); return; } S.work.search = JSON.parse(JSON.stringify(S.work.push)); paintAreas(true); markAreaDirty(); toast("Gebiet von «Push & Mail» übernommen. Unten «Speichern» tippen."); });
 // Karte genau zwischen Knöpfen oben und «Gebiet speichern» einpassen
 function fitMap() {
-  const el = $("map"); if (!el || $("v-map").hidden) return;
-  const top = el.getBoundingClientRect().top + window.scrollY;
-  const bar = document.querySelector("#v-map .savebar");
+  const el = $("map"); if (!el || $("v-search").hidden) return;
+  // fast bildschirmhoch: zwischen Kopfzeile und Speichern-Knopf
+  const head = document.querySelector(".appbar") ? document.querySelector(".appbar").getBoundingClientRect().height : 0;
+  const bar = document.querySelector("#v-search .savebar");
   const tab = $("tabbar") ? $("tabbar").getBoundingClientRect().height : 60;
-  const h = Math.max(200, Math.floor(window.innerHeight - top - (bar ? bar.offsetHeight : 56) - tab - 30));
+  const h = Math.max(280, Math.floor(window.innerHeight - head - (bar ? bar.offsetHeight : 56) - tab - 40));
   el.style.height = h + "px";
   if (S.map) S.map.invalidateSize();
 }
@@ -1143,7 +1137,6 @@ function critMarkup(p) {
   const checks = (obj, attr) => Object.entries(obj).map(([k, l]) =>
     `<label class="check" for="${p}-${attr}-${k}"><input type="checkbox" id="${p}-${attr}-${k}" data-${attr}="${k}"><span class="cl">${k === "aussen" ? "Aussenraum<small>Balkon, Terrasse, Sitzplatz, Garten</small>" : l}</span></label>`).join("");
   return `
-  <div class="editing">Du bearbeitest: <b>${p === "s" ? "App-Suche" : "Push &amp; Briefing"}</b></div>
   <div class="panel">
     <div class="ftitle">Objektart</div>
     <div class="seg">
@@ -1183,6 +1176,7 @@ function critMarkup(p) {
     <div class="ftitle">Unvollständige Inserate</div>
     <label class="switch" for="${p}UnkPrice">Ohne Preisangabe trotzdem <input type="checkbox" id="${p}UnkPrice"></label>
     <label class="switch" for="${p}UnkRooms">Ohne Zimmerzahl trotzdem <input type="checkbox" id="${p}UnkRooms"></label>
+    ${p === "n" ? '<label class="switch" for="pushIncomplete"><span>Auch wenn die Ausstattung nicht prüfbar ist<small class="sw-sub">Bei kurzen Inseraten ohne Beschreibung</small></span><input type="checkbox" id="pushIncomplete"></label>' : ""}
   </div>`;
 }
 const root = (p) => $(p === "s" ? "critS" : "critN");
@@ -1267,21 +1261,14 @@ function renderSummary() {
   $("sumNotify").textContent = pn.join(" · ");
   const diff = pn.filter((x) => !ps.includes(x));
   const chans = [];
-  if (!$("pushOn").checked) chans.push("Push aus");
   if (!$("dgOn").checked) chans.push("Briefing aus");
   else if (F.recips.length) chans.push(`Briefing ${F.days === "weekdays" ? "Mo–Fr" : "täglich"} ${$("dgTime").value} an ${F.recips.length}`);
   const sa = S.work ? S.work.search : S.config.areas, pa = S.work ? S.work.push : pushAreasOf(S.config);
-  const ownArea = pa && JSON.stringify(pa) !== JSON.stringify(sa) ? ["eigenes Push-Gebiet"] : [];
-  $("sumNotifyDiff").textContent = (diff.length || ownArea.length ? "Anders als die App-Suche: " + [...diff, ...ownArea].join(" · ") : "Gleich wie die App-Suche") + (chans.length ? " · " + chans.join(" · ") : "");
+  const ownArea = pa && JSON.stringify(pa) !== JSON.stringify(sa) ? ["eigenes Gebiet"] : [];
+  $("sumNotifyDiff").textContent = (diff.length || ownArea.length ? "Enger als «Anzeigen»: " + [...diff, ...ownArea].join(" · ") : "Gleich wie «Anzeigen»") + (chans.length ? " · " + chans.join(" · ") : "");
 }
-function showCritTab(t) {
-  F.ctab = t;
-  $("cs-search").hidden = t !== "search"; $("cs-notify").hidden = t !== "notify";
-  document.querySelectorAll("[data-ctab]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.ctab === t)));
-  window.scrollTo(0, 0);
-}
-$("critTabs").addEventListener("click", (e) => { const b = e.target.closest("[data-ctab]"); if (b) showCritTab(b.dataset.ctab); });
-$("copyCrit").addEventListener("click", () => { setCrit("n", getCrit("s")); renderSummary(); toast("Kriterien der App-Suche übernommen. Jetzt anpassen und speichern."); });
+$("copyCrit").addEventListener("click", () => { setCrit("n", getCrit("s")); renderSummary(); toast("Kriterien von «Anzeigen» übernommen. Anpassen und speichern."); });
+$("copyCritBack").addEventListener("click", () => { setCrit("s", getCrit("n")); renderSummary(); toast("Kriterien von «Push & Mail» übernommen. Anpassen und speichern."); });
 
 function fillForm() {
   const c = S.config;
@@ -1296,8 +1283,6 @@ function fillForm() {
   const src = c.sources || {};
   $("srcMail").checked = src.mail_alerts !== false; $("srcFlatfox").checked = src.flatfox !== false; $("srcPages").checked = src.watch_pages !== false;
   $("pages").value = (c.watch_pages || []).map((x) => `${x.name} | ${x.url}`).join("\n");
-  $("pushOn").checked = p.enabled !== false;
-  $("pushMail").checked = p.mail_alerts !== false; $("pushFlatfox").checked = p.flatfox !== false; $("pushPages").checked = p.pages !== false;
   $("pushIncomplete").checked = p.allow_incomplete !== false;
   const d = c.digest || { enabled: true, to: [], time: "07:00", days: "daily", skip_empty: true };
   $("dgOn").checked = d.enabled !== false;
@@ -1321,8 +1306,9 @@ function readForm() {
     const [name, url] = ln.includes("|") ? ln.split("|").map((s) => s.trim()) : [ln, ln];
     return { ...(old[url] || {}), name: name || url, url };
   }).filter((x) => /^https?:\/\//.test(x.url));
-  c.push = { enabled: $("pushOn").checked, mail_alerts: $("pushMail").checked, flatfox: $("pushFlatfox").checked,
-    pages: $("pushPages").checked, allow_incomplete: $("pushIncomplete").checked, criteria: getCrit("n") };
+  // Ob jemand Push bekommt, regelt jede Person unter Einstellungen; hier nur, was meldenswert ist
+  c.push = { enabled: true, mail_alerts: true, flatfox: true, pages: true,
+    allow_incomplete: $("pushIncomplete").checked, criteria: getCrit("n") };
   delete c.digest_to;
   const typed = $("dgAdd").value.trim().toLowerCase();
   if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(typed) && !F.recips.includes(typed)) { F.recips.push(typed); $("dgAdd").value = ""; setTimeout(renderChannels); }
@@ -1334,14 +1320,13 @@ function readForm() {
 }
 function validate(c) {
   if (!c.areas.features.length) return "Bitte mindestens eine Fläche einzeichnen.";
-  for (const [label, k] of [["Suche", c], ["Push & Briefing", c.push.criteria]]) {
+  for (const [label, k] of [["Anzeigen", c], ["Push & Mail", c.push.criteria]]) {
     if (k.rent_min && k.rent_max && k.rent_min > k.rent_max) return `${label}: Die Mindestmiete ist höher als die Höchstmiete.`;
     if (k.m2_min && k.m2_max && k.m2_min > k.m2_max) return `${label}: Die Mindestfläche ist grösser als die Höchstfläche.`;
   }
   return null;
 }
 function renderChannels() {
-  $("pushRules").classList.toggle("off", !$("pushOn").checked);
   $("dgList").innerHTML = F.recips.length ? F.recips.map((m, i) => `<div class="recip"><span>${esc(m)}</span><button type="button" data-rm="${i}" aria-label="${esc(m)} entfernen">${icon.x}</button></div>`).join("")
     : '<p class="hint">Noch keine Empfänger.</p>';
   document.querySelectorAll("[data-days]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.days === F.days)));
@@ -1361,6 +1346,7 @@ function addRecipient() {
   const hours = [...Array(24).keys()];
   opts("myQuietFrom", hours, (h) => `${h}:00`, "keine", null);
   opts("myQuietTo", hours, (h) => `${h}:00`, "–", null);
+  setSearchMode("show");
 })();
 $("cs-search").addEventListener("change", renderSummary);
 $("cs-notify").addEventListener("change", renderChannels);
@@ -1453,19 +1439,20 @@ async function load() {
   applyDeep(true);
 }
 function showTab(t) {
-  if (S.tab === "map" && t !== "map" && S.areasDirty) toast("Achtung: Das geänderte Gebiet ist noch nicht gespeichert.", "err", 6000);
+  if (t === "map" || t === "criteria") t = "search";
+  if (S.tab === "search" && t !== "search" && S.areasDirty) toast("Achtung: Das geänderte Gebiet ist noch nicht gespeichert.", "err", 6000);
   S.tab = t; store.set("wh_tab", t);
-  ["hits", "map", "criteria", "status"].forEach((n) => ($("v-" + n).hidden = n !== t));
+  ["hits", "search", "status", "settings"].forEach((n) => ($("v-" + n).hidden = n !== t));
   document.querySelectorAll(".tab").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.tab === t)));
-  if (t === "map") { ensureMap(); setTimeout(fitMap, 0); }
-  if (t === "status") renderPush();
+  if (t === "search") { ensureMap(); setTimeout(fitMap, 0); }
+  if (t === "settings") renderPush();
   window.scrollTo(0, 0);
 }
 document.querySelectorAll(".tab").forEach((b) => b.addEventListener("click", () => showTab(b.dataset.tab)));
 $("refreshBtn").addEventListener("click", () => S.token && load());
 function showSetup(err) {
   $("setup").hidden = false; $("tabbar").hidden = true;
-  ["hits", "map", "criteria", "status"].forEach((n) => ($("v-" + n).hidden = true));
+  ["hits", "search", "status", "settings"].forEach((n) => ($("v-" + n).hidden = true));
   $("repoInput").value = S.repo;
   if (err) { $("setupMsg").textContent = err; $("setupMsg").hidden = false; }
 }
@@ -1596,7 +1583,7 @@ let installEvt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("installBtn").hidden = false; $("installHint").hidden = true; });
 $("installBtn").addEventListener("click", async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("installBtn").hidden = true; });
 if (window.matchMedia("(display-mode: standalone)").matches) { $("installHint").textContent = "Läuft als App."; }
-const APP_VERSION = "27 · 18.10.2026";
+const APP_VERSION = "28 · 18.10.2026";
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").then((reg) => { reg.update().catch(() => {}); }).catch(() => {});
   let reloaded = false;
