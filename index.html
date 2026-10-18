@@ -243,6 +243,7 @@ textarea.field { min-height: 110px; resize: vertical; font-size: 15px }
 .arow { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 0 0 10px }
 .arow.one { grid-template-columns: 1fr }
 .hint.center { text-align: center; margin-top: 8px }
+#gmailBtn { margin-top: 12px; text-decoration: none; text-align: center }
 .srclink { color: inherit; text-decoration: none; border-bottom: 2px solid var(--accent); display: inline-block; justify-self: start; width: fit-content }
 .advbody { display: grid; gap: 14px; margin-top: 14px }
 .advbody .ftitle.sm { margin-top: 10px }
@@ -402,7 +403,9 @@ details.adv:not([open]) { display: block }
   <section class="view" id="v-status" hidden>
     <div class="stats" id="stats"></div>
     <button class="btn primary" id="runBtn" type="button">Jetzt suchen</button>
-    <div class="panel"><h2>Quellen</h2><div id="sources"></div></div>
+    <div class="panel"><h2>Quellen</h2><div id="sources"></div>
+      <a class="btn" id="gmailBtn" href="https://mail.google.com/mail/u/meierstadelmann@gmail.com/#label/Wollihood" target="_blank" rel="noopener">Gmail-Postfach öffnen ↗</a></div>
+    <div class="panel"><h2>Versand</h2><div id="delivery"></div></div>
     <p class="hint center" id="appVersion"></p>
   </section>
 
@@ -1416,7 +1419,6 @@ document.querySelectorAll("[data-save]").forEach((b) => b.addEventListener("clic
 // ---------- Status ----------
 // Links zu den Quellen, damit man selbst nachschauen kann
 function sourceLink(name) {
-  if (name === "Abo-Mails") return "https://mail.google.com/mail/u/meierstadelmann@gmail.com/#label/Wollihood";
   if (name === "Flatfox") {
     const pts = (S.config?.areas?.features || []).flatMap((f) => (f.geometry?.type === "Polygon" ? f.geometry.coordinates[0] : (f.geometry?.coordinates || []).flatMap((p) => p[0])));
     if (!pts.length) return "https://flatfox.ch/de/search/";
@@ -1446,8 +1448,10 @@ function renderStatus() {
     rows.push(srcRow(name, v.ok ? "ok" : "bad", `${v.msg} · ${ago(v.at)}`, sourceLink(name)));
     if (name === "Abo-Mails") nl.forEach(([n, x]) => rows.push(srcRow(n, x.level, x.level === "bad" ? x.msg : (x.last ? `letzte Mail ${ago(x.last)} · ` : "") + x.msg.replace(/^seit \d+ Tagen keine Mail · /, ""), x.url, true)));
   });
-  if (h?.last_digest) rows.push(`<div class="src"><span class="s"></span><b>Briefing</b><div class="m">zuletzt ${esc(ago(h.last_digest))}</div></div>`);
-  if (h?.push) rows.push(`<div class="src"><span class="s ${h.push.ok ? "" : "bad"}"></span><b>Push-Meldungen</b><div class="m">${h.push.ok ? "funktionieren" : esc(h.push.msg)}</div></div>`);
+  const dl = [];
+  dl.push(`<div class="src"><span class="s ${S.config?.digest?.enabled === false ? "warn" : ""}"></span><b>Tägliches Briefing</b><div class="m">${S.config?.digest?.enabled === false ? "ausgeschaltet" : h?.last_digest ? "zuletzt verschickt " + esc(ago(h.last_digest)) : "noch nie verschickt"}</div></div>`);
+  if (h?.push) dl.push(`<div class="src"><span class="s ${h.push.ok ? "" : "bad"}"></span><b>Push-Mitteilungen</b><div class="m">${h.push.ok ? "funktionieren · zuletzt geprüft " + esc(ago(h.push.at)) : esc(h.push.msg)}</div></div>`);
+  $("delivery").innerHTML = dl.join("");
   $("sources").innerHTML = rows.join("") || '<p class="hint">Noch kein Lauf.</p>';
 }
 $("runBtn").addEventListener("click", async () => {
@@ -1629,7 +1633,7 @@ let installEvt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("installBtn").hidden = false; $("installHint").hidden = true; });
 $("installBtn").addEventListener("click", async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("installBtn").hidden = true; });
 if (window.matchMedia("(display-mode: standalone)").matches) { $("installHint").textContent = "Läuft als App."; }
-const APP_VERSION = "35 · 18.10.2026";
+const APP_VERSION = "36 · 18.10.2026";
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").then((reg) => { reg.update().catch(() => {}); }).catch(() => {});
   let reloaded = false;
