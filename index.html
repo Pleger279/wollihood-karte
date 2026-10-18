@@ -57,6 +57,8 @@ a { color: var(--accent) }
 .iconbtn:active { background: var(--sunk) }
 .iconbtn svg { width: 20px; height: 20px }
 .spin svg { animation: spin 1s linear infinite }
+.card.flash { animation: flash 2.2s ease-out }
+@keyframes flash { 0%, 35% { box-shadow: 0 0 0 5px var(--accent) } 100% { box-shadow: 0 0 0 0 transparent } }
 @keyframes spin { to { transform: rotate(360deg) } }
 .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); display: inline-block }
 .dot.bad { background: var(--bad) }
@@ -635,6 +637,38 @@ function showOnMap(k) {
   };
   setTimeout(go, 80); setTimeout(() => { go(); S.focus = null; }, 350);
 }
+// ---------- Direkt zu einer Wohnung (aus Push oder Briefing) ----------
+function parseDeep(href) {
+  const h = new URL(href, location.href).hash.replace(/^#/, "");
+  const q = new URLSearchParams(h);
+  return q.get("l") ? { key: q.get("l"), comments: q.get("c") === "1", tries: 0 } : null;
+}
+function applyDeep(final) {
+  const d = S.deep; if (!d || !S.hits) return;
+  const x = S.hits.find((h) => keyOf(h) === d.key || (h.keys || []).includes(d.key));
+  if (!x) {
+    if (final) { toast("Diese Wohnung ist nicht mehr in der Liste."); S.deep = null; history.replaceState(null, "", location.pathname); }
+    return;
+  }
+  const k = keyOf(x);
+  S.deep = null; history.replaceState(null, "", location.pathname);
+  showTab("hits");
+  if (!filtered().some((h) => keyOf(h) === k)) { S.filter = verdict(k) === "out" ? "out" : "all"; S.filterChosen = true; }
+  if (d.comments) S.openThreads.add(k);
+  renderHits();
+  setTimeout(() => {
+    const card = document.querySelector(`.card[data-key="${CSS.escape(k)}"]`);
+    if (!card) return;
+    card.scrollIntoView({ block: "start", behavior: "smooth" });
+    card.classList.remove("flash"); void card.offsetWidth; card.classList.add("flash");
+    if (d.comments) { const t = card.querySelector(".cform textarea"); if (t) setTimeout(() => t.focus({ preventScroll: true }), 500); }
+  }, 60);
+}
+S.deep = parseDeep(location.href);
+window.addEventListener("hashchange", () => { S.deep = parseDeep(location.href); applyDeep(false); });
+if (navigator.serviceWorker) navigator.serviceWorker.addEventListener("message", (e) => {
+  if (e.data && e.data.type === "deeplink") { S.deep = parseDeep(e.data.url); applyDeep(false); if (S.token) load(); }
+});
 function inSavedArea(x) {
   return x.lat == null || !S.config?.areas?.features?.length || inAreas(x.lat, x.lon, S.config.areas);
 }
@@ -1322,6 +1356,7 @@ async function load() {
   if (!S.filterChosen) { S.filter = S.hits.some(isNew) ? "new" : "all"; S.filterChosen = true; }
   renderHits(); renderStatus(); renderMarkers();
   $("refreshBtn").classList.remove("spin");
+  applyDeep(true);
 }
 function showTab(t) {
   if (S.tab === "map" && t !== "map" && S.areasDirty) toast("Achtung: Das geänderte Suchgebiet ist noch nicht gespeichert.", "err", 6000);
@@ -1344,7 +1379,7 @@ function showApp() {
   $("setup").hidden = true; $("tabbar").hidden = false;
   try { S.hits = JSON.parse(store.get("wh_cache_hits") || "[]"); S.marks = JSON.parse(store.get("wh_marks") || "{}"); } catch {}
   S.filter = S.hits.some(isNew) ? "new" : "all";
-  showTab(S.tab); renderHits(); load();
+  showTab(S.tab); renderHits(); applyDeep(false); load();
 }
 $("connectBtn").addEventListener("click", () => {
   const t = $("tokenInput").value.trim(); if (!t) { $("tokenInput").focus(); return; }
@@ -1467,7 +1502,7 @@ let installEvt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("installBtn").hidden = false; $("installHint").hidden = true; });
 $("installBtn").addEventListener("click", async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("installBtn").hidden = true; });
 if (window.matchMedia("(display-mode: standalone)").matches) { $("installHint").textContent = "Läuft als App."; }
-const APP_VERSION = "23 · 18.10.2026";
+const APP_VERSION = "24 · 18.10.2026";
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").then((reg) => { reg.update().catch(() => {}); }).catch(() => {});
   let reloaded = false;

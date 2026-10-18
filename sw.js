@@ -1,5 +1,5 @@
 // Hält die App-Hülle offline bereit und zeigt Push-Meldungen an.
-const CACHE = "wollihood-v23";
+const CACHE = "wollihood-v24";
 const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icons/icon-192.png", "./icons/icon-512.png", "./icons/badge-96.png"];
 
 self.addEventListener("install", (e) => {
@@ -31,22 +31,32 @@ self.addEventListener("push", (e) => {
     tag: m.tag || undefined,
     renotify: !!m.tag,
     silent: !!m.silent,
-    data: { url: m.url || "./" },
+    data: { url: m.url || "./", listing: m.listing_url || null },
   };
   if (m.image) opts.image = m.image;
-  if (m.url && m.url !== "./") opts.actions = [{ action: "open", title: "Inserat öffnen" }, { action: "app", title: "In der App" }];
+  if (m.listing_url) opts.actions = [{ action: "open", title: "Inserat öffnen" }];
+  // ältere Meldungen: url zeigte direkt aufs Portal
+  else if (m.url && /^https?:/.test(m.url) && !m.url.startsWith(self.registration.scope))
+    opts.actions = [{ action: "open", title: "Inserat öffnen" }, { action: "app", title: "In der App" }];
   e.waitUntil(self.registration.showNotification(m.title || "Wollihood", opts));
 });
 
 self.addEventListener("notificationclick", (e) => {
   e.notification.close();
-  const target = e.action === "app" ? "./" : (e.notification.data && e.notification.data.url) || "./";
+  const d = e.notification.data || {};
+  const target = e.action === "open" && d.listing ? d.listing : e.action === "app" ? "./" : d.url || "./";
   const url = new URL(target, self.registration.scope).href;
   e.waitUntil((async () => {
     const own = url.startsWith(self.registration.scope);
     if (own) {
       const wins = await clients.matchAll({ type: "window", includeUncontrolled: true });
-      for (const w of wins) { if (w.url.startsWith(self.registration.scope)) { await w.focus(); return; } }
+      for (const w of wins) {
+        if (w.url.startsWith(self.registration.scope)) {
+          await w.focus();
+          w.postMessage({ type: "deeplink", url });
+          return;
+        }
+      }
     }
     await clients.openWindow(url);
   })());
