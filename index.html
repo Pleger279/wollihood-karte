@@ -223,6 +223,13 @@ details.adv[open], details.adv-inner[open] { display: grid; gap: 14px }
 .cmt.mine .who { justify-content: flex-end }
 .cform { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px }
 .cform textarea { min-height: 42px; height: 42px; font-size: 15px; resize: none }
+.vbtn.star[aria-pressed="true"] { background: var(--star); border-color: var(--star); color: #fff }
+.statusrow { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; align-items: end; margin-top: 8px; background: var(--accent-soft); border-radius: 10px; padding: 10px }
+.statusrow .hint { grid-column: 1 / -1; font-size: 12px }
+.badge.stat { left: auto; right: 10px; background: var(--accent); color: var(--accent-ink) }
+.badge.st-zusage { background: var(--ok); color: #fff } .badge.st-absage { background: var(--bad); color: #fff }
+.badge.st-besichtigung { background: var(--star); color: #fff }
+.card .photo.noimg:has(.stat, .fav, .split, .match)::after { content: none }
 .badge.split { left: auto; right: 10px; background: var(--warn); color: #fff }
 .badge.match { left: auto; right: 10px; background: var(--ok); color: #fff }
 .tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 4px }
@@ -262,8 +269,7 @@ details.adv[open], details.adv-inner[open] { display: grid; gap: 14px }
   <section class="view" id="v-hits" hidden>
     <div class="chips" role="group" aria-label="Filter">
       <button class="chip" type="button" data-filter="new" aria-pressed="true">Neu</button>
-      <button class="chip" type="button" data-filter="fav" aria-pressed="false">Merkliste</button>
-      <button class="chip" type="button" data-filter="both" aria-pressed="false">Beide dafür</button>
+      <button class="chip" type="button" data-filter="fav" aria-pressed="false">Favoriten</button>
       <button class="chip" type="button" data-filter="split" aria-pressed="false">Uneinig</button>
       <button class="chip" type="button" data-filter="open" aria-pressed="false">Offen für mich</button>
       <button class="chip" type="button" data-filter="all" aria-pressed="false">Alle</button>
@@ -403,7 +409,8 @@ details.adv[open], details.adv-inner[open] { display: grid; gap: 14px }
       <label class="switch" for="mp-pages">Neues auf Genossenschaftsseiten <input type="checkbox" id="mp-pages" data-mp="pages"></label>
       <div class="ftitle sm" id="mpOtherTitle">Reaktionen der anderen Person</div>
       <label class="switch" for="mp-comment">Neuer Kommentar <input type="checkbox" id="mp-comment" data-mp="comment"></label>
-      <label class="switch" for="mp-match">«Ihr seid euch einig» (beide Daumen hoch) <input type="checkbox" id="mp-match" data-mp="match"></label>
+      <label class="switch" for="mp-match">Neuer Favorit (Stern oder beide Daumen hoch) <input type="checkbox" id="mp-match" data-mp="match"></label>
+      <label class="switch" for="mp-status">Stand geändert (angefragt, Besichtigung …) <input type="checkbox" id="mp-status" data-mp="status"></label>
       <label class="switch" for="mp-up">Daumen hoch <input type="checkbox" id="mp-up" data-mp="up"></label>
       <label class="switch" for="mp-down">Daumen runter <input type="checkbox" id="mp-down" data-mp="down"></label>
       <div class="ftitle sm">Postfach und System</div>
@@ -592,12 +599,11 @@ function inSavedArea(x) {
 }
 function filtered() {
   return sortHits(S.hits).filter(inSavedArea).filter((x) => {
-    const k = keyOf(x), m = S.marks[k], v = verdict(k);
+    const k = keyOf(x), v = verdict(k);
     if (S.filter === "out") return v === "out";
     if (v === "out") return false;
     if (S.filter === "new") return isNew(x);
-    if (S.filter === "fav") return m === "fav";
-    if (S.filter === "both") return v === "both";
+    if (S.filter === "fav") return isFav(k);
     if (S.filter === "split") return v === "split";
     if (S.filter === "open") return !!S.person && !myVote(k);
     return true;
@@ -620,6 +626,50 @@ function verdict(k) {
   return "";
 }
 const myVote = (k) => (S.person ? (itemOf(k).votes || {})[S.person] : null);
+const isFav = (k) => verdict(k) !== "out" && (verdict(k) === "both" || !!itemOf(k).fav);
+const STATUS = [["", "Noch nichts unternommen"], ["angefragt", "Angefragt"], ["besichtigung", "Besichtigung"],
+  ["beworben", "Beworben"], ["zusage", "Zusage"], ["absage", "Absage"]];
+const statusLabel = (st) => {
+  if (!st || !st.value) return "";
+  const base = (STATUS.find(([v]) => v === st.value) || [0, st.value])[1];
+  if (st.value === "besichtigung" && st.when) {
+    const d = new Date(st.when);
+    return `${base} ${d.toLocaleDateString("de-CH", { weekday: "short", day: "2-digit", month: "2-digit" })} ${d.toLocaleTimeString("de-CH", { hour: "2-digit", minute: "2-digit" })}`;
+  }
+  return base;
+};
+function toggleFav(k) {
+  if (needPerson()) return;
+  const me = S.person, label = (S.hits.find((h) => keyOf(h) === k) || {}).street || "Inserat";
+  const on = !itemOf(k).fav;
+  if (!on && verdict(k) === "both") { toast("Ihr habt beide Daumen hoch gegeben, darum bleibt sie in den Favoriten."); return; }
+  socialOp(`${PEOPLE[me]} ${on ? "favorisiert" : "entfernt Favorit"} (${label})`, (items) => {
+    const it = items[k] || (items[k] = { votes: {}, comments: [] });
+    if (on) it.fav = { by: me, at: new Date().toISOString() }; else delete it.fav;
+    it.updated = new Date().toISOString();
+  });
+}
+function setStatus(k, value, when) {
+  if (needPerson()) return;
+  const me = S.person, label = (S.hits.find((h) => keyOf(h) === k) || {}).street || "Inserat";
+  socialOp(`Status ${value || "zurückgesetzt"} von ${PEOPLE[me]} (${label})`, (items) => {
+    const it = items[k] || (items[k] = { votes: {}, comments: [] });
+    if (value) it.status = { value, when: value === "besichtigung" ? (when || it.status?.when || null) : null, by: me, at: new Date().toISOString() };
+    else delete it.status;
+    it.updated = new Date().toISOString();
+  });
+}
+// einmalig: alte Merkliste in Favoriten übernehmen
+async function migrateMarks() {
+  const keys = Object.entries(S.marks || {}).filter(([, v]) => v === "fav").map(([k]) => k);
+  if (!keys.length || store.get("wh_marks_migrated")) return;
+  const todo = keys.filter((k) => !itemOf(k).fav);
+  store.set("wh_marks_migrated", "1");
+  if (!todo.length) return;
+  socialOp("Merkliste übernommen", (items) => {
+    todo.forEach((k) => { const it = items[k] || (items[k] = { votes: {}, comments: [] }); it.fav = it.fav || { by: S.person || "pascal", at: new Date().toISOString() }; });
+  });
+}
 let socialQueue = Promise.resolve();
 function socialOp(label, apply) {
   // sofort lokal anwenden, dann mit dem neusten Stand im Repo zusammenführen
@@ -677,6 +727,17 @@ function deleteComment(k, id) {
     it.comments = (it.comments || []).filter((x) => !(x.id === id && x.by === S.person));
   });
 }
+function statusBlock(k) {
+  const it = itemOf(k), st = it.status || {}, favBy = it.fav?.by;
+  const why = verdict(k) === "both" ? "Ihr seid euch einig" : favBy ? `Favorit von ${PEOPLE[favBy] || favBy}` : "";
+  const when = st.when ? new Date(new Date(st.when).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16) : "";
+  return `<div class="statusrow">
+    <label class="f"><small>${esc(why)}${why ? " · " : ""}Stand</small>
+      <select class="field" data-status>${STATUS.map(([v, l]) => `<option value="${v}"${(st.value || "") === v ? " selected" : ""}>${l}</option>`).join("")}</select></label>
+    ${st.value === "besichtigung" ? `<label class="f"><small>Termin</small><input class="field" type="datetime-local" data-when value="${when}"></label>` : ""}
+    ${st.by ? `<span class="hint">${esc(PEOPLE[st.by] || st.by)}, ${esc(ago(st.at))}</span>` : ""}
+  </div>`;
+}
 function socialBlock(x) {
   const k = keyOf(x), it = itemOf(k), mine = myVote(k);
   const other = S.person ? otherOf(S.person) : null;
@@ -695,6 +756,7 @@ function socialBlock(x) {
   return `<div class="votes">
       <button type="button" class="vbtn up" data-vote="up" aria-pressed="${mine === "up"}" aria-label="Daumen hoch">${thumb("up")}</button>
       <button type="button" class="vbtn down" data-vote="down" aria-pressed="${mine === "down"}" aria-label="Daumen runter">${thumb("down")}</button>
+      <button type="button" class="vbtn star" data-fav aria-pressed="${isFav(k)}" aria-label="Favorit">${isFav(k) ? icon.star : icon.starO}</button>
       ${otherHtml}
       <button type="button" class="cbtn" data-thread>${bubble} ${n ? n + " " : ""}Kommentar${n === 1 ? "" : "e"}</button>
     </div>${thread}`;
@@ -711,11 +773,10 @@ function renderHits() {
   const pool = S.hits.filter(inSavedArea);
   const live = pool.filter((x) => verdict(keyOf(x)) !== "out");
   const cnt = {
-    new: live.filter(isNew).length, fav: live.filter((x) => S.marks[keyOf(x)] === "fav").length,
-    both: live.filter((x) => verdict(keyOf(x)) === "both").length, split: live.filter((x) => verdict(keyOf(x)) === "split").length,
+    new: live.filter(isNew).length, fav: live.filter((x) => isFav(keyOf(x))).length, split: live.filter((x) => verdict(keyOf(x)) === "split").length,
     open: S.person ? live.filter((x) => !myVote(keyOf(x))).length : 0, all: 0, out: pool.length - live.length,
   };
-  const names = { new: "Neu", fav: "Merkliste", both: "Beide dafür", split: "Uneinig", open: "Offen für mich", all: "Alle", out: "Aussortiert" };
+  const names = { new: "Neu", fav: "Favoriten", split: "Uneinig", open: "Offen für mich", all: "Alle", out: "Aussortiert" };
   const newN = cnt.new;
   document.querySelectorAll("[data-filter]").forEach((b) => {
     const f = b.dataset.filter;
@@ -729,9 +790,8 @@ function renderHits() {
   if (!list.length) {
     const msg = {
       new: ["Nichts Neues", "Sobald eine passende Wohnung auftaucht, erscheint sie hier und du bekommst eine Push-Meldung."],
-      fav: ["Die Merkliste ist leer", "Tippe bei einem Treffer auf «Merken», dann landet er hier, auch auf Leonies Handy."],
+      fav: ["Noch keine Favoriten", "Hier landen Wohnungen, bei denen ihr beide Daumen hoch gegeben habt oder die jemand mit dem Stern markiert hat."],
       all: ["Noch keine Treffer", "Die Suche läuft alle 30 Minuten. Treffer der letzten Wochen erscheinen hier."],
-      both: ["Noch keine gemeinsamen Favoriten", "Hier landen Wohnungen, bei denen ihr beide Daumen hoch gegeben habt."],
       split: ["Keine offenen Diskussionen", "Hier landen Wohnungen, bei denen einer dafür und einer dagegen ist."],
       open: [S.person ? "Alles bewertet" : "Wer bist du?", S.person ? "Du hast alle Treffer bewertet." : "Wähle oben, wer dieses Handy nutzt."],
       out: ["Nichts aussortiert", "Haben beide Daumen runter gegeben, landet die Wohnung hier."],
@@ -740,14 +800,14 @@ function renderHits() {
     return;
   }
   $("hitList").innerHTML = list.map((x) => {
-    const k = keyOf(x), m = S.marks[k];
+    const k = keyOf(x), fav = isFav(k), st = itemOf(k).status;
     const place = [x.street, [x.plz, x.city].filter(Boolean).join(" ")].filter(Boolean).join(", ") || x.title || "";
     const photo = x.image
       ? `<img src="${esc(x.image)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentNode.classList.add('noimg');this.remove()">`
       : "";
     return `<article class="card" data-key="${esc(k)}">
       <a class="photo ${x.image ? "" : "noimg"}" data-label="kein Bild" href="${esc(x.url)}" target="_blank" rel="noopener" data-open>${photo}
-        ${isNew(x) ? '<span class="badge">Neu</span>' : ""}${m === "fav" ? `<span class="badge fav">Merkliste</span>` : verdict(k) === "both" ? '<span class="badge match">Beide dafür</span>' : verdict(k) === "split" ? '<span class="badge split">Uneinig</span>' : ""}</a>
+        ${isNew(x) ? '<span class="badge">Neu</span>' : ""}${st && st.value ? `<span class="badge stat st-${esc(st.value)}">${esc(statusLabel(st))}</span>` : fav ? '<span class="badge fav">Favorit</span>' : verdict(k) === "split" ? '<span class="badge split">Uneinig</span>' : ""}</a>
       <div class="body">
         <div class="price">${esc(chf(x.rent))} <small>· ${esc(rooms(x.rooms))}${x.m2 ? " · " + esc(x.m2) + " m²" : ""}</small></div>
         <div class="addr">${esc(place)}</div>
@@ -756,9 +816,9 @@ function renderHits() {
         ${x.notes && x.notes.length ? `<div class="notes">${esc(x.notes.join(" · "))}</div>` : ""}
         ${miniMap(x)}
         ${socialBlock(x)}
+        ${fav ? statusBlock(k) : ""}
         <div class="actions">
-          <button class="btn ${m === "fav" ? "on" : ""}" type="button" data-mark="${m === "fav" ? "" : "fav"}">${m === "fav" ? icon.star : icon.starO} ${m === "fav" ? "Gemerkt" : "Merken"}</button>
-          <a class="btn primary" href="${esc(x.url)}" target="_blank" rel="noopener" data-open>${icon.open} Öffnen</a>
+          <a class="btn primary" href="${esc(x.url)}" target="_blank" rel="noopener" data-open>${icon.open} Inserat öffnen</a>
         </div>
       </div></article>`;
   }).join("");
@@ -780,6 +840,12 @@ function setMark(k, val) {
     store.set("wh_marks", JSON.stringify(S.marks));
   });
 }
+$("hitList").addEventListener("change", (e) => {
+  const card = e.target.closest(".card"); if (!card) return;
+  const k = card.dataset.key;
+  if (e.target.matches("[data-status]")) setStatus(k, e.target.value, null);
+  if (e.target.matches("[data-when]") && e.target.value) setStatus(k, "besichtigung", new Date(e.target.value).toISOString());
+});
 $("hitList").addEventListener("keydown", (e) => {
   if (e.key === "Enter" && !e.shiftKey && e.target.matches("[data-cinput]")) {
     e.preventDefault(); const card = e.target.closest(".card"); addComment(card.dataset.key, e.target.value); e.target.value = "";
@@ -790,11 +856,12 @@ $("hitList").addEventListener("click", (e) => {
   const k = card.dataset.key;
   if (e.target.closest(".mini")) return;   // die kleine Karte kümmert sich selbst um Tippen und Zoomen
   const vb = e.target.closest("[data-vote]"); if (vb) { setVote(k, vb.dataset.vote); return; }
+  if (e.target.closest("[data-fav]")) { toggleFav(k); return; }
   if (e.target.closest("[data-thread]")) { S.openThreads.has(k) ? S.openThreads.delete(k) : S.openThreads.add(k); renderHits();
     if (S.openThreads.has(k)) setTimeout(() => document.querySelector(`.card[data-key="${CSS.escape(k)}"] [data-cinput]`)?.focus(), 50); return; }
   if (e.target.closest("[data-csend]")) { const ta = card.querySelector("[data-cinput]"); addComment(k, ta.value); ta.value = ""; return; }
   const del = e.target.closest("[data-del]"); if (del) { deleteComment(k, del.dataset.del); return; }
-  const mb = e.target.closest("[data-mark]");
+  const mb = null;
   if (mb) { setMark(k, mb.dataset.mark); return; }
   if (e.target.closest("[data-open]")) { S.seen.add(k); saveSeen(); setTimeout(renderHits, 400); }
 });
@@ -856,7 +923,7 @@ function renderMarkers() {
   S.hitLayer.clearLayers();
   S.markers = {};
   S.hits.forEach((x) => {
-    const m = S.marks[keyOf(x)];
+    const m = isFav(keyOf(x)) ? "fav" : "";
     if (x.lat == null || !inSavedArea(x)) return;
     const c = m === "fav" ? getComputedStyle(document.documentElement).getPropertyValue("--star").trim() : accent();
     S.markers[keyOf(x)] = L.circleMarker([x.lat, x.lon], { radius: 8, color: "#fff", weight: 2, fillColor: c, fillOpacity: 0.95, pmIgnore: true })
@@ -1129,7 +1196,7 @@ function addRecipient() {
 }
 (function buildStatic() {
   wireCrit("s"); wireCrit("n");
-  const times = []; for (let h = 5; h <= 22; h++) for (const m of ["00", "30"]) times.push(`${String(h).padStart(2, "0")}:${m}`);
+  const times = []; for (let h = 6; h <= 22; h++) for (const m of ["00", "30"]) times.push(`${String(h).padStart(2, "0")}:${m}`);
   $("dgTime").innerHTML = times.map((t) => `<option value="${t}">${t} Uhr</option>`).join("");
   const hours = [...Array(24).keys()];
   opts("myQuietFrom", hours, (h) => `${h}:00`, "keine", null);
@@ -1212,7 +1279,7 @@ async function load() {
     readJson("social.json"), readJson("people.json")]);
   if (social.status === "fulfilled") { S.social = social.value.data.items || {}; S.socialSha = social.value.sha; }
   if (people.status === "fulfilled") { S.people = people.value.data.people || {}; S.peopleSha = people.value.sha; }
-  renderMyPush(); syncDevicePerson();
+  renderMyPush(); syncDevicePerson(); migrateMarks();
   if (hits.status === "fulfilled") { S.hits = hits.value.data; store.set("wh_cache_hits", JSON.stringify(S.hits)); }
   if (health.status === "fulfilled") S.health = health.value.data;
   if (events.status === "fulfilled") S.events = events.value.data;
@@ -1329,7 +1396,7 @@ $("wpOff").addEventListener("click", async () => {
 
 
 // ---------- Meine Push-Mitteilungen ----------
-const MP_DEFAULT = { hits: true, pages: true, comment: true, match: true, up: true, down: false, mail: true, source: true };
+const MP_DEFAULT = { hits: true, pages: true, comment: true, match: true, status: true, up: true, down: false, mail: true, source: true };
 function renderMyPush() {
   const p = S.person;
   document.querySelectorAll("[data-who]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.who === p)));
@@ -1366,7 +1433,7 @@ let installEvt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("installBtn").hidden = false; $("installHint").hidden = true; });
 $("installBtn").addEventListener("click", async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("installBtn").hidden = true; });
 if (window.matchMedia("(display-mode: standalone)").matches) { $("installHint").textContent = "Läuft als App."; }
-const APP_VERSION = "18 · 18.10.2026";
+const APP_VERSION = "19 · 18.10.2026";
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").then((reg) => { reg.update().catch(() => {}); }).catch(() => {});
   let reloaded = false;
