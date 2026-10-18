@@ -77,7 +77,8 @@ h2 { font: 20px/1.05 var(--display); letter-spacing: -.4px; text-transform: uppe
   white-space: nowrap; cursor: pointer; font-variant-numeric: tabular-nums; flex: none }
 .chip:last-child { border-right: 0 }
 .chip[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink) }
-.sortrow { display: flex; align-items: center; gap: 0; flex-wrap: wrap; margin-top: -6px }
+.sortrow { display: flex; align-items: center; gap: 0; flex-wrap: nowrap; margin-top: -6px; overflow-x: auto; scrollbar-width: none }
+.sortrow .sortbtn { white-space: nowrap; flex: none }
 .sortrow .hint { font: 700 10.5px var(--body); text-transform: uppercase; letter-spacing: .14em; margin-right: 8px }
 .sortbtn { border: 0; background: none; padding: 6px 8px; font: 800 12px var(--body); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); cursor: pointer; border-bottom: 3px solid transparent }
 .sortbtn[aria-pressed="true"] { color: var(--fg); border-bottom-color: var(--accent) }
@@ -109,7 +110,7 @@ h2 { font: 20px/1.05 var(--display); letter-spacing: -.4px; text-transform: uppe
 .facts .rm { padding: 10px 12px; display: grid; gap: 6px; align-content: start }
 .facts .rm b { display: block; font: 22px/1 var(--display); letter-spacing: -.6px; margin-top: 2px; font-variant-numeric: tabular-nums }
 .card .body { display: grid; grid-template-columns: minmax(0, 1fr); min-width: 0 }
-.addr { padding: 10px 12px 2px; font: 800 17px/1.15 var(--body); text-transform: uppercase; letter-spacing: -.1px; overflow-wrap: anywhere }
+.addr { padding: 10px 12px 2px; font: 800 17px/1.15 var(--body); text-transform: uppercase; letter-spacing: -.1px; overflow-wrap: break-word }
 .meta { padding: 0 12px 10px; color: var(--muted); font-size: 12.5px }
 .meta b { font-weight: 800; color: var(--fg) }
 .notes { padding: 0 12px 10px; color: var(--warn); font-size: 12.5px; font-weight: 700 }
@@ -253,6 +254,8 @@ textarea.field { min-height: 110px; resize: vertical; font-size: 15px }
 .rooms button:nth-last-child(-n+6) { border-bottom: 0 }
 .rooms button.in { background: var(--accent-soft) }
 .rooms button.end { background: var(--accent); color: var(--accent-ink) }
+.check .cl { min-width: 0; flex: 1 1 auto; hyphens: auto; -webkit-hyphens: auto; overflow-wrap: anywhere }
+.check .cl small { display: block; font-weight: 400; font-size: 12px; color: var(--muted); margin-top: 2px }
 .checks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border: 2px solid var(--line) }
 .check { display: flex; gap: 10px; align-items: center; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 10px; font-size: 14px; font-weight: 600; min-width: 0; hyphens: auto; overflow-wrap: break-word; cursor: pointer; min-height: 50px; line-height: 1.2 }
 .check:nth-child(2n) { border-right: 0 }
@@ -269,6 +272,7 @@ details summary::-webkit-details-marker { display: none }
 details.adv summary::after { content: "+"; font: 22px/1 var(--display) }
 details.adv[open] summary::after { content: "–" }
 details.adv[open], details.adv-inner[open] { display: grid; gap: 14px }
+details.adv:not([open]) { display: block }
 .pushrules { display: grid; gap: 14px }
 .pushrules.off, #myPushPanel.off { opacity: .4; pointer-events: none }
 .recips { display: grid; border: 2px solid var(--line) }
@@ -324,7 +328,7 @@ details.adv[open], details.adv-inner[open] { display: grid; gap: 14px }
       <button class="chip" type="button" data-filter="out" aria-pressed="false">Aussortiert</button>
     </div>
     <div class="sortrow" role="group" aria-label="Sortierung">
-      <span class="hint">Sortieren:</span>
+      <span class="hint" aria-hidden="true">Sort.</span>
       <button class="sortbtn" type="button" data-sort="new">Neueste</button>
       <button class="sortbtn" type="button" data-sort="price">Günstigste</button>
       <button class="sortbtn" type="button" data-sort="size">Grösste</button>
@@ -341,13 +345,12 @@ details.adv[open], details.adv-inner[open] { display: grid; gap: 14px }
   <!-- Karte -->
   <section class="view" id="v-map" hidden>
     <div class="seg tabs2" id="areaTabs" role="tablist">
-      <button type="button" class="opt" data-amode="search" aria-pressed="true">Suche</button>
+      <button type="button" class="opt" data-amode="search" aria-pressed="true">App-Suche</button>
       <button type="button" class="opt" data-amode="push" aria-pressed="false">Push &amp; Briefing</button>
     </div>
     <p class="hint" id="areaHint"></p>
-    <div class="arow" id="pushAreaBtns" hidden>
-      <button class="btn" type="button" id="paCopy">Suchgebiet übernehmen</button>
-      <button class="btn" type="button" id="paReset">Gleich wie Suche</button>
+    <div class="arow one" id="pushAreaBtns" hidden>
+      <button class="btn" type="button" id="paCopy">App-Suchgebiet übernehmen</button>
     </div>
     <div class="arow one" id="searchAreaBtns" hidden>
       <button class="btn" type="button" id="saCopy">Push-Gebiet übernehmen</button>
@@ -362,7 +365,7 @@ details.adv[open], details.adv-inner[open] { display: grid; gap: 14px }
   <!-- Kriterien -->
   <section class="view" id="v-criteria" hidden>
     <div class="seg tabs2" id="critTabs" role="tablist">
-      <button type="button" class="opt" data-ctab="search" aria-pressed="true">Suche</button>
+      <button type="button" class="opt" data-ctab="search" aria-pressed="true">App-Suche</button>
       <button type="button" class="opt" data-ctab="notify" aria-pressed="false">Push &amp; Briefing</button>
     </div>
 
@@ -401,8 +404,8 @@ details.adv[open], details.adv-inner[open] { display: grid; gap: 14px }
     <div class="view" id="cs-notify" hidden>
       <div class="summary"><span class="sumlabel">Push und Briefing bei</span><span id="sumNotify"></span><span class="sw-sub" id="sumNotifyDiff"></span></div>
       <div class="panel">
-        <p class="hint">Diese Kriterien gelten für Push-Mitteilungen und das tägliche Briefing. Gemeldet wird nur, was auch in der Suche erscheint. Setz sie also gleich streng oder strenger.</p>
-        <button class="btn" id="copyCrit" type="button">Kriterien der Suche übernehmen</button>
+        <p class="hint">Diese Kriterien gelten für Push-Mitteilungen und das tägliche Briefing. Gemeldet wird nur, was auch in der App-Suche erscheint. Setz sie also gleich streng oder strenger.</p>
+        <button class="btn" id="copyCrit" type="button">Kriterien der App-Suche übernehmen</button>
       </div>
       <div class="view" id="critN"></div>
 
@@ -427,7 +430,7 @@ details.adv[open], details.adv-inner[open] { display: grid; gap: 14px }
           <div class="ftitle sm">Empfänger</div>
           <div class="recips" id="dgList"></div>
           <div class="addrow">
-            <input class="field" id="dgAdd" type="email" inputmode="email" autocomplete="email" placeholder="E-Mail-Adresse eingeben">
+            <input class="field" id="dgAdd" type="email" inputmode="email" autocomplete="email" placeholder="E-Mail-Adresse">
             <button class="btn" id="dgAddBtn" type="button">Hinzufügen</button>
           </div>
           <div class="row2">
@@ -828,7 +831,9 @@ function statusBlock(k) {
     ${st.by ? `<span class="hint">${esc(PEOPLE[st.by] || st.by)}, ${esc(ago(st.at))}</span>` : ""}
   </div>`;
 }
-const QUARTER = { "8038": "Wollishofen", "8041": "Leimbach", "8002": "Enge", "8045": "Friesenberg", "8003": "Wiedikon", "8055": "Friesenberg", "8134": "Adliswil", "8135": "Langnau a.A.", "8802": "Kilchberg" };
+const QUARTER = { "8001": "Altstadt", "8004": "Aussersihl", "8005": "Industriequartier", "8006": "Oberstrass", "8008": "Riesbach",
+  "8032": "Hottingen", "8037": "Wipkingen", "8047": "Albisrieden", "8048": "Altstetten", "8050": "Oerlikon", "8051": "Schwamendingen",
+  "8053": "Witikon", "8057": "Unterstrass", "8064": "Altstetten", "8038": "Wollishofen", "8041": "Leimbach", "8002": "Enge", "8045": "Friesenberg", "8003": "Wiedikon", "8055": "Friesenberg", "8134": "Adliswil", "8135": "Langnau a.A.", "8802": "Kilchberg" };
 function socialBlock(x) {
   const k = keyOf(x), it = itemOf(k), mine = myVote(k);
   const other = S.person ? otherOf(S.person) : null;
@@ -1000,7 +1005,8 @@ const pushAreasOf = (c) => (hasFeat(c?.push?.areas) ? c.push.areas : null);
 function drawAreas(force = false) {
   if (!S.map || !S.config) return;
   if (S.areasDirty && !force) return;   // ungespeicherte Änderungen nicht überschreiben
-  S.work = { search: S.config.areas, push: pushAreasOf(S.config) };
+  // Push-Gebiet ist immer eigenständig; fehlt es, startet es als Kopie des App-Suchgebiets
+  S.work = { search: S.config.areas, push: pushAreasOf(S.config) || JSON.parse(JSON.stringify(S.config.areas)) };
   paintAreas(true);
   S.areasDirty = false; S.areasDrawn = true;
   $("areaState").hidden = true;
@@ -1021,12 +1027,12 @@ function renderAreaUi() {
   document.querySelectorAll("[data-amode]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.amode === S.amode)));
   $("pushAreaBtns").hidden = S.amode !== "push";
   const own = S.work && hasFeat(S.work.push);
-  $("searchAreaBtns").hidden = S.amode !== "search" || !own;
+  $("searchAreaBtns").hidden = S.amode !== "search";
   fitMap();
   $("areaHint").textContent = S.amode === "search"
-    ? "Suchgebiet: Nur hier wird gesucht. Mit dem Fünfeck links zeichnen, mit dem Stift anpassen, mit dem Papierkorb löschen." + (own ? " Gestrichelt: dein Push-Gebiet." : "")
-    : own ? "Push-Gebiet: Nur Wohnungen hier lösen Push und Briefing aus. Gestrichelt: das Suchgebiet; ausserhalb davon wird nicht gesucht."
-      : "Kein eigenes Push-Gebiet: Es gilt das Suchgebiet (gestrichelt). Zeichne eine Fläche oder übernimm das Suchgebiet als Startpunkt.";
+    ? "App-Suchgebiet: Nur hier wird gesucht, diese Wohnungen erscheinen in der App. Mit dem Fünfeck links zeichnen, mit dem Stift anpassen, mit dem Radiergummi löschen. Gestrichelt: das Push-Gebiet."
+    : own ? "Push-Gebiet: Nur Wohnungen hier lösen Push und Briefing aus. Gestrichelt: das App-Suchgebiet; ausserhalb davon wird nicht gesucht."
+      : "Noch kein Push-Gebiet: Zeichne eine Fläche oder übernimm das App-Suchgebiet. Solange keine Fläche da ist, gilt das App-Suchgebiet.";
 }
 function grabWork() {
   if (!S.map || !S.work) return;
@@ -1038,20 +1044,19 @@ function setAreaMode(m) {
   grabWork(); S.amode = m; paintAreas(false);
 }
 document.querySelectorAll("[data-amode]").forEach((b) => b.addEventListener("click", () => setAreaMode(b.dataset.amode)));
-$("paCopy").addEventListener("click", () => { if (!S.work) return; S.work.push = JSON.parse(JSON.stringify(S.work.search)); paintAreas(false); markAreaDirty(); });
-$("saCopy").addEventListener("click", () => { if (!S.work || !hasFeat(S.work.push)) return; grabWork(); S.work.search = JSON.parse(JSON.stringify(S.work.push)); paintAreas(false); markAreaDirty(); toast("Übernommen. Zum Übernehmen unten «Gebiet speichern» tippen."); });
+$("paCopy").addEventListener("click", () => { if (!S.work) return; grabWork(); S.work.push = JSON.parse(JSON.stringify(S.work.search)); paintAreas(true); markAreaDirty(); toast("App-Suchgebiet übernommen. Zum Übernehmen unten «Gebiet speichern» tippen."); });
+$("saCopy").addEventListener("click", () => { if (!S.work) return; grabWork(); if (!hasFeat(S.work.push)) { toast("Es gibt noch kein Push-Gebiet.", "err"); return; } S.work.search = JSON.parse(JSON.stringify(S.work.push)); paintAreas(true); markAreaDirty(); toast("Push-Gebiet übernommen. Zum Übernehmen unten «Gebiet speichern» tippen."); });
 // Karte genau zwischen Knöpfen oben und «Gebiet speichern» einpassen
 function fitMap() {
   const el = $("map"); if (!el || $("v-map").hidden) return;
   const top = el.getBoundingClientRect().top + window.scrollY;
   const bar = document.querySelector("#v-map .savebar");
   const tab = $("tabbar") ? $("tabbar").getBoundingClientRect().height : 60;
-  const h = Math.max(260, Math.floor(window.innerHeight - top - (bar ? bar.offsetHeight : 56) - tab - 30));
+  const h = Math.max(200, Math.floor(window.innerHeight - top - (bar ? bar.offsetHeight : 56) - tab - 30));
   el.style.height = h + "px";
   if (S.map) S.map.invalidateSize();
 }
 window.addEventListener("resize", () => fitMap());
-$("paReset").addEventListener("click", () => { if (!S.work) return; S.work.push = null; paintAreas(false); markAreaDirty(); });
 function renderMarkers() {
   if (!S.hitLayer) return;
   S.hitLayer.clearLayers();
@@ -1115,15 +1120,15 @@ function inAreas(lat, lon, areas) {
 // ---------- Kriterien ----------
 const lines = (t) => t.split("\n").map((s) => s.trim()).filter(Boolean);
 const FEATURES = { aussen: "Aussenraum (Balkon, Terrasse, Sitzplatz oder Garten)", garten: "Garten", lift: "Lift", haustiere: "Haustiere erlaubt",
-  waschturm: "Eigene Waschmaschine", altbau: "Altbau", neubau: "Neubau", aussicht: "Seesicht",
-  rollstuhl: "Rollstuhlgängig", parkplatz: "Parkplatz" };
+  waschturm: "Eigene Wasch\u00ADmaschine", altbau: "Altbau", neubau: "Neubau", aussicht: "Seesicht",
+  rollstuhl: "Rollstuhl\u00ADgängig", parkplatz: "Parkplatz" };
 const FEATURE_ALIAS = { balkon: "aussen" };
 const featKeys = (list) => [...new Set((list || []).map((k) => FEATURE_ALIAS[k] || k))].filter((k) => FEATURES[k]);
 const featShort = (k) => (k === "aussen" ? "Aussenraum" : FEATURES[k]);
 // alte Einstellung «Balkon oder Garten» → Aussenraum
 const migrateFeat = (c) => (c.features_mode === "any" && (c.features_required || []).length && (c.features_required || []).every((k) => ["balkon", "garten", "aussen"].includes(k))
   ? ["aussen"] : featKeys(c.features_required));
-const EXCL = { befristet: "Befristete Verträge", moebliert: "Möbliert", untermiete: "Untermiete", alter: "Alterswohnungen", wg: "WG-Zimmer", tausch: "Tauschwohnungen" };
+const EXCL = { befristet: "Befristete Verträge", moebliert: "Möbliert", untermiete: "Untermiete", alter: "Alters\u00ADwohnungen", wg: "WG-Zimmer", tausch: "Tausch\u00ADwohnungen" };
 const ROOMS = [1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5, 5.5, 6, 7];
 const RENTS = [1000, 1250, 1500, 1750, 2000, 2250, 2500, 2750, 3000, 3250, 3500, 3750, 4000, 4500, 5000, 6000];
 const M2 = [30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 140, 160, 200];
@@ -1136,9 +1141,9 @@ const fmtN = (v) => Number(v).toLocaleString("de-CH");
 
 function critMarkup(p) {
   const checks = (obj, attr) => Object.entries(obj).map(([k, l]) =>
-    `<label class="check" for="${p}-${attr}-${k}"><input type="checkbox" id="${p}-${attr}-${k}" data-${attr}="${k}">${l}</label>`).join("");
+    `<label class="check" for="${p}-${attr}-${k}"><input type="checkbox" id="${p}-${attr}-${k}" data-${attr}="${k}"><span class="cl">${k === "aussen" ? "Aussenraum<small>Balkon, Terrasse, Sitzplatz, Garten</small>" : l}</span></label>`).join("");
   return `
-  <div class="editing">Du bearbeitest: <b>${p === "s" ? "Suche" : "Push &amp; Briefing"}</b></div>
+  <div class="editing">Du bearbeitest: <b>${p === "s" ? "App-Suche" : "Push &amp; Briefing"}</b></div>
   <div class="panel">
     <div class="ftitle">Objektart</div>
     <div class="seg">
@@ -1265,7 +1270,9 @@ function renderSummary() {
   if (!$("pushOn").checked) chans.push("Push aus");
   if (!$("dgOn").checked) chans.push("Briefing aus");
   else if (F.recips.length) chans.push(`Briefing ${F.days === "weekdays" ? "Mo–Fr" : "täglich"} ${$("dgTime").value} an ${F.recips.length}`);
-  $("sumNotifyDiff").textContent = (diff.length ? "Strenger als die Suche: " + diff.join(" · ") : "Gleich wie die Suche") + (chans.length ? " · " + chans.join(" · ") : "");
+  const sa = S.work ? S.work.search : S.config.areas, pa = S.work ? S.work.push : pushAreasOf(S.config);
+  const ownArea = pa && JSON.stringify(pa) !== JSON.stringify(sa) ? ["eigenes Push-Gebiet"] : [];
+  $("sumNotifyDiff").textContent = (diff.length || ownArea.length ? "Anders als die App-Suche: " + [...diff, ...ownArea].join(" · ") : "Gleich wie die App-Suche") + (chans.length ? " · " + chans.join(" · ") : "");
 }
 function showCritTab(t) {
   F.ctab = t;
@@ -1274,7 +1281,7 @@ function showCritTab(t) {
   window.scrollTo(0, 0);
 }
 $("critTabs").addEventListener("click", (e) => { const b = e.target.closest("[data-ctab]"); if (b) showCritTab(b.dataset.ctab); });
-$("copyCrit").addEventListener("click", () => { setCrit("n", getCrit("s")); renderSummary(); toast("Kriterien der Suche übernommen. Jetzt anpassen und speichern."); });
+$("copyCrit").addEventListener("click", () => { setCrit("n", getCrit("s")); renderSummary(); toast("Kriterien der App-Suche übernommen. Jetzt anpassen und speichern."); });
 
 function fillForm() {
   const c = S.config;
@@ -1322,7 +1329,7 @@ function readForm() {
   c.digest = { enabled: $("dgOn").checked, to: [...F.recips], time: $("dgTime").value, days: F.days, skip_empty: $("dgSkip").checked };
   c.areas = collectAreas();
   const pa = collectPushAreas();
-  if (pa) c.push.areas = pa;
+  c.push.areas = pa || { type: "FeatureCollection", features: [] };
   return c;
 }
 function validate(c) {
@@ -1396,10 +1403,11 @@ function renderStatus() {
   $("subline").innerHTML = h?.last_run
     ? `<span class="dot ${bad.length || (h.push && !h.push.ok) ? "bad" : ""}"></span>${h.paused ? "Pausiert" : "Gesucht " + esc(ago(h.last_run))}`
     : "Wohnungssuche Wollishofen";
-  const week = S.hits.filter((x) => Date.now() - new Date(x.first_seen) < 7 * 864e5).length;
+  const live = S.hits.filter(inSavedArea).filter((x) => verdict(keyOf(x)) !== "out");
+  const week = live.filter((x) => Date.now() - new Date(x.first_seen) < 7 * 864e5).length;
   $("stats").innerHTML = `
-    <div class="stat"><b>${S.hits.filter(isNew).length}</b><span>neu</span></div>
-    <div class="stat"><b>${week}</b><span>Treffer 7 Tage</span></div>
+    <div class="stat"><b>${live.filter(isNew).length}</b><span>neu</span></div>
+    <div class="stat"><b>${week}</b><span>7 Tage</span></div>
     <div class="stat"><b>${src.length - bad.length}/${src.length}</b><span>Quellen ok</span></div>`;
   const rows = src.map(([name, v]) => `<div class="src"><span class="s ${v.ok ? "" : "bad"}"></span><b>${esc(name)}</b><div class="m">${esc(v.msg)} · ${esc(ago(v.at))}</div></div>`);
   if (h?.last_digest) rows.push(`<div class="src"><span class="s"></span><b>Briefing</b><div class="m">zuletzt ${esc(ago(h.last_digest))}</div></div>`);
@@ -1588,7 +1596,7 @@ let installEvt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("installBtn").hidden = false; $("installHint").hidden = true; });
 $("installBtn").addEventListener("click", async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("installBtn").hidden = true; });
 if (window.matchMedia("(display-mode: standalone)").matches) { $("installHint").textContent = "Läuft als App."; }
-const APP_VERSION = "26 · 18.10.2026";
+const APP_VERSION = "27 · 18.10.2026";
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").then((reg) => { reg.update().catch(() => {}); }).catch(() => {});
   let reloaded = false;
