@@ -383,6 +383,7 @@ details.adv:not([open]) { display: block }
     <div class="view" id="cs-search">
       <div class="panel copyrow"><button class="btn" id="copyCritBack" type="button">Kriterien von «Push &amp; Mail» übernehmen</button></div>
       <div class="view" id="critS"></div>
+      <p class="hint" id="recheckHint"></p>
     </div>
 
     <div class="view" id="cs-notify" hidden>
@@ -471,6 +472,8 @@ details.adv:not([open]) { display: block }
       <summary>Erweitert</summary>
       <div class="advbody">
       <p class="hint">Gilt für euch beide.</p>
+      <label class="f" for="recheckDays">Beim Ändern der Suche neu prüfen<small>So weit zurück werden aussortierte Inserate nochmals geprüft, wenn ihr Gebiet oder Kriterien ändert. Push gibt es nur für Inserate bis 14 Tage.</small>
+        <select class="field" id="recheckDays"><option value="7">7 Tage</option><option value="14">14 Tage</option><option value="30">30 Tage</option><option value="60">60 Tage</option></select></label>
       <label class="switch" for="active"><span><b>Suche aktiv</b><small class="sw-sub">Aus = nichts wird gesucht, keine Push-Mitteilungen</small></span><input type="checkbox" id="active"></label>
       <div class="ftitle sm">Quellen</div>
       <label class="switch" for="srcMail">Suchabo-Mails der Portale <input type="checkbox" id="srcMail"></label>
@@ -1297,12 +1300,17 @@ function renderSummary() {
 $("copyCrit").addEventListener("click", () => { setCrit("n", getCrit("s")); renderSummary(); toast("Kriterien von «Anzeigen» übernommen. Anpassen und speichern."); });
 $("copyCritBack").addEventListener("click", () => { setCrit("s", getCrit("n")); renderSummary(); toast("Kriterien von «Push & Mail» übernommen. Anpassen und speichern."); });
 
+function renderRecheckHint() {
+  $("recheckHint").textContent = `Beim Speichern prüft Wollihood auch die aussortierten Inserate der letzten ${$("recheckDays").value || 14} Tage nochmals. Ändern unter Optionen → Erweitert.`;
+}
+$("recheckDays").addEventListener("change", renderRecheckHint);
 function fillForm() {
   const c = S.config;
   $("active").checked = c.active !== false;
   setCrit("s", c);
   const p = c.push || {};
   setCrit("n", { ...Object.fromEntries(CRIT_KEYS.map((k) => [k, c[k]])), ...(p.criteria || {}) });
+  $("recheckDays").value = String(c.recheck_days || 14); renderRecheckHint();
   $("exclWords").value = [...new Set([...(c.exclude_keywords || []), ...(c.title_exclude_keywords || [])])].join("\n");
   const src = c.sources || {};
   $("srcMail").checked = src.mail_alerts !== false; $("srcFlatfox").checked = src.flatfox !== false; $("srcPages").checked = src.watch_pages !== false;
@@ -1321,6 +1329,7 @@ function readForm() {
   c.active = $("active").checked;
   Object.assign(c, getCrit("s"));
   c.exclude_keywords = lines($("exclWords").value);
+  c.recheck_days = +$("recheckDays").value || 14;
   c.title_exclude_keywords = [];
   c.sources = { mail_alerts: $("srcMail").checked, flatfox: $("srcFlatfox").checked, watch_pages: $("srcPages").checked };
   const old = Object.fromEntries((S.config.watch_pages || []).map((x) => [x.url, x]));
@@ -1620,7 +1629,7 @@ let installEvt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("installBtn").hidden = false; $("installHint").hidden = true; });
 $("installBtn").addEventListener("click", async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("installBtn").hidden = true; });
 if (window.matchMedia("(display-mode: standalone)").matches) { $("installHint").textContent = "Läuft als App."; }
-const APP_VERSION = "34 · 18.10.2026";
+const APP_VERSION = "35 · 18.10.2026";
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").then((reg) => { reg.update().catch(() => {}); }).catch(() => {});
   let reloaded = false;
