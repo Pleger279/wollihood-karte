@@ -1436,11 +1436,14 @@ function renderStatus() {
     ? `<span class="dot ${bad.length || (h.push && !h.push.ok) ? "bad" : ""}"></span>${h.paused ? "Pausiert" : "Gesucht " + esc(ago(h.last_run))}`
     : "Wohnungssuche Wollishofen";
   const live = S.hits.filter(inSavedArea).filter((x) => verdict(keyOf(x)) !== "out");
+  // Quellen inkl. der einzelnen Abos (gelb oder rot zählt nicht als ok)
+  const subs = Object.values(h?.newsletters || {});
+  const allN = src.length + subs.length, allOk = src.length - bad.length + subs.filter((x) => x.level === "ok").length;
   const week = live.filter((x) => Date.now() - new Date(x.first_seen) < 7 * 864e5).length;
   $("stats").innerHTML = `
     <div class="stat"><b>${live.filter(isNew).length}</b><span>neu</span></div>
     <div class="stat"><b>${week}</b><span>7 Tage</span></div>
-    <div class="stat"><b>${src.length - bad.length}/${src.length}</b><span>Quellen ok</span></div>`;
+    <div class="stat"><b>${allOk}/${allN}</b><span>Quellen ok</span></div>`;
   const srcRow = (name, level, msg, u, sub) => `<div class="src${sub ? " sub" : ""}"><span class="s ${level === "ok" ? "" : level}"></span>${u ? `<a class="srclink" href="${esc(u)}" target="_blank" rel="noopener"><b>${esc(name)}</b> ↗</a>` : `<b>${esc(name)}</b>`}<div class="m">${esc(msg)}</div></div>`;
   const nl = Object.entries(h?.newsletters || {});
   const rows = [];
@@ -1633,7 +1636,7 @@ let installEvt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("installBtn").hidden = false; $("installHint").hidden = true; });
 $("installBtn").addEventListener("click", async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("installBtn").hidden = true; });
 if (window.matchMedia("(display-mode: standalone)").matches) { $("installHint").textContent = "Läuft als App."; }
-const APP_VERSION = "36 · 18.10.2026";
+const APP_VERSION = "37 · 18.10.2026";
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").then((reg) => { reg.update().catch(() => {}); }).catch(() => {});
   let reloaded = false;
