@@ -341,7 +341,7 @@ details.adv:not([open]) { display: block }
     </div>
     <div class="panel whoami" id="whoPanel" hidden>
       <div class="ftitle">Wer nutzt dieses Handy?</div>
-      <p class="hint">Damit eure Daumen und Kommentare richtig zugeordnet werden. Du kannst das unter Einstellungen jederzeit ändern.</p>
+      <p class="hint">Damit eure Daumen und Kommentare richtig zugeordnet werden. Du kannst das unter Optionen jederzeit ändern.</p>
       <div class="seg"><button type="button" class="opt" data-who="pascal">Pascal</button><button type="button" class="opt" data-who="leonie">Leonie</button></div>
     </div>
     <div id="hitList" class="view"></div>
@@ -378,30 +378,7 @@ details.adv:not([open]) { display: block }
     <div class="view" id="cs-notify" hidden>
       <div class="panel copyrow"><button class="btn" id="copyCrit" type="button">Kriterien von «Anzeigen» übernehmen</button></div>
       <div class="view" id="critN"></div>
-      <div class="panel" id="digestPanel">
-        <div class="ftitle">Tägliches Briefing (Mail)</div>
-        <p class="hint">Eine Mail mit allen neuen Wohnungen seit dem letzten Briefing, mit Foto und Link.</p>
-        <label class="switch" for="dgOn"><span><b>Briefing aktiv</b></span><input type="checkbox" id="dgOn"></label>
-        <div id="dgRules" class="pushrules">
-          <div class="ftitle sm">Empfänger</div>
-          <div class="recips" id="dgList"></div>
-          <div class="addrow">
-            <input class="field" id="dgAdd" type="email" inputmode="email" autocomplete="email" placeholder="E-Mail-Adresse">
-            <button class="btn" id="dgAddBtn" type="button">Hinzufügen</button>
-          </div>
-          <div class="row2">
-            <label class="f" for="dgTime"><small>Uhrzeit</small><select class="field" id="dgTime"></select></label>
-            <div class="f"><small>Tage</small>
-              <div class="seg" id="dgDays">
-                <button type="button" class="opt" data-days="daily">Täglich</button>
-                <button type="button" class="opt" data-days="weekdays">Mo–Fr</button>
-              </div>
-            </div>
-          </div>
-          <label class="switch" for="dgSkip"><span>Nur senden, wenn es Neues gibt</span><input type="checkbox" id="dgSkip"></label>
-          <button class="btn" id="dgNow" type="button">Briefing jetzt senden</button>
-        </div>
-      </div>
+
     </div>
 
     <div class="savebar">
@@ -456,6 +433,31 @@ details.adv:not([open]) { display: block }
         <button class="btn" id="wpOff" type="button" hidden>Abmelden</button>
       </div>
     </div>
+    <div class="panel" id="digestPanel">
+        <h2>Tägliches Briefing</h2>
+        <p class="hint">Eine Mail mit allen neuen Wohnungen seit dem letzten Briefing, mit Foto und Link. Welche Wohnungen darin vorkommen, legst du unter Suche → «Push &amp; Mail» fest. Gilt für euch beide.</p>
+        <label class="switch" for="dgOn"><span><b>Briefing aktiv</b></span><input type="checkbox" id="dgOn"></label>
+        <div id="dgRules" class="pushrules">
+          <div class="ftitle sm">Empfänger</div>
+          <div class="recips" id="dgList"></div>
+          <div class="addrow">
+            <input class="field" id="dgAdd" type="email" inputmode="email" autocomplete="email" placeholder="E-Mail-Adresse">
+            <button class="btn" id="dgAddBtn" type="button">Hinzufügen</button>
+          </div>
+          <div class="row2">
+            <label class="f" for="dgTime"><small>Uhrzeit</small><select class="field" id="dgTime"></select></label>
+            <div class="f"><small>Tage</small>
+              <div class="seg" id="dgDays">
+                <button type="button" class="opt" data-days="daily">Täglich</button>
+                <button type="button" class="opt" data-days="weekdays">Mo–Fr</button>
+              </div>
+            </div>
+          </div>
+          <label class="switch" for="dgSkip"><span>Nur senden, wenn es Neues gibt</span><input type="checkbox" id="dgSkip"></label>
+          <button class="btn" id="dgNow" type="button">Briefing jetzt senden</button>
+        </div>
+        <button class="btn primary" type="button" data-save>Briefing speichern</button>
+      </div>
     <details class="panel adv" id="advPanel">
       <summary>Erweitert</summary>
       <div class="advbody">
@@ -500,7 +502,7 @@ details.adv:not([open]) { display: block }
     <span class="pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3-7 4 14 3-7h4"/></svg></span>Status
   </button>
   <button class="tab" role="tab" data-tab="settings" aria-selected="false">
-    <span class="pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg></span>Einstellungen
+    <span class="pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg></span>Optionen
   </button>
 </nav>
 
@@ -1350,6 +1352,7 @@ function addRecipient() {
 })();
 $("cs-search").addEventListener("change", renderSummary);
 $("cs-notify").addEventListener("change", renderChannels);
+$("digestPanel").addEventListener("change", renderChannels);
 $("dgAddBtn").addEventListener("click", addRecipient);
 $("dgAdd").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); addRecipient(); } });
 $("dgList").addEventListener("click", (e) => { const b = e.target.closest("[data-rm]"); if (!b) return; F.recips.splice(+b.dataset.rm, 1); renderChannels(); toast("Entfernt. Zum Übernehmen unten speichern."); });
@@ -1583,7 +1586,7 @@ let installEvt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("installBtn").hidden = false; $("installHint").hidden = true; });
 $("installBtn").addEventListener("click", async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("installBtn").hidden = true; });
 if (window.matchMedia("(display-mode: standalone)").matches) { $("installHint").textContent = "Läuft als App."; }
-const APP_VERSION = "29 · 18.10.2026";
+const APP_VERSION = "30 · 18.10.2026";
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").then((reg) => { reg.update().catch(() => {}); }).catch(() => {});
   let reloaded = false;
