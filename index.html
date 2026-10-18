@@ -161,6 +161,11 @@ h2 { font: 20px/1.05 var(--display); letter-spacing: -.4px; text-transform: uppe
 .statusrow .hint { grid-column: 1 / -1; font-size: 12px; padding: 0 12px 8px }
 .actions { display: grid; border-top: 3px solid var(--line) }
 .actions .btn { border: 0; min-height: 50px }
+.actions.two { grid-template-columns: minmax(0, 1fr) auto }
+.outbtn { border-left: 3px solid var(--line) !important; padding-inline: 14px; gap: 6px; font-size: 11px }
+.outbtn svg { width: 18px; height: 18px }
+.toast.act { display: flex; align-items: center; justify-content: space-between; gap: 12px }
+.toast .tbtn { border: 2px solid currentColor; background: none; color: inherit; font: 800 11px var(--body); text-transform: uppercase; letter-spacing: .1em; padding: 8px 10px; cursor: pointer }
 
 /* Knöpfe & Felder */
 .btn { flex: 1; border: 2px solid var(--line); background: var(--surface); padding: 10px 12px; font: 800 12px var(--body); text-transform: uppercase; letter-spacing: .1em;
@@ -559,6 +564,12 @@ function ago(iso) {
   return d.toLocaleDateString("de-CH", { day: "2-digit", month: "2-digit" });
 }
 let toastTimer;
+function toastAction(text, label, fn, ms = 6000) {
+  const t = $("toast"); t.className = "toast act"; t.hidden = false;
+  t.innerHTML = `<span>${esc(text)}</span><button type="button" class="tbtn">${esc(label)}</button>`;
+  t.querySelector("button").onclick = () => { t.hidden = true; fn(); };
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => (t.hidden = true), ms);
+}
 function toast(text, cls = "", ms = 4000) {
   const t = $("toast"); t.textContent = text; t.className = "toast " + cls; t.hidden = false;
   clearTimeout(toastTimer); if (ms) toastTimer = setTimeout(() => (t.hidden = true), ms);
@@ -689,7 +700,7 @@ const itemOf = (k) => S.social[k] || { votes: {}, comments: [] };
 function verdict(k) {
   const v = itemOf(k).votes || {};
   const a = v.pascal, b = v.leonie;
-  if (a === "down" && b === "down") return "out";
+  if (itemOf(k).out || (a === "down" && b === "down")) return "out";
   if (a === "up" && b === "up") return "both";
   if (a && b && a !== b) return "split";
   return "";
@@ -717,6 +728,19 @@ function toggleFav(k) {
     if (on) it.fav = { by: me, at: new Date().toISOString() }; else delete it.fav;
     it.updated = new Date().toISOString();
   });
+}
+// Von Hand aussortieren (gilt für beide), mit Rückgängig
+function setOut(k, on) {
+  if (needPerson()) return;
+  const me = S.person, label = (S.hits.find((h) => keyOf(h) === k) || {}).street || "Inserat";
+  socialOp(`${PEOPLE[me]} ${on ? "sortiert aus" : "holt zurück"} (${label})`, (items) => {
+    const it = items[k] || (items[k] = { votes: {}, comments: [] });
+    if (on) it.out = { by: me, at: new Date().toISOString() }; else delete it.out;
+    it.updated = new Date().toISOString();
+  });
+  if (on) toastAction("Aussortiert.", "Rückgängig", () => setOut(k, false));
+  else if (verdict(k) === "out") toast("Zurückgeholt, aber ihr habt beide Daumen runter gegeben. Ändere deinen Daumen, damit sie wieder erscheint.", "", 7000);
+  else toast("Zurückgeholt.");
 }
 function setStatus(k, value, when) {
   if (needPerson()) return;
@@ -810,6 +834,11 @@ function statusBlock(k) {
 const QUARTER = { "8001": "Altstadt", "8004": "Aussersihl", "8005": "Industriequartier", "8006": "Oberstrass", "8008": "Riesbach",
   "8032": "Hottingen", "8037": "Wipkingen", "8047": "Albisrieden", "8048": "Altstetten", "8050": "Oerlikon", "8051": "Schwamendingen",
   "8053": "Witikon", "8057": "Unterstrass", "8064": "Altstetten", "8038": "Wollishofen", "8041": "Leimbach", "8002": "Enge", "8045": "Friesenberg", "8003": "Wiedikon", "8055": "Friesenberg", "8134": "Adliswil", "8135": "Langnau a.A.", "8802": "Kilchberg" };
+function outBtn(k) {
+  const o = itemOf(k).out;
+  if (verdict(k) !== "out") return `<button type="button" class="btn outbtn" data-out="1" aria-label="Aussortieren">${icon.x}<span>Aussortieren</span></button>`;
+  return `<button type="button" class="btn outbtn back" data-out="0">${icon.undo}<span>Zurückholen</span></button>`;
+}
 function socialBlock(x) {
   const k = keyOf(x), it = itemOf(k), mine = myVote(k);
   const other = S.person ? otherOf(S.person) : null;
@@ -894,6 +923,7 @@ function renderHits() {
       <div class="body">
         <div class="addr">${esc(x.street || x.title || place)}</div>
         <div class="meta">${esc(x.portal || "")} · ${pubLabel(x)}${x.also_urls && x.also_urls.length ? ` · <a href="${esc(x.also_urls[0])}" target="_blank" rel="noopener">${x.also_urls.length + 1}× inseriert</a>` : ""}${x.pushed ? " · Push gesendet" : x.push_skipped ? " · kein Push (" + esc(x.push_skipped) + ")" : ""}</div>
+        ${verdict(k) === "out" ? `<div class="notes">${itemOf(k).out ? "Aussortiert von " + esc(PEOPLE[itemOf(k).out.by] || "") : "Aussortiert: beide Daumen runter"}</div>` : ""}
         ${x.notes && x.notes.length ? `<div class="notes">${esc(x.notes.join(" · "))}</div>` : ""}
         ${x.swap || featKeys(x.features).length ? `<div class="tags">${x.swap ? '<span class="tag swap">Tausch</span>' : ""}${featKeys(x.features).map((k) => `<span class="tag">${esc(featShort(k))}</span>`).join("")}</div>` : ""}
         ${x.swap && x.swap_wants ? `<div class="wants"><b>Sucht:</b> ${esc(x.swap_wants)}</div>` : ""}
@@ -901,7 +931,7 @@ function renderHits() {
         ${fav ? statusBlock(k) : ""}
         ${miniMap(x)}
       </div>
-      <div class="actions"><a class="btn primary" href="${esc(x.url)}" target="_blank" rel="noopener" data-open>${icon.open} Inserat öffnen</a></div>
+      <div class="actions two"><a class="btn primary" href="${esc(x.url)}" target="_blank" rel="noopener" data-open>${icon.open} Inserat öffnen</a>${outBtn(k)}</div>
     </article>`;
   }).join("");
   mountMinis();
@@ -939,6 +969,7 @@ $("hitList").addEventListener("click", (e) => {
   if (e.target.closest(".mini")) return;   // die kleine Karte kümmert sich selbst um Tippen und Zoomen
   const vb = e.target.closest("[data-vote]"); if (vb) { setVote(k, vb.dataset.vote); return; }
   if (e.target.closest("[data-fav]")) { toggleFav(k); return; }
+  const ob = e.target.closest("[data-out]"); if (ob) { setOut(k, ob.dataset.out === "1"); return; }
   if (e.target.closest("[data-thread]")) { S.openThreads.has(k) ? S.openThreads.delete(k) : S.openThreads.add(k); renderHits();
     if (S.openThreads.has(k)) setTimeout(() => document.querySelector(`.card[data-key="${CSS.escape(k)}"] [data-cinput]`)?.focus(), 50); return; }
   if (e.target.closest("[data-csend]")) { const ta = card.querySelector("[data-cinput]"); addComment(k, ta.value); ta.value = ""; return; }
@@ -1580,7 +1611,7 @@ let installEvt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("installBtn").hidden = false; $("installHint").hidden = true; });
 $("installBtn").addEventListener("click", async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("installBtn").hidden = true; });
 if (window.matchMedia("(display-mode: standalone)").matches) { $("installHint").textContent = "Läuft als App."; }
-const APP_VERSION = "32 · 18.10.2026";
+const APP_VERSION = "33 · 18.10.2026";
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").then((reg) => { reg.update().catch(() => {}); }).catch(() => {});
   let reloaded = false;
