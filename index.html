@@ -1476,7 +1476,13 @@ function renderStatus() {
   const nl = Object.entries(h?.newsletters || {});
   const rows = [];
   src.forEach(([name, v]) => {
-    rows.push(srcRow(name, v.ok ? "ok" : "bad", `${v.msg} · ${ago(v.at)}`, sourceLink(name)));
+    let msg = `${v.msg} · ${ago(v.at)}`;
+    if (name === "Abo-Mails" && v.ok && nl.length) {      // Zusammenfassung über alle Abos statt nur letzter Lauf
+      const last = nl.map(([, x]) => x.last).filter(Boolean).sort().pop();
+      const read = nl.reduce((a, [, x]) => a + (x.read || 0), 0), hit = nl.reduce((a, [, x]) => a + (x.hits || 0), 0);
+      msg = `${nl.length} Abos${last ? " · letzte Mail " + ago(last) : ""} · ${read} Inserate gelesen, ${hit} passend (7 Tage)`;
+    }
+    rows.push(srcRow(name, v.ok ? "ok" : "bad", msg, sourceLink(name)));
     if (name === "Abo-Mails") nl.forEach(([n, x]) => rows.push(srcRow(n, x.level, x.level === "bad" ? x.msg : (x.last ? `letzte Mail ${ago(x.last)} · ` : "") + x.msg.replace(/^seit \d+ Tagen keine Mail · /, ""), x.url, true)));
   });
   const dl = [];
@@ -1665,7 +1671,7 @@ let installEvt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("installBtn").hidden = false; $("installHint").hidden = true; });
 $("installBtn").addEventListener("click", async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("installBtn").hidden = true; });
 if (window.matchMedia("(display-mode: standalone)").matches) { $("installHint").textContent = "Läuft als App."; }
-const APP_VERSION = "38 · 19.10.2026";
+const APP_VERSION = "39 · 19.10.2026";
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").then((reg) => { reg.update().catch(() => {}); }).catch(() => {});
   let reloaded = false;
