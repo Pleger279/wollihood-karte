@@ -113,6 +113,31 @@ h2 { font: 20px/1.05 var(--display); letter-spacing: -.4px; text-transform: uppe
 .facts .rm b { display: block; font: 22px/1 var(--display); letter-spacing: -.6px; margin-top: 2px; font-variant-numeric: tabular-nums }
 .card .body { display: grid; grid-template-columns: minmax(0, 1fr); min-width: 0 }
 .addr { padding: 10px 12px 2px; font: 800 17px/1.15 var(--body); text-transform: uppercase; letter-spacing: -.1px; overflow-wrap: break-word }
+.sheet { position: fixed; inset: 0; z-index: 50; background: var(--bg); display: flex; flex-direction: column }
+.sheethead { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: calc(env(safe-area-inset-top, 0px) + 10px) 16px 10px; border-bottom: 3px solid var(--line); background: var(--bar); color: var(--bar-ink) }
+.sheethead b { font: 18px/1.1 var(--display); text-transform: uppercase; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.sheetbody { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 14px 16px calc(env(safe-area-inset-bottom, 0px) + 28px); display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; align-content: start }
+.onl { font: 800 11px var(--body); text-transform: uppercase; letter-spacing: .1em; padding: 9px 12px; border: 2px solid var(--line) }
+.onl.online { background: var(--ok); color: #fff; border-color: var(--ok) } .onl.offline { background: var(--bad); color: #fff; border-color: var(--bad) }
+.onl.reserviert { background: var(--warn); color: #fff; border-color: var(--warn) }
+.gal { display: grid; grid-auto-flow: column; grid-auto-columns: 100%; overflow-x: auto; scroll-snap-type: x mandatory; border: 3px solid var(--line); background: var(--sunk); aspect-ratio: 4 / 3 }
+.gal { aspect-ratio: auto; height: min(72vw, 440px); grid-auto-rows: 100% }
+.gal figure { margin: 0; scroll-snap-align: start; position: relative; overflow: hidden; min-height: 0 }
+.gal img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; display: block }
+.gal figcaption { position: absolute; right: 8px; bottom: 8px; background: var(--fg); color: var(--bg); font: 800 11px var(--body); padding: 3px 7px }
+.dfacts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border: 2px solid var(--line) }
+.dfacts div { padding: 8px 10px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line) }
+.dfacts div:nth-child(2n) { border-right: 0 }
+.dfacts b { display: block; font: 800 15px var(--body) }
+.desc { white-space: pre-wrap; font-size: 15px; line-height: 1.5; overflow-wrap: anywhere }
+.contact { display: grid; gap: 8px }
+.contact .ag { display: flex; gap: 12px; align-items: center }
+.contact .ag img { width: 54px; height: 54px; object-fit: contain; background: #fff; border: 1px solid var(--hair) }
+.contact a { color: var(--accent); font-weight: 800; text-decoration: none; overflow-wrap: anywhere }
+.ref { font: 800 14px var(--body); letter-spacing: .04em; user-select: all }
+.chips2 { display: flex; flex-wrap: wrap; gap: 6px }
+.chips2 span { border: 1px solid var(--line); padding: 3px 8px; font: 800 11px var(--body); text-transform: uppercase; letter-spacing: .06em }
+.doclist a { display: block; padding: 8px 0; border-top: 1px solid var(--hair); color: var(--accent); font-weight: 800; text-decoration: none }
 .srcs { padding: 0 12px 10px; font-size: 12.5px; color: var(--muted); margin-top: -4px }
 .srcs a { color: var(--accent); font-weight: 800; text-decoration: none }
 .meta { padding: 0 12px 10px; color: var(--muted); font-size: 12.5px }
@@ -164,6 +189,9 @@ h2 { font: 20px/1.05 var(--display); letter-spacing: -.4px; text-transform: uppe
 .statusrow .hint { grid-column: 1 / -1; font-size: 12px; padding: 0 12px 8px }
 .actions { display: grid; border-top: 3px solid var(--line) }
 .actions .btn { border: 0; min-height: 50px }
+.actions.three { grid-template-columns: minmax(0, 1fr) auto auto }
+.detbtn { border-left: 3px solid var(--line) !important; padding-inline: 12px; gap: 6px; font-size: 11px }
+.detbtn svg { width: 18px; height: 18px }
 .actions.two { grid-template-columns: minmax(0, 1fr) auto }
 .outbtn { border-left: 3px solid var(--line) !important; padding-inline: 14px; gap: 6px; font-size: 11px }
 .outbtn svg { width: 18px; height: 18px }
@@ -497,6 +525,11 @@ details.adv:not([open]) { display: block }
   </section>
 
   <div class="toast" id="toast" hidden></div>
+  <!-- Details & Archiv -->
+  <div class="sheet" id="detail" hidden role="dialog" aria-modal="true" aria-labelledby="dTitle">
+    <div class="sheethead"><b id="dTitle">Details</b><button type="button" class="iconbtn" id="dClose" aria-label="Schliessen">✕</button></div>
+    <div class="sheetbody" id="dBody"></div>
+  </div>
 </main>
 
 <nav class="tabbar" id="tabbar" role="tablist" hidden>
@@ -592,6 +625,7 @@ const icon = {
   starO: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1 6.2L12 17.3 6.5 20.2l1-6.2L3 9.6l6.2-.9z"/></svg>',
   x: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>',
   undo: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></svg>',
+  doc: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8z"/><path d="M14 3v5h5M8 13h8M8 17h6"/></svg>',
   open: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>',
 };
 
@@ -846,6 +880,114 @@ function statusBlock(k) {
 const QUARTER = { "8001": "Altstadt", "8004": "Aussersihl", "8005": "Industriequartier", "8006": "Oberstrass", "8008": "Riesbach",
   "8032": "Hottingen", "8037": "Wipkingen", "8047": "Albisrieden", "8048": "Altstetten", "8050": "Oerlikon", "8051": "Schwamendingen",
   "8053": "Witikon", "8057": "Unterstrass", "8064": "Altstetten", "8038": "Wollishofen", "8041": "Leimbach", "8002": "Enge", "8045": "Friesenberg", "8003": "Wiedikon", "8055": "Friesenberg", "8134": "Adliswil", "8135": "Langnau a.A.", "8802": "Kilchberg" };
+// ---------- Details & Archiv ----------
+S.archive = {}; S.agencies = {}; S.agenciesSha = null;
+const archEntry = (x) => { if (!x) return null; for (const k of x.keys || [keyOf(x)]) { if (S.archive[k]) return S.archive[k]; } return null; };
+const agencyOf = (x) => x.agency || archEntry(x)?.agency || null;
+const agencyKey = (n) => String(n || "").toLowerCase().replace(/\b(ag|sa|gmbh|sàrl|ltd)\b\.?/g, "").replace(/[^a-z0-9äöü]+/g, " ").trim();
+const ATTR = { balconygarden: "Balkon/Garten", lift: "Lift", garage: "Garage", parkingspace: "Parkplatz", dishwasher: "Geschirrspüler",
+  washingmachine: "Waschmaschine", tumbledryer: "Tumbler", parquetflooring: "Parkett", view: "Aussicht", cable: "Kabel-TV",
+  petsallowed: "Haustiere erlaubt", wheelchairaccessible: "Rollstuhlgängig", minergie: "Minergie", fireplace: "Cheminée",
+  raisedgroundfloor: "Hochparterre", childfriendly: "Kinderfreundlich", newbuilding: "Neubau", oldbuilding: "Altbau", quiet: "Ruhig" };
+const fileCache = new Map();
+async function repoFile(path) {
+  if (fileCache.has(path)) return fileCache.get(path);
+  const p = fetch(`https://api.github.com/repos/${S.repo}/contents/${path}`, {
+    headers: { Authorization: `Bearer ${S.token}`, Accept: "application/vnd.github.raw", "X-GitHub-Api-Version": "2022-11-28" } })
+    .then((r) => { if (!r.ok) throw new Error(r.status); return r.blob(); }).then((b) => URL.createObjectURL(b));
+  fileCache.set(path, p);
+  return p;
+}
+function closeDetail() { $("detail").hidden = true; document.body.style.overflow = ""; if (location.hash.startsWith("#d=")) history.replaceState(null, "", location.pathname); }
+$("dClose").addEventListener("click", closeDetail);
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("detail").hidden) closeDetail(); });
+async function openDetail(k) {
+  const x = S.hits.find((h) => keyOf(h) === k) || {};
+  const a = archEntry(x);
+  S.detailKey = k;
+  $("dTitle").textContent = x.street || x.title || "Details";
+  $("detail").hidden = false; document.body.style.overflow = "hidden";
+  $("dBody").innerHTML = '<p class="hint">Lade …</p>';
+  let d = null;
+  if (a) { try { d = (await readJson(`archiv/${a.id}/data.json`)).data; } catch (e) { d = null; } }
+  renderDetail(x, a, d);
+}
+function renderDetail(x, a, d) {
+  const onl = !a ? "" : a.online === "offline" ? `<div class="onl offline">Offline seit ${esc(ago(a.offline_since))} · gesichert ${esc(ago(a.archived_at))}</div>`
+    : a.online === "reserviert" ? `<div class="onl reserviert">Reserviert · gesichert ${esc(ago(a.archived_at))}</div>`
+    : a.online === "online" ? `<div class="onl online">Noch online · gesichert ${esc(ago(a.archived_at))}</div>`
+    : `<div class="onl">Gesichert ${esc(ago(a.archived_at))} · Online-Status bei diesem Portal nicht prüfbar</div>`;
+  const imgs = (d?.images || []);
+  const gal = imgs.length ? `<div class="gal">${imgs.map((im, i) => `<figure><img data-src="archiv/${esc(a.id)}/${esc(im.file)}" alt="${esc(im.caption || "")}"><figcaption>${i + 1}/${imgs.length}</figcaption></figure>`).join("")}</div>`
+    : x.image ? `<div class="gal"><figure><img src="${esc(x.image)}" alt="" referrerpolicy="no-referrer"></figure></div>` : "";
+  const f = d?.facts || {};
+  const fact = (l, v) => (v != null && v !== "" ? `<div><span class="cap">${l}</span><b>${esc(v)}</b></div>` : "");
+  const facts = `<div class="dfacts">${fact("Miete brutto", (f.rent_gross || x.rent) ? "CHF " + fmtN(f.rent_gross || x.rent) : null)}${fact("Netto + NK", f.rent_net ? `${fmtN(f.rent_net)} + ${fmtN(f.rent_charges || 0)}` : null)}
+    ${fact("Zimmer", x.rooms ?? f.number_of_rooms)}${fact("Fläche", (x.m2 || f.livingspace) ? (x.m2 || f.livingspace) + " m²" : null)}${fact("Etage", f.floor != null ? (f.floor === 0 ? "EG" : f.floor + ". OG") : null)}
+    ${fact("Baujahr", f.year_built)}${fact("Renoviert", f.year_renovated)}${fact("Bezug", f.moving_date ? new Date(f.moving_date).toLocaleDateString("de-CH") : f.moving_date_type === "imm" ? "sofort" : (x.moving_date ? new Date(x.moving_date).toLocaleDateString("de-CH") : null))}</div>`;
+  // Kontakt
+  const ag = d?.agency || (x.agency ? { name: x.agency } : null);
+  const book = ag ? (S.agencies[agencyKey(ag.name)] || {}) : {};
+  const c = d?.contacts || {};
+  const lines = [];
+  if (ag) {
+    lines.push(`<div class="ag">${ag.logo ? `<img data-src="archiv/${esc(a.id)}/${esc(ag.logo)}" alt="">` : ""}<div><b>${esc(ag.name)}</b>${ag.name_2 ? "<br>" + esc(ag.name_2) : ""}${ag.street ? `<br><span class="hint">${esc(ag.street)}, ${esc(ag.zipcode || "")} ${esc(ag.city || "")}</span>` : ""}</div></div>`);
+  } else if (d) lines.push('<p class="hint">Privat inseriert oder keine Verwaltung angegeben. Kontakt über das Inserat bzw. den Bewerbungslink.</p>');
+  if (d?.reference) lines.push(`<div>Referenz / Objekt-Nr.: <span class="ref">${esc(d.reference)}</span></div>`);
+  if (book.phone) lines.push(`<div>☎ <a href="tel:${esc(book.phone.replace(/\s/g, ""))}">${esc(book.phone)}</a></div>`);
+  if (book.email) lines.push(`<div>✉ <a href="mailto:${esc(book.email)}">${esc(book.email)}</a></div>`);
+  if (book.website) lines.push(`<div>↗ <a href="${esc(/^https?:/.test(book.website) ? book.website : "https://" + book.website)}" target="_blank" rel="noopener">${esc(book.website)}</a></div>`);
+  if (book.note) lines.push(`<div class="hint">${esc(book.note)}</div>`);
+  (c.phones || []).forEach((p) => lines.push(`<div>☎ <a href="tel:${esc(p.replace(/\s/g, ""))}">${esc(p)}</a> <span class="hint">(aus dem Inserat)</span></div>`));
+  (c.emails || []).forEach((m) => lines.push(`<div>✉ <a href="mailto:${esc(m)}">${esc(m)}</a> <span class="hint">(aus dem Inserat)</span></div>`));
+  if (d?.apply_url && a?.online !== "offline") lines.push(`<a class="btn primary" href="${esc(d.apply_url)}" target="_blank" rel="noopener">Online bewerben</a>`);
+  const bookForm = ag ? `<details class="adv-inner"><summary>${book.phone || book.email || book.website ? "Kontakt der Verwaltung bearbeiten" : "Telefon / E-Mail der Verwaltung ergänzen"}</summary>
+      <p class="hint">Gilt für alle Wohnungen von «${esc(ag.name)}», auch künftige.</p>
+      <label class="f">Telefon<input class="field" id="agPhone" type="tel" value="${esc(book.phone || "")}"></label>
+      <label class="f">E-Mail<input class="field" id="agEmail" type="email" value="${esc(book.email || "")}"></label>
+      <label class="f">Website<input class="field" id="agWeb" type="url" value="${esc(book.website || "")}"></label>
+      <label class="f">Notiz<input class="field" id="agNote" type="text" value="${esc(book.note || "")}" placeholder="z.B. Frau Muster, Vermietung"></label>
+      <button type="button" class="btn primary" id="agSave" data-ag="${esc(ag.name)}">Im Adressbuch speichern</button></details>` : "";
+  const desc = (d?.description || x.text || "").replace(/\*\*/g, "").replace(/\s*\|\s*/g, "\n").trim();
+  const attrs = (d?.attributes || []).map((t) => `<span>${esc(ATTR[t] || t)}</span>`).join("");
+  const docs = (d?.documents || []).map((doc) => doc.file ? `<a href="#" data-doc="archiv/${esc(a.id)}/${esc(doc.file)}">📄 ${esc(doc.title || "Dokument")}</a>`
+    : doc.url ? `<a href="${esc(doc.url)}" target="_blank" rel="noopener">📄 ${esc(doc.title || "Dokument")} (online)</a>` : "").join("");
+  const mail = d?.mail ? `<a href="${esc(d.mail.link)}" target="_blank" rel="noopener">Original-Mail in Gmail öffnen ↗</a>` : "";
+  $("dBody").innerHTML = `
+    ${onl || '<div class="onl">Noch nicht gesichert. Neue Treffer, Favoriten und Wohnungen mit Stand sichert Wollihood beim nächsten Suchlauf.</div>'}
+    ${gal}
+    ${facts}
+    <div class="panel"><h2>Kontakt</h2><div class="contact">${lines.join("") || '<p class="hint">Keine Angaben.</p>'}${bookForm}</div></div>
+    ${attrs ? `<div class="chips2">${attrs}</div>` : ""}
+    ${desc ? `<div class="panel"><h2>Beschreibung</h2><div class="desc">${esc(desc)}</div></div>` : ""}
+    ${docs ? `<div class="panel doclist"><h2>Dokumente</h2>${docs}</div>` : ""}
+    <div class="srcs" style="padding:0">Gefunden auf: ${sourcesHtml(x)}${mail ? " · " + mail : ""}</div>`;
+  // Bilder aus dem privaten Repo nachladen
+  $("dBody").querySelectorAll("img[data-src]").forEach((img) => repoFile(img.dataset.src).then((u) => (img.src = u)).catch(() => img.closest("figure")?.remove()));
+}
+$("dBody").addEventListener("click", async (e) => {
+  const doc = e.target.closest("[data-doc]");
+  if (doc) { e.preventDefault(); try { window.open(await repoFile(doc.dataset.doc), "_blank"); } catch { toast("Dokument nicht ladbar.", "err"); } return; }
+  const sv = e.target.closest("#agSave");
+  if (sv) {
+    const name = sv.dataset.ag, k = agencyKey(name);
+    const entry = { name, phone: $("agPhone").value.trim(), email: $("agEmail").value.trim(), website: $("agWeb").value.trim(), note: $("agNote").value.trim(), by: S.person || null, at: new Date().toISOString() };
+    sv.disabled = true;
+    for (let i = 0; i < 4; i++) {
+      try {
+        let cur = { data: { agencies: {} }, sha: null };
+        try { cur = await readJson("agencies.json"); } catch (er) { if (er.status !== 404) throw er; }
+        const all = cur.data.agencies || {}; all[k] = entry;
+        S.agenciesSha = await writeJson("agencies.json", { agencies: all }, cur.sha, `Adressbuch: ${name}`);
+        S.agencies = all; toast("Im Adressbuch gespeichert.", "ok"); break;
+      } catch (er) { if (!(er.status === 409 || er.status === 422) || i === 3) { toast("Nicht gespeichert: " + er.message, "err"); break; } }
+    }
+    sv.disabled = false;
+    const x = S.hits.find((h) => keyOf(h) === S.detailKey) || {}; const a = archEntry(x);
+    let d = null; if (a) { try { d = (await readJson(`archiv/${a.id}/data.json`)).data; } catch {} }
+    renderDetail(x, a, d); renderHits();
+  }
+});
 const firstUrl = (x) => (x.sources && x.sources[0] && x.sources[0].url) || x.url;
 // Fundstellen: zuerst gefunden zuerst, jede antippbar
 function sourcesHtml(x) {
@@ -942,7 +1084,7 @@ function renderHits() {
       <div class="body">
         <div class="addr">${esc(x.street || x.title || place)}</div>
         <div class="meta">${pubLabel(x)}${x.pushed ? " · Push gesendet" : x.push_skipped ? " · kein Push (" + esc(x.push_skipped) + ")" : ""}</div>
-        <div class="srcs">Gefunden auf: ${sourcesHtml(x)}</div>
+        <div class="srcs">Gefunden auf: ${sourcesHtml(x)}${agencyOf(x) ? ` · Verwaltung: <b>${esc(agencyOf(x))}</b>` : ""}</div>
         ${verdict(k) === "out" ? `<div class="notes">${itemOf(k).out ? "Aussortiert von " + esc(PEOPLE[itemOf(k).out.by] || "") : "Aussortiert: beide Daumen runter"}</div>` : ""}
         ${x.notes && x.notes.length ? `<div class="notes">${esc(x.notes.join(" · "))}</div>` : ""}
         ${x.swap || featKeys(x.features).length ? `<div class="tags">${x.swap ? '<span class="tag swap">Tausch</span>' : ""}${featKeys(x.features).map((k) => `<span class="tag">${esc(featShort(k))}</span>`).join("")}</div>` : ""}
@@ -951,7 +1093,7 @@ function renderHits() {
         ${fav ? statusBlock(k) : ""}
         ${miniMap(x)}
       </div>
-      <div class="actions two"><a class="btn primary" href="${esc(firstUrl(x))}" target="_blank" rel="noopener" data-open>${icon.open} Inserat öffnen</a>${outBtn(k)}</div>
+      <div class="actions three"><a class="btn primary" href="${esc(firstUrl(x))}" target="_blank" rel="noopener" data-open>${icon.open} Inserat</a><button type="button" class="btn detbtn" data-detail aria-label="Details und Archiv">${icon.doc}<span>Details</span></button>${outBtn(k)}</div>
     </article>`;
   }).join("");
   mountMinis();
@@ -990,6 +1132,7 @@ $("hitList").addEventListener("click", (e) => {
   const vb = e.target.closest("[data-vote]"); if (vb) { setVote(k, vb.dataset.vote); return; }
   if (e.target.closest("[data-fav]")) { toggleFav(k); return; }
   const ob = e.target.closest("[data-out]"); if (ob) { setOut(k, ob.dataset.out === "1"); return; }
+  if (e.target.closest("[data-detail]")) { openDetail(k); return; }
   if (e.target.closest("[data-thread]")) { S.openThreads.has(k) ? S.openThreads.delete(k) : S.openThreads.add(k); renderHits();
     if (S.openThreads.has(k)) setTimeout(() => document.querySelector(`.card[data-key="${CSS.escape(k)}"] [data-cinput]`)?.focus(), 50); return; }
   if (e.target.closest("[data-csend]")) { const ta = card.querySelector("[data-cinput]"); addComment(k, ta.value); ta.value = ""; return; }
@@ -1526,9 +1669,11 @@ async function load() {
     if (e.status === 401 || e.status === 404) { showSetup(e.message); return; }
     toast(e.message, "err", 8000); return;
   }
-  const [hits, health, events, marks, social, people] = await Promise.allSettled([
+  const [hits, health, events, marks, social, people, arch, ags] = await Promise.allSettled([
     readJson("state/recent.json"), readJson("state/health.json"), readJson("state/events.json"), readJson("marks.json"),
-    readJson("social.json"), readJson("people.json")]);
+    readJson("social.json"), readJson("people.json"), readJson("archiv/index.json"), readJson("agencies.json")]);
+  if (arch.status === "fulfilled") S.archive = arch.value.data || {};
+  if (ags.status === "fulfilled") { S.agencies = ags.value.data.agencies || {}; S.agenciesSha = ags.value.sha; }
   if (social.status === "fulfilled") { S.social = social.value.data.items || {}; S.socialSha = social.value.sha; }
   if (people.status === "fulfilled") { S.people = people.value.data.people || {}; S.peopleSha = people.value.sha; }
   renderMyPush(); syncDevicePerson(); migrateMarks();
@@ -1688,7 +1833,7 @@ let installEvt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("installBtn").hidden = false; $("installHint").hidden = true; });
 $("installBtn").addEventListener("click", async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("installBtn").hidden = true; });
 if (window.matchMedia("(display-mode: standalone)").matches) { $("installHint").textContent = "Läuft als App."; }
-const APP_VERSION = "41 · 19.10.2026";
+const APP_VERSION = "42 · 19.10.2026";
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").then((reg) => { reg.update().catch(() => {}); }).catch(() => {});
   let reloaded = false;
