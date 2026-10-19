@@ -1453,6 +1453,13 @@ async function autoRun() {
     setTimeout(load, 80000);
   } catch (e) { /* nicht schlimm, der nächste Lauf kommt sowieso */ }
 }
+function digestText(h) {
+  const sent = h?.last_digest_sent, skipped = h?.last_digest_skipped;
+  const parts = [];
+  if (skipped && (!sent || skipped > sent)) parts.push(`zuletzt nicht verschickt, nichts Neues (${ago(skipped)})`);
+  parts.push(sent ? "zuletzt verschickt " + ago(sent) : "verschickt: noch keine Angabe");
+  return esc(parts.join(" · "));
+}
 function renderStatus() {
   const h = S.health;
   const src = Object.entries(h?.sources || {});
@@ -1486,7 +1493,7 @@ function renderStatus() {
     if (name === "Abo-Mails") nl.forEach(([n, x]) => rows.push(srcRow(n, x.level, x.level === "bad" ? x.msg : (x.last ? `letzte Mail ${ago(x.last)} · ` : "") + x.msg.replace(/^seit \d+ Tagen keine Mail · /, ""), x.url, true)));
   });
   const dl = [];
-  dl.push(`<div class="src"><span class="s ${S.config?.digest?.enabled === false ? "warn" : ""}"></span><b>Tägliches Briefing</b><div class="m">${S.config?.digest?.enabled === false ? "ausgeschaltet" : h?.last_digest ? "zuletzt verschickt " + esc(ago(h.last_digest)) : "noch nie verschickt"}</div></div>`);
+  dl.push(`<div class="src"><span class="s ${S.config?.digest?.enabled === false ? "warn" : ""}"></span><b>Tägliches Briefing</b><div class="m">${S.config?.digest?.enabled === false ? "ausgeschaltet" : digestText(h)}</div></div>`);
   if (h?.push) dl.push(`<div class="src"><span class="s ${h.push.ok ? "" : "bad"}"></span><b>Push-Mitteilungen</b><div class="m">${h.push.ok ? "funktionieren · zuletzt geprüft " + esc(ago(h.push.at)) : esc(h.push.msg)}</div></div>`);
   $("delivery").innerHTML = dl.join("");
   $("sources").innerHTML = rows.join("") || '<p class="hint">Noch kein Lauf.</p>';
@@ -1671,7 +1678,7 @@ let installEvt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("installBtn").hidden = false; $("installHint").hidden = true; });
 $("installBtn").addEventListener("click", async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("installBtn").hidden = true; });
 if (window.matchMedia("(display-mode: standalone)").matches) { $("installHint").textContent = "Läuft als App."; }
-const APP_VERSION = "39 · 19.10.2026";
+const APP_VERSION = "40 · 19.10.2026";
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").then((reg) => { reg.update().catch(() => {}); }).catch(() => {});
   let reloaded = false;
