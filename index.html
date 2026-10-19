@@ -137,6 +137,11 @@ h2 { font: 20px/1.05 var(--display); letter-spacing: -.4px; text-transform: uppe
 .ref { font: 800 14px var(--body); letter-spacing: .04em; user-select: all }
 .chips2 { display: flex; flex-wrap: wrap; gap: 6px }
 .chips2 span { border: 1px solid var(--line); padding: 3px 8px; font: 800 11px var(--body); text-transform: uppercase; letter-spacing: .06em }
+.ownfiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px }
+.ownfiles img { width: 100%; aspect-ratio: 1; object-fit: cover; border: 1px solid var(--line); background: var(--sunk) }
+.ownfiles a { grid-column: 1 / -1; color: var(--accent); font-weight: 800; text-decoration: none }
+.sharelist { display: grid; border: 2px solid var(--line); max-height: 50vh; overflow-y: auto }
+.sharelist .check { border-right: 0 }
 .doclist a { display: block; padding: 8px 0; border-top: 1px solid var(--hair); color: var(--accent); font-weight: 800; text-decoration: none }
 .srcs { padding: 0 12px 10px; font-size: 12.5px; color: var(--muted); margin-top: -4px }
 .srcs a { color: var(--accent); font-weight: 800; text-decoration: none }
@@ -961,11 +966,121 @@ function renderDetail(x, a, d) {
     ${attrs ? `<div class="chips2">${attrs}</div>` : ""}
     ${desc ? `<div class="panel"><h2>Beschreibung</h2><div class="desc">${esc(desc)}</div></div>` : ""}
     ${docs ? `<div class="panel doclist"><h2>Dokumente</h2>${docs}</div>` : ""}
-    <div class="srcs" style="padding:0">Gefunden auf: ${sourcesHtml(x)}${mail ? " · " + mail : ""}</div>`;
+    <div class="srcs" style="padding:0">Gefunden auf: ${sourcesHtml(x)}${mail ? " · " + mail : ""}</div>
+    ${ownBlock(S.detailKey)}`;
   // Bilder aus dem privaten Repo nachladen
   $("dBody").querySelectorAll("img[data-src]").forEach((img) => repoFile(img.dataset.src).then((u) => (img.src = u)).catch(() => img.closest("figure")?.remove()));
 }
+// ---------- Eigene Dateien, Notiz, «Teilen → Wollihood» ----------
+async function aidOf(k) {
+  const a = S.archive[k] || Object.values(S.archive).find((v) => (v.keys || []).includes(k));
+  if (a) return a.id;
+  const h = await crypto.subtle.digest("SHA-1", new TextEncoder().encode(k));
+  return [...new Uint8Array(h)].map((b) => b.toString(16).padStart(2, "0")).join("").slice(0, 12);
+}
+function ownBlock(k) {
+  const it = itemOf(k), files = it.files || [];
+  return `<div class="panel"><h2>Eigene Notizen & Dateien</h2>
+    <p class="hint">Für euch beide. Screenshots aus Homegate & Co. könnt ihr auch direkt über «Teilen → Wollihood» hierher schicken.</p>
+    <textarea class="field" id="ownNote" rows="3" placeholder="z.B. Kontakt Frau Muster, 044 …, Besichtigung Do 18 Uhr">${esc(it.note || "")}</textarea>
+    <button type="button" class="btn" id="ownNoteSave">Notiz speichern</button>
+    <div class="ownfiles">${files.map((f) => f.type === "application/pdf" ? `<a href="#" data-doc="${esc(f.path)}">📄 ${esc(f.name || "Dokument")}</a>`
+      : `<img data-src="${esc(f.path)}" data-full="${esc(f.path)}" alt="${esc(f.name || "")}">`).join("")}</div>
+    <label class="btn" for="ownFiles">Fotos / Screenshots hinzufügen</label>
+    <input type="file" id="ownFiles" accept="image/*,application/pdf" multiple hidden></div>`;
+}
+async function shrinkImage(file) {
+  if (!file.type.startsWith("image/")) return file;
+  try {
+    const bmp = await createImageBitmap(file);
+    const scale = Math.min(1, 1600 / Math.max(bmp.width, bmp.height));
+    const c = document.createElement("canvas"); c.width = Math.round(bmp.width * scale); c.height = Math.round(bmp.height * scale);
+    c.getContext("2d").drawImage(bmp, 0, 0, c.width, c.height);
+    return await new Promise((r) => c.toBlob((b) => r(b || file), "image/jpeg", 0.82));
+  } catch { return file; }
+}
+const blobB64 = (blob) => new Promise((r) => { const fr = new FileReader(); fr.onload = () => r(String(fr.result).split(",")[1]); fr.readAsDataURL(blob); });
+async function uploadOwn(k, files, note) {
+  if (needPerson()) return 0;
+  const x = S.hits.find((h) => keyOf(h) === k) || {}, aid = await aidOf(k);
+  const added = [];
+  for (const [i, f] of [...files].entries()) {
+    if (f.size > 12e6) { toast(`«${f.name}» ist zu gross (max. 12 MB).`, "err"); continue; }
+    const blob = await shrinkImage(f);
+    const pdf = (f.type || blob.type) === "application/pdf";
+    const path = `archiv/${aid}/eigene/${Date.now().toString(36)}_${i}.${pdf ? "pdf" : "jpg"}`;
+    try {
+      await gh(path, { method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: `Eigene Datei: ${x.street || k}`, content: await blobB64(blob), branch: "main" }) });
+      added.push({ path, name: f.name || "Datei", type: pdf ? "application/pdf" : "image/jpeg", by: S.person, at: new Date().toISOString() });
+    } catch (e) { toast("Hochladen fehlgeschlagen: " + e.message, "err"); }
+  }
+  if (added.length || note) {
+    socialOp(`${PEOPLE[S.person]} ergänzt (${x.street || "Inserat"})`, (items) => {
+      const it = items[k] || (items[k] = { votes: {}, comments: [] });
+      if (added.length) it.files = [...(it.files || []), ...added];
+      if (note) it.note = [it.note, note].filter(Boolean).join("\n");
+      it.updated = new Date().toISOString();
+    });
+  }
+  return added.length;
+}
+async function refreshDetail() {
+  if ($("detail").hidden || !S.detailKey) return;
+  const x = S.hits.find((h) => keyOf(h) === S.detailKey) || {}; const a = archEntry(x);
+  let d = null; if (a) { try { d = (await readJson(`archiv/${a.id}/data.json`)).data; } catch {} }
+  renderDetail(x, a, d);
+}
+$("dBody").addEventListener("change", async (e) => {
+  if (e.target.id !== "ownFiles" || !e.target.files.length) return;
+  toast("Lade hoch …", "", 0);
+  const n = await uploadOwn(S.detailKey, e.target.files);
+  toast(n ? `${n} Datei${n > 1 ? "en" : ""} gespeichert.` : "Nichts gespeichert.", n ? "ok" : "err");
+  setTimeout(refreshDetail, 300);
+});
+// Geteiltes aus anderen Apps entgegennehmen
+async function handleShare(id) {
+  let meta;
+  try { const c = await caches.open("wollihood-share"); const r = await c.match(`./__share/${id}/meta`); meta = r && (await r.json()); } catch {}
+  history.replaceState(null, "", location.pathname);
+  if (!meta) return;
+  const blob = `${meta.title} ${meta.text} ${meta.url}`;
+  const ids = blob.match(/\d{6,12}/g) || [];
+  const guess = S.hits.find((h) => (h.sources || [{ url: h.url }]).some((s) => blob.includes(s.url)) || (h.keys || []).some((k) => ids.some((n) => k.endsWith(":" + n))));
+  const rank = (h) => (h === guess ? 0 : verdict(keyOf(h)) === "out" ? 2 : 1);
+  const list = [...S.hits].sort((a, b) => rank(a) - rank(b));
+  S.detailKey = null;
+  $("dTitle").textContent = "Geteilt";
+  $("detail").hidden = false; document.body.style.overflow = "hidden";
+  $("dBody").innerHTML = `<div class="panel"><h2>Zu welcher Wohnung?</h2>
+      <p class="hint">${meta.files.length} Datei${meta.files.length === 1 ? "" : "en"}${meta.text || meta.url ? " und Text" : ""} geteilt.${guess ? " Passende Wohnung ist vorausgewählt." : ""}</p>
+      <input class="field" id="shareFilter" placeholder="Strasse oder Quartier suchen">
+      <div class="sharelist">${list.map((h) => `<label class="check"><input type="radio" name="shareTo" value="${esc(keyOf(h))}" ${h === guess ? "checked" : ""}><span class="cl">${esc(h.street || h.title || "Inserat")}<small>${esc([h.plz, QUARTER[h.plz] || h.city].filter(Boolean).join(" "))} · ${esc(rooms(h.rooms))} · ${esc(chf(h.rent))}${verdict(keyOf(h)) === "out" ? " · aussortiert" : ""}</small></span></label>`).join("") || '<p class="hint">Keine Treffer in der Liste.</p>'}</div>
+      <button type="button" class="btn primary" id="shareSave">Speichern</button></div>`;
+  $("shareFilter").oninput = (ev) => { const q = ev.target.value.toLowerCase(); $("dBody").querySelectorAll(".sharelist label").forEach((l) => (l.hidden = q && !l.textContent.toLowerCase().includes(q))); };
+  $("shareSave").onclick = async () => {
+    const k = ($("dBody").querySelector("input[name=shareTo]:checked") || {}).value;
+    if (!k) { toast("Bitte eine Wohnung wählen.", "err"); return; }
+    $("shareSave").disabled = true; toast("Speichere …", "", 0);
+    const c = await caches.open("wollihood-share");
+    const files = [];
+    for (const f of meta.files) { const r = await c.match(f.path); if (r) files.push(new File([await r.blob()], decodeURIComponent(r.headers.get("X-Name") || f.name || "datei"), { type: f.type || "image/jpeg" })); }
+    const note = [meta.title, meta.text, meta.url].filter(Boolean).join(" ").trim();
+    const n = await uploadOwn(k, files, note);
+    for (const key of await c.keys()) if (key.url.includes(`/__share/${id}/`)) await c.delete(key);
+    toast(`Gespeichert${n ? `: ${n} Datei${n > 1 ? "en" : ""}` : ""}.`, "ok");
+    openDetail(k);
+  };
+}
 $("dBody").addEventListener("click", async (e) => {
+  if (e.target.id === "ownNoteSave") {
+    if (needPerson()) return;
+    const k = S.detailKey, val = $("ownNote").value.trim();
+    socialOp(`${PEOPLE[S.person]} Notiz`, (items) => { const it = items[k] || (items[k] = { votes: {}, comments: [] }); it.note = val; it.updated = new Date().toISOString(); });
+    toast("Notiz gespeichert.", "ok"); return;
+  }
+  const full = e.target.closest("img[data-full]");
+  if (full && full.src) { window.open(full.src, "_blank"); return; }
   const doc = e.target.closest("[data-doc]");
   if (doc) { e.preventDefault(); try { window.open(await repoFile(doc.dataset.doc), "_blank"); } catch { toast("Dokument nicht ladbar.", "err"); } return; }
   const sv = e.target.closest("#agSave");
@@ -1685,6 +1800,7 @@ async function load() {
   if (!S.filterChosen) { S.filter = S.hits.some(isNew) ? "new" : "all"; S.filterChosen = true; }
   renderHits(); renderStatus(); renderMarkers();
   autoRun();
+  const sh = location.hash.match(/^#share=([\w]+)/); if (sh) handleShare(sh[1]);
   $("refreshBtn").classList.remove("spin");
   applyDeep(true);
 }
@@ -1833,7 +1949,7 @@ let installEvt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("installBtn").hidden = false; $("installHint").hidden = true; });
 $("installBtn").addEventListener("click", async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("installBtn").hidden = true; });
 if (window.matchMedia("(display-mode: standalone)").matches) { $("installHint").textContent = "Läuft als App."; }
-const APP_VERSION = "42 · 19.10.2026";
+const APP_VERSION = "43 · 19.10.2026";
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").then((reg) => { reg.update().catch(() => {}); }).catch(() => {});
   let reloaded = false;
