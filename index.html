@@ -201,6 +201,10 @@ h2 { font: 20px/1.05 var(--display); letter-spacing: -.4px; text-transform: uppe
 .cform { display: grid; grid-template-columns: minmax(0, 1fr) auto; }
 .cform textarea.field { min-height: 48px; height: 48px; font-size: 15px; resize: none; border: 0; border-right: 1px solid var(--line) }
 .cform .btn { border: 0 }
+.stline { display: flex; width: 100%; justify-content: space-between; align-items: center; gap: 8px; margin-top: 10px; padding: 10px 12px; background: var(--accent-soft); border: 0; border-left: 4px solid var(--accent); color: var(--fg); font: 600 14px var(--body); text-align: left; cursor: pointer }
+.stline b { font-weight: 800 }
+.standrow { display: grid; gap: 10px }
+.standrow .f small { display: block; font: 800 11px var(--body); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px }
 .statusrow { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0; border-top: 1px solid var(--line); background: var(--accent-soft) }
 .statusrow .f { padding: 8px 12px 10px; border-right: 1px solid var(--line) }
 .statusrow .f:last-of-type { border-right: 0 }
@@ -890,15 +894,22 @@ function deleteComment(k, id) {
     it.comments = (it.comments || []).filter((x) => !(x.id === id && x.by === S.person));
   });
 }
-function statusBlock(k) {
+function stLine(k) {
+  const st = itemOf(k).status;
+  if (!st || !st.value) return "";
+  return `<button type="button" class="stline" data-detail><span>Stand: <b>${esc(statusLabel(st))}</b>${st.by ? ` · ${esc(PEOPLE[st.by] || st.by)}, ${esc(ago(st.at))}` : ""}</span><span aria-hidden="true">›</span></button>`;
+}
+function standPanel(k) {
   const it = itemOf(k), st = it.status || {}, favBy = it.fav?.by;
   const why = verdict(k) === "both" ? "Ihr seid euch einig" : favBy ? `Favorit von ${PEOPLE[favBy] || favBy}` : "";
   const when = st.when ? new Date(new Date(st.when).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16) : "";
-  return `<div class="statusrow">
-    <label class="f"><small>${esc(why)}${why ? " · " : ""}Stand</small>
-      <select class="field" data-status>${STATUS.map(([v, l]) => `<option value="${v}"${(st.value || "") === v ? " selected" : ""}>${l}</option>`).join("")}</select></label>
-    ${st.value === "besichtigung" ? `<label class="f"><small>Termin</small><input class="field" type="datetime-local" data-when value="${when}"></label>` : ""}
-    ${st.by ? `<span class="hint">${esc(PEOPLE[st.by] || st.by)}, ${esc(ago(st.at))}</span>` : ""}
+  return `<div class="panel" id="dStand"><h2>Unser Stand</h2>
+    ${why ? `<p class="hint">${esc(why)}</p>` : ""}
+    <div class="standrow">
+      <select class="field" data-status aria-label="Stand">${STATUS.map(([v, l]) => `<option value="${v}"${(st.value || "") === v ? " selected" : ""}>${l}</option>`).join("")}</select>
+      ${st.value === "besichtigung" ? `<label class="f"><small>Termin</small><input class="field" type="datetime-local" data-when value="${when}"></label>` : ""}
+    </div>
+    ${st.by ? `<p class="hint">Gesetzt von ${esc(PEOPLE[st.by] || st.by)}, ${esc(ago(st.at))}</p>` : ""}
   </div>`;
 }
 const QUARTER = { "8001": "Altstadt", "8004": "Aussersihl", "8005": "Industriequartier", "8006": "Oberstrass", "8008": "Riesbach",
@@ -1085,14 +1096,15 @@ function renderDetail(x, a, d) {
   const mail = d?.mail ? `<a href="${esc(d.mail.link)}" target="_blank" rel="noopener">Original-Mail in Gmail öffnen ↗</a>` : "";
   $("dBody").innerHTML = `
     ${onl || '<div class="onl">Noch nicht gesichert. Neue Treffer, Favoriten und Wohnungen mit Stand sichert Wollihood beim nächsten Suchlauf.</div>'}
+    ${standPanel(S.detailKey)}
+    ${ownBlock(S.detailKey)}
     ${gal}
     ${facts}
     <div class="panel"><h2>Kontakt</h2><div class="contact">${lines.join("") || '<p class="hint">Keine Angaben.</p>'}${bookForm}</div></div>
     ${attrs ? `<div class="chips2">${attrs}</div>` : ""}
     ${desc ? `<div class="panel"><h2>Beschreibung</h2><div class="desc">${esc(desc)}</div></div>` : ""}
     ${docs ? `<div class="panel doclist"><h2>Dokumente</h2>${docs}</div>` : ""}
-    <div class="srcs" style="padding:0">Gefunden auf: ${sourcesHtml(x)}${mail ? " · " + mail : ""}</div>
-    ${ownBlock(S.detailKey)}`;
+    <div class="srcs" style="padding:0">Gefunden auf: ${sourcesHtml(x)}${mail ? " · " + mail : ""}</div>`;
   // Bilder aus dem privaten Repo nachladen
   $("dBody").querySelectorAll("img[data-src]").forEach((img) => repoFile(img.dataset.src).then((u) => (img.src = u)).catch(() => img.closest("figure")?.remove()));
 }
@@ -1156,6 +1168,13 @@ async function refreshDetail() {
   let d = null; if (a) { try { d = (await readJson(`archiv/${a.id}/data.json`)).data; } catch {} }
   renderDetail(x, a, d);
 }
+$("dBody").addEventListener("change", (e) => {
+  const k = S.detailKey; if (!k) return;
+  let hit = false;
+  if (e.target.matches("[data-status]")) { setStatus(k, e.target.value, null); hit = true; }
+  if (e.target.matches("[data-when]") && e.target.value) { setStatus(k, "besichtigung", new Date(e.target.value).toISOString()); hit = true; }
+  if (hit) setTimeout(() => { const el = $("dStand"); if (el) el.outerHTML = standPanel(k); }, 60);
+});
 $("dBody").addEventListener("change", async (e) => {
   if (e.target.id !== "ownFiles" || !e.target.files.length) return;
   toast("Lade hoch …", "", 0);
@@ -1330,7 +1349,7 @@ function renderHits() {
         ${x.swap || featKeys(x.features).length ? `<div class="tags">${x.swap ? '<span class="tag swap">Tausch</span>' : ""}${featKeys(x.features).map((k) => `<span class="tag">${esc(featShort(k))}</span>`).join("")}</div>` : ""}
         ${x.swap && x.swap_wants ? `<div class="wants"><b>Sucht:</b> ${esc(x.swap_wants)}</div>` : ""}
         ${socialBlock(x)}
-        ${fav ? statusBlock(k) : ""}
+        ${stLine(k)}
         ${miniMap(x)}
       </div>
       <div class="actions three"><a class="btn primary" href="${esc(firstUrl(x))}" target="_blank" rel="noopener" data-open>${icon.open} Inserat</a><button type="button" class="btn detbtn" data-detail aria-label="Details und Archiv">${icon.doc}<span>Details</span></button>${outBtn(k)}</div>
@@ -2074,7 +2093,7 @@ let installEvt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("installBtn").hidden = false; $("installHint").hidden = true; });
 $("installBtn").addEventListener("click", async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("installBtn").hidden = true; });
 if (window.matchMedia("(display-mode: standalone)").matches) { $("installHint").textContent = "Läuft als App."; }
-const APP_VERSION = "44 · 19.10.2026";
+const APP_VERSION = "45 · 19.10.2026";
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").then((reg) => { reg.update().catch(() => {}); }).catch(() => {});
   let reloaded = false;
