@@ -113,6 +113,8 @@ h2 { font: 20px/1.05 var(--display); letter-spacing: -.4px; text-transform: uppe
 .facts .rm b { display: block; font: 22px/1 var(--display); letter-spacing: -.6px; margin-top: 2px; font-variant-numeric: tabular-nums }
 .card .body { display: grid; grid-template-columns: minmax(0, 1fr); min-width: 0 }
 .addr { padding: 10px 12px 2px; font: 800 17px/1.15 var(--body); text-transform: uppercase; letter-spacing: -.1px; overflow-wrap: break-word }
+.srcs { padding: 0 12px 10px; font-size: 12.5px; color: var(--muted); margin-top: -4px }
+.srcs a { color: var(--accent); font-weight: 800; text-decoration: none }
 .meta { padding: 0 12px 10px; color: var(--muted); font-size: 12.5px }
 .meta b { font-weight: 800; color: var(--fg) }
 .notes { padding: 0 12px 10px; color: var(--warn); font-size: 12.5px; font-weight: 700 }
@@ -844,6 +846,13 @@ function statusBlock(k) {
 const QUARTER = { "8001": "Altstadt", "8004": "Aussersihl", "8005": "Industriequartier", "8006": "Oberstrass", "8008": "Riesbach",
   "8032": "Hottingen", "8037": "Wipkingen", "8047": "Albisrieden", "8048": "Altstetten", "8050": "Oerlikon", "8051": "Schwamendingen",
   "8053": "Witikon", "8057": "Unterstrass", "8064": "Altstetten", "8038": "Wollishofen", "8041": "Leimbach", "8002": "Enge", "8045": "Friesenberg", "8003": "Wiedikon", "8055": "Friesenberg", "8134": "Adliswil", "8135": "Langnau a.A.", "8802": "Kilchberg" };
+const firstUrl = (x) => (x.sources && x.sources[0] && x.sources[0].url) || x.url;
+// Fundstellen: zuerst gefunden zuerst, jede antippbar
+function sourcesHtml(x) {
+  const list = (x.sources && x.sources.length ? x.sources : [{ portal: x.portal, url: x.url, at: x.first_seen }])
+    .concat((x.also_urls || []).filter((u) => !(x.sources || []).some((s) => s.url === u)).map((u) => ({ portal: "weiterer Link", url: u, at: null })));
+  return list.map((s) => `<a href="${esc(s.url)}" target="_blank" rel="noopener" data-open>${esc(s.portal || "Link")}</a>${s.at ? " " + esc(new Date(s.at).toLocaleDateString("de-CH", { day: "2-digit", month: "2-digit" })) : ""}`).join(" · ");
+}
 function outBtn(k) {
   const o = itemOf(k).out;
   if (verdict(k) !== "out") return `<button type="button" class="btn outbtn" data-out="1" aria-label="Aussortieren">${icon.x}<span>Aussortieren</span></button>`;
@@ -932,7 +941,8 @@ function renderHits() {
       </div>
       <div class="body">
         <div class="addr">${esc(x.street || x.title || place)}</div>
-        <div class="meta">${esc(x.portal || "")} · ${pubLabel(x)}${x.also_urls && x.also_urls.length ? ` · <a href="${esc(x.also_urls[0])}" target="_blank" rel="noopener">${x.also_urls.length + 1}× inseriert</a>` : ""}${x.pushed ? " · Push gesendet" : x.push_skipped ? " · kein Push (" + esc(x.push_skipped) + ")" : ""}</div>
+        <div class="meta">${pubLabel(x)}${x.pushed ? " · Push gesendet" : x.push_skipped ? " · kein Push (" + esc(x.push_skipped) + ")" : ""}</div>
+        <div class="srcs">Gefunden auf: ${sourcesHtml(x)}</div>
         ${verdict(k) === "out" ? `<div class="notes">${itemOf(k).out ? "Aussortiert von " + esc(PEOPLE[itemOf(k).out.by] || "") : "Aussortiert: beide Daumen runter"}</div>` : ""}
         ${x.notes && x.notes.length ? `<div class="notes">${esc(x.notes.join(" · "))}</div>` : ""}
         ${x.swap || featKeys(x.features).length ? `<div class="tags">${x.swap ? '<span class="tag swap">Tausch</span>' : ""}${featKeys(x.features).map((k) => `<span class="tag">${esc(featShort(k))}</span>`).join("")}</div>` : ""}
@@ -941,7 +951,7 @@ function renderHits() {
         ${fav ? statusBlock(k) : ""}
         ${miniMap(x)}
       </div>
-      <div class="actions two"><a class="btn primary" href="${esc(x.url)}" target="_blank" rel="noopener" data-open>${icon.open} Inserat öffnen</a>${outBtn(k)}</div>
+      <div class="actions two"><a class="btn primary" href="${esc(firstUrl(x))}" target="_blank" rel="noopener" data-open>${icon.open} Inserat öffnen</a>${outBtn(k)}</div>
     </article>`;
   }).join("");
   mountMinis();
@@ -1678,7 +1688,7 @@ let installEvt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("installBtn").hidden = false; $("installHint").hidden = true; });
 $("installBtn").addEventListener("click", async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("installBtn").hidden = true; });
 if (window.matchMedia("(display-mode: standalone)").matches) { $("installHint").textContent = "Läuft als App."; }
-const APP_VERSION = "40 · 19.10.2026";
+const APP_VERSION = "41 · 19.10.2026";
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").then((reg) => { reg.update().catch(() => {}); }).catch(() => {});
   let reloaded = false;
