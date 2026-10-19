@@ -125,6 +125,20 @@ h2 { font: 20px/1.05 var(--display); letter-spacing: -.4px; text-transform: uppe
 .gal figure { margin: 0; scroll-snap-align: start; position: relative; overflow: hidden; min-height: 0 }
 .gal img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; display: block }
 .gal figcaption { position: absolute; right: 8px; bottom: 8px; background: var(--fg); color: var(--bg); font: 800 11px var(--body); padding: 3px 7px }
+.gal img, .ownfiles img { cursor: zoom-in }
+.viewer { position: fixed; inset: 0; z-index: 80; background: #000; display: flex; flex-direction: column }
+.viewer .vtrack { flex: 1; display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; min-height: 0; touch-action: pan-x }
+.viewer .vtrack::-webkit-scrollbar { display: none }
+.viewer .vtrack.zoomed { overflow: hidden }
+.viewer figure { margin: 0; flex: 0 0 100%; scroll-snap-align: center; display: flex; align-items: center; justify-content: center; overflow: hidden; touch-action: pan-x }
+.viewer .vtrack.zoomed, .viewer .vtrack.zoomed figure { touch-action: none }
+.viewer img { max-width: 100%; max-height: 100%; object-fit: contain; transform-origin: 0 0; will-change: transform; user-select: none; -webkit-user-drag: none }
+.viewer .vbar { position: absolute; left: 0; right: 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 14px; color: #fff; font: 800 14px var(--body); pointer-events: none }
+.viewer .vbar > * { pointer-events: auto }
+.viewer .vtop { top: 0; padding-top: max(12px, env(safe-area-inset-top)) }
+.viewer .vbot { bottom: 0; padding-bottom: max(14px, env(safe-area-inset-bottom)) }
+.viewer .vbtn { background: rgba(0,0,0,.55); color: #fff; border: 2px solid #fff; font: 800 15px var(--body); padding: 8px 14px; text-decoration: none; min-height: 44px; display: inline-flex; align-items: center }
+.viewer .vcount { background: rgba(0,0,0,.55); padding: 6px 10px }
 .dfacts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border: 2px solid var(--line) }
 .dfacts div { padding: 8px 10px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line) }
 .dfacts div:nth-child(2n) { border-right: 0 }
@@ -535,6 +549,11 @@ details.adv:not([open]) { display: block }
     <div class="sheethead"><b id="dTitle">Details</b><button type="button" class="iconbtn" id="dClose" aria-label="Schliessen">✕</button></div>
     <div class="sheetbody" id="dBody"></div>
   </div>
+  <div class="viewer" id="viewer" hidden role="dialog" aria-modal="true" aria-label="Bild gross">
+    <div class="vtrack" id="vTrack"></div>
+    <div class="vbar vtop"><span class="vcount" id="vCount"></span><button type="button" class="vbtn" id="vClose" aria-label="Schliessen">✕</button></div>
+    <div class="vbar vbot"><span></span><a class="vbtn" id="vSave" download>Herunterladen</a></div>
+  </div>
 </main>
 
 <nav class="tabbar" id="tabbar" role="tablist" hidden>
@@ -903,6 +922,112 @@ async function repoFile(path) {
   fileCache.set(path, p);
   return p;
 }
+// --- Bildbetrachter: gross ansehen, wischen, zoomen -----------------------------------------
+const V = { imgs: [], idx: 0, open: false };
+function openViewer(img) {
+  const box = img.closest(".gal, .ownfiles");
+  V.imgs = [...box.querySelectorAll("img")].filter((i) => i.src).map((i) => ({ src: i.src, name: i.alt || "" }));
+  V.idx = Math.max(0, V.imgs.findIndex((i) => i.src === img.src));
+  const tr = $("vTrack");
+  tr.innerHTML = V.imgs.map((i) => `<figure><img src="${esc(i.src)}" alt="${esc(i.name)}" draggable="false"></figure>`).join("");
+  $("viewer").hidden = false; V.open = true;
+  tr.scrollLeft = V.idx * tr.clientWidth;
+  vUpdate();
+  history.pushState({ viewer: 1 }, "");
+}
+function vUpdate() {
+  $("vCount").textContent = V.imgs.length > 1 ? `${V.idx + 1} / ${V.imgs.length}` : "";
+  $("vCount").hidden = V.imgs.length < 2;
+  const cur = V.imgs[V.idx];
+  $("vSave").href = cur?.src || "#";
+  $("vSave").download = (cur?.name || `wollihood_${V.idx + 1}`).replace(/[^\w.-]+/g, "_") + (/\.(jpe?g|png|webp)$/i.test(cur?.name || "") ? "" : ".jpg");
+}
+function vHide() { if (!V.open) return; V.open = false; $("viewer").hidden = true; $("vTrack").innerHTML = ""; vz.reset(); }
+function closeViewer() { if (!V.open) return; if (history.state?.viewer) history.back(); else vHide(); }
+window.addEventListener("popstate", () => vHide());
+$("vClose").addEventListener("click", closeViewer);
+$("vTrack").addEventListener("scroll", () => {
+  const tr = $("vTrack"), i = Math.round(tr.scrollLeft / Math.max(1, tr.clientWidth));
+  if (i !== V.idx) { vz.reset(); V.idx = i; vUpdate(); }
+}, { passive: true });
+document.addEventListener("keydown", (e) => {
+  if (!V.open) return;
+  if (e.key === "Escape") { e.stopImmediatePropagation(); closeViewer(); }
+  const tr = $("vTrack");
+  if (e.key === "ArrowRight") tr.scrollBy({ left: tr.clientWidth, behavior: "smooth" });
+  if (e.key === "ArrowLeft") tr.scrollBy({ left: -tr.clientWidth, behavior: "smooth" });
+}, true);
+// Zoom: zwei Finger, Doppeltipp; gezoomt verschieben mit einem Finger
+const vz = (() => {
+  const pts = new Map();
+  let s = 1, tx = 0, ty = 0, start = null, img = null, lastTap = 0, moved = false;
+  const apply = () => {
+    if (!img) return;
+    img.style.transform = s === 1 ? "" : `translate(${tx}px, ${ty}px) scale(${s})`;
+    $("vTrack").classList.toggle("zoomed", s > 1);
+  };
+  const clamp = () => {
+    if (!img) return;
+    const w = img.offsetWidth, h = img.offsetHeight;
+    tx = Math.min(0, Math.max(w - w * s, tx)); ty = Math.min(0, Math.max(h - h * s, ty));
+  };
+  const zoomAt = (ns, cx, cy) => {        // cx/cy in Bildschirmkoordinaten
+    const r = img.getBoundingClientRect(), ox = r.left - tx, oy = r.top - ty;
+    const px = (cx - ox - tx) / s, py = (cy - oy - ty) / s;
+    s = Math.min(5, Math.max(1, ns));
+    tx = cx - ox - px * s; ty = cy - oy - py * s;
+    if (s === 1) { tx = ty = 0; }
+    clamp(); apply();
+  };
+  const tr = $("vTrack");
+  tr.addEventListener("pointerdown", (e) => {
+    const t = e.target.closest(".viewer img");
+    if (!t) { if (e.target.closest("figure") && s === 1) start = { bg: true, x: e.clientX, y: e.clientY }; return; }
+    if (img !== t) { reset(); img = t; }
+    pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    moved = false;
+    if (pts.size === 2) {
+      const [a, b] = [...pts.values()];
+      start = { d: Math.hypot(a.x - b.x, a.y - b.y), s, cx: (a.x + b.x) / 2, cy: (a.y + b.y) / 2 };
+    } else if (pts.size === 1) start = { x: e.clientX, y: e.clientY, tx, ty };
+    if (s > 1 || pts.size === 2) tr.setPointerCapture?.(e.pointerId);
+  });
+  tr.addEventListener("pointermove", (e) => {
+    if (!pts.has(e.pointerId)) return;
+    pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pts.size === 2 && start?.d) {
+      const [a, b] = [...pts.values()];
+      zoomAt(start.s * Math.hypot(a.x - b.x, a.y - b.y) / start.d, (a.x + b.x) / 2, (a.y + b.y) / 2);
+      moved = true; e.preventDefault();
+    } else if (pts.size === 1 && s > 1 && start) {
+      tx = start.tx + e.clientX - start.x; ty = start.ty + e.clientY - start.y;
+      if (Math.abs(e.clientX - start.x) + Math.abs(e.clientY - start.y) > 6) moved = true;
+      clamp(); apply(); e.preventDefault();
+    } else if (start && Math.abs(e.clientX - start.x) + Math.abs(e.clientY - start.y) > 10) moved = true;
+  });
+  const up = (e) => {
+    const wasTap = pts.size === 1 && !moved;
+    pts.delete(e.pointerId);
+    if (pts.size === 1) { const [p] = [...pts.values()]; start = { x: p.x, y: p.y, tx, ty }; return; }
+    if (e.type === "pointerup" && wasTap) {
+      const now = Date.now();
+      if (now - lastTap < 300) { zoomAt(s > 1 ? 1 : 2.5, e.clientX, e.clientY); lastTap = 0; }
+      else lastTap = now;
+    }
+    start = null;
+  };
+  tr.addEventListener("pointerup", up); tr.addEventListener("pointercancel", up);
+  // Tipp neben das Bild schliesst
+  tr.addEventListener("click", (e) => { if (!e.target.closest("img") && s === 1 && !moved) closeViewer(); });
+  tr.addEventListener("wheel", (e) => {
+    const t = e.target.closest(".viewer img"); if (!t || !e.ctrlKey && Math.abs(e.deltaY) < 1) return;
+    if (img !== t) { reset(); img = t; }
+    e.preventDefault(); zoomAt(s * (e.deltaY < 0 ? 1.2 : 1 / 1.2), e.clientX, e.clientY);
+  }, { passive: false });
+  function reset() { if (img) img.style.transform = ""; s = 1; tx = ty = 0; img = null; pts.clear(); start = null; tr.classList.remove("zoomed"); }
+  return { reset };
+})();
+
 function closeDetail() { $("detail").hidden = true; document.body.style.overflow = ""; if (location.hash.startsWith("#d=")) history.replaceState(null, "", location.pathname); }
 $("dClose").addEventListener("click", closeDetail);
 document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("detail").hidden) closeDetail(); });
@@ -1079,8 +1204,8 @@ $("dBody").addEventListener("click", async (e) => {
     socialOp(`${PEOPLE[S.person]} Notiz`, (items) => { const it = items[k] || (items[k] = { votes: {}, comments: [] }); it.note = val; it.updated = new Date().toISOString(); });
     toast("Notiz gespeichert.", "ok"); return;
   }
-  const full = e.target.closest("img[data-full]");
-  if (full && full.src) { window.open(full.src, "_blank"); return; }
+  const zimg = e.target.closest(".gal img, .ownfiles img");
+  if (zimg && zimg.src) { openViewer(zimg); return; }
   const doc = e.target.closest("[data-doc]");
   if (doc) { e.preventDefault(); try { window.open(await repoFile(doc.dataset.doc), "_blank"); } catch { toast("Dokument nicht ladbar.", "err"); } return; }
   const sv = e.target.closest("#agSave");
@@ -1949,7 +2074,7 @@ let installEvt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("installBtn").hidden = false; $("installHint").hidden = true; });
 $("installBtn").addEventListener("click", async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("installBtn").hidden = true; });
 if (window.matchMedia("(display-mode: standalone)").matches) { $("installHint").textContent = "Läuft als App."; }
-const APP_VERSION = "43 · 19.10.2026";
+const APP_VERSION = "44 · 19.10.2026";
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").then((reg) => { reg.update().catch(() => {}); }).catch(() => {});
   let reloaded = false;
