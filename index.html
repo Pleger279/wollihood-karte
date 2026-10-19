@@ -62,6 +62,7 @@ a { color: var(--accent) }
 @keyframes spin { to { transform: rotate(360deg) } }
 .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); display: inline-block }
 .dot.bad { background: var(--bad) }
+.appbar .sub .stale { color: var(--bad) }
 
 /* Inhalt */
 main { padding: 14px max(16px, env(safe-area-inset-right, 0px)) calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px) + 24px) max(16px, env(safe-area-inset-left, 0px));
@@ -1428,13 +1429,40 @@ function sourceLink(name) {
   const page = (S.config?.watch_pages || []).find((p) => (p.name || p.url) === name);
   return page ? page.url : null;
 }
+// Letzter Suchlauf zu lange her? (nur tagsüber, nachts ruht die Suche)
+function runIsStale(h, minutes) {
+  if (!h?.last_run || h.paused) return false;
+  const hour = Number(new Intl.DateTimeFormat("de-CH", { hour: "numeric", hourCycle: "h23", timeZone: "Europe/Zurich" })
+    .formatToParts(new Date()).find((x) => x.type === "hour").value);
+  if (hour < 6) return false;
+  const age = (Date.now() - new Date(h.last_run)) / 60000;
+  const sinceSix = hour * 60 - 6 * 60 + new Date().getMinutes();     // morgens erst ab 6 Uhr messen
+  return age > minutes && sinceSix > minutes;
+}
+// Beim Öffnen: ist der letzte Lauf über 45 Min. her, gleich einen starten (höchstens alle 10 Min.)
+async function autoRun() {
+  const h = S.health;
+  if (!S.config || !runIsStale(h, 45)) return;
+  const last = +store.get("wh_autorun") || 0;
+  if (Date.now() - last < 10 * 60000) return;
+  store.set("wh_autorun", String(Date.now()));
+  try {
+    const c = structuredClone(S.config); c.requested_at = new Date().toISOString();
+    S.configSha = await writeJson("config.json", c, S.configSha, "Suche beim Öffnen gestartet");
+    S.config = c; S.autoRunAt = Date.now(); renderStatus();
+    setTimeout(load, 80000);
+  } catch (e) { /* nicht schlimm, der nächste Lauf kommt sowieso */ }
+}
 function renderStatus() {
   const h = S.health;
   const src = Object.entries(h?.sources || {});
   const bad = src.filter(([, v]) => !v.ok);
-  $("subline").innerHTML = h?.last_run
-    ? `<span class="dot ${bad.length || (h.push && !h.push.ok) ? "bad" : ""}"></span>${h.paused ? "Pausiert" : "Gesucht " + esc(ago(h.last_run))}`
-    : "Wohnungssuche Wollishofen";
+  const stale = runIsStale(h, 120);
+  $("subline").innerHTML = S.autoRunAt && Date.now() - S.autoRunAt < 120000
+    ? `<span class="dot"></span>Sucht gerade …`
+    : h?.last_run
+      ? `<span class="dot ${bad.length || (h.push && !h.push.ok) || stale ? "bad" : ""}"></span><span class="${stale ? "stale" : ""}">${h.paused ? "Pausiert" : "Gesucht " + esc(ago(h.last_run))}</span>`
+      : "Wohnungssuche Wollishofen";
   const live = S.hits.filter(inSavedArea).filter((x) => verdict(keyOf(x)) !== "out");
   // Quellen inkl. der einzelnen Abos (gelb oder rot zählt nicht als ok)
   const subs = Object.values(h?.newsletters || {});
@@ -1488,6 +1516,7 @@ async function load() {
   else if (marks.reason?.status === 404) { S.marks = JSON.parse(store.get("wh_marks") || "{}"); S.marksSha = null; }
   if (!S.filterChosen) { S.filter = S.hits.some(isNew) ? "new" : "all"; S.filterChosen = true; }
   renderHits(); renderStatus(); renderMarkers();
+  autoRun();
   $("refreshBtn").classList.remove("spin");
   applyDeep(true);
 }
@@ -1636,7 +1665,7 @@ let installEvt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("installBtn").hidden = false; $("installHint").hidden = true; });
 $("installBtn").addEventListener("click", async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("installBtn").hidden = true; });
 if (window.matchMedia("(display-mode: standalone)").matches) { $("installHint").textContent = "Läuft als App."; }
-const APP_VERSION = "37 · 18.10.2026";
+const APP_VERSION = "38 · 19.10.2026";
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").then((reg) => { reg.update().catch(() => {}); }).catch(() => {});
   let reloaded = false;
