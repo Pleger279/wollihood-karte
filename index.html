@@ -201,6 +201,8 @@ h2 { font: 20px/1.05 var(--display); letter-spacing: -.4px; text-transform: uppe
 .cform { display: grid; grid-template-columns: minmax(0, 1fr) auto; }
 .cform textarea.field { min-height: 48px; height: 48px; font-size: 15px; resize: none; border: 0; border-right: 1px solid var(--line) }
 .cform .btn { border: 0 }
+.ailine { margin: 8px 0 8px; padding: 8px 10px; background: var(--sunk); font: 600 14px/1.35 var(--body) }
+.ailine span { color: var(--accent); font-weight: 800 }
 .stline { display: flex; width: 100%; justify-content: space-between; align-items: center; gap: 8px; margin-top: 10px; padding: 10px 12px; background: var(--accent-soft); border: 0; border-left: 4px solid var(--accent); color: var(--fg); font: 600 14px var(--body); text-align: left; cursor: pointer }
 .stline b { font-weight: 800 }
 .standrow { display: grid; gap: 10px }
@@ -1343,6 +1345,7 @@ function renderHits() {
       <div class="body">
         <div class="addr">${esc(x.street || x.title || place)}</div>
         <div class="meta">${pubLabel(x)}${x.pushed ? " · Push gesendet" : x.push_skipped ? " · kein Push (" + esc(x.push_skipped) + ")" : ""}</div>
+        ${x.ai && x.ai.text ? `<div class="ailine"><span aria-hidden="true">✦</span> ${esc(x.ai.text)}</div>` : ""}
         <div class="srcs">Gefunden auf: ${sourcesHtml(x)}${agencyOf(x) ? ` · Verwaltung: <b>${esc(agencyOf(x))}</b>` : ""}</div>
         ${verdict(k) === "out" ? `<div class="notes">${itemOf(k).out ? "Aussortiert von " + esc(PEOPLE[itemOf(k).out.by] || "") : "Aussortiert: beide Daumen runter"}</div>` : ""}
         ${x.notes && x.notes.length ? `<div class="notes">${esc(x.notes.join(" · "))}</div>` : ""}
@@ -2093,7 +2096,7 @@ let installEvt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("installBtn").hidden = false; $("installHint").hidden = true; });
 $("installBtn").addEventListener("click", async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("installBtn").hidden = true; });
 if (window.matchMedia("(display-mode: standalone)").matches) { $("installHint").textContent = "Läuft als App."; }
-const APP_VERSION = "45 · 19.10.2026";
+const APP_VERSION = "46 · 21.10.2026";
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").then((reg) => { reg.update().catch(() => {}); }).catch(() => {});
   let reloaded = false;
