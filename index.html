@@ -753,7 +753,12 @@ if (navigator.serviceWorker) navigator.serviceWorker.addEventListener("message",
 function inSavedArea(x) {
   return x.lat == null || !S.config?.areas?.features?.length || inAreas(x.lat, x.lon, S.config.areas);
 }
+// Zeitpunkt des Aussortierens: von Hand gesetzt, sonst letzte Änderung (zweiter Daumen runter)
+function outTime(k) { const it = itemOf(k); return new Date(it.out?.at || it.updated || 0).getTime() || 0; }
+const dmy = (t) => (t ? new Date(t).toLocaleDateString("de-CH", { day: "2-digit", month: "2-digit" }) : "");
 function filtered() {
+  if (S.filter === "out") return S.hits.filter(inSavedArea).filter((x) => verdict(keyOf(x)) === "out")
+    .sort((a, b) => outTime(keyOf(b)) - outTime(keyOf(a)));
   return sortHits(S.hits).filter(inSavedArea).filter((x) => {
     const k = keyOf(x), v = verdict(k);
     if (S.filter === "out") return v === "out";
@@ -1347,7 +1352,7 @@ function renderHits() {
         <div class="meta">${pubLabel(x)}${x.pushed ? " · Push gesendet" : x.push_skipped ? " · kein Push (" + esc(x.push_skipped) + ")" : ""}</div>
         ${x.ai && x.ai.text ? `<div class="ailine"><span aria-hidden="true">✦</span> ${esc(x.ai.text)}</div>` : ""}
         <div class="srcs">Gefunden auf: ${sourcesHtml(x)}${agencyOf(x) ? ` · Verwaltung: <b>${esc(agencyOf(x))}</b>` : ""}</div>
-        ${verdict(k) === "out" ? `<div class="notes">${itemOf(k).out ? "Aussortiert von " + esc(PEOPLE[itemOf(k).out.by] || "") : "Aussortiert: beide Daumen runter"}</div>` : ""}
+        ${verdict(k) === "out" ? `<div class="notes">${itemOf(k).out ? "Aussortiert von " + esc(PEOPLE[itemOf(k).out.by] || "") : "Aussortiert: beide Daumen runter"}${outTime(k) ? " · " + dmy(outTime(k)) : ""}</div>` : ""}
         ${x.notes && x.notes.length ? `<div class="notes">${esc(x.notes.join(" · "))}</div>` : ""}
         ${x.swap || featKeys(x.features).length ? `<div class="tags">${x.swap ? '<span class="tag swap">Tausch</span>' : ""}${featKeys(x.features).map((k) => `<span class="tag">${esc(featShort(k))}</span>`).join("")}</div>` : ""}
         ${x.swap && x.swap_wants ? `<div class="wants"><b>Sucht:</b> ${esc(x.swap_wants)}</div>` : ""}
@@ -2096,7 +2101,7 @@ let installEvt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("installBtn").hidden = false; $("installHint").hidden = true; });
 $("installBtn").addEventListener("click", async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("installBtn").hidden = true; });
 if (window.matchMedia("(display-mode: standalone)").matches) { $("installHint").textContent = "Läuft als App."; }
-const APP_VERSION = "46 · 21.10.2026";
+const APP_VERSION = "47 · 22.10.2026";
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").then((reg) => { reg.update().catch(() => {}); }).catch(() => {});
   let reloaded = false;
