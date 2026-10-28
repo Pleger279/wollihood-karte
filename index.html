@@ -384,6 +384,9 @@ textarea.bewnote { min-height: 220px; font: 15px/1.5 Georgia, "Times New Roman",
 .drow label input { width: 18px; height: 18px; margin-top: 2px; flex: none }
 .drow small { display: block; color: var(--muted); font-size: 12px; margin-top: 1px }
 .drow small.old { color: var(--bad); font-weight: 700 } .drow small.soon { color: var(--warn); font-weight: 700 }
+.mv { display: grid; grid-template-rows: 1fr 1fr; gap: 2px; flex: none }
+.mv button { width: 34px; height: 21px; border: 1px solid var(--line); background: transparent; color: inherit; font: 800 13px/1 var(--body); cursor: pointer; padding: 0 }
+.mv button:disabled { opacity: .25; cursor: default }
 .drow .iconbtn { flex: none; display: inline-flex; align-items: center; justify-content: center; cursor: pointer }
 .jobbox { border-left: 3px solid var(--hair); padding: 2px 0 6px 10px; margin: 8px 0; display: grid; gap: 6px }
 #bStamm .f { margin-top: 4px }
@@ -2191,7 +2194,7 @@ let installEvt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("installBtn").hidden = false; $("installHint").hidden = true; });
 $("installBtn").addEventListener("click", async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("installBtn").hidden = true; });
 if (window.matchMedia("(display-mode: standalone)").matches) { $("installHint").textContent = "Läuft als App."; }
-const APP_VERSION = "55 · 29.10.2026";
+const APP_VERSION = "57 · 29.10.2026";
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").then((reg) => { reg.update().catch(() => {}); }).catch(() => {});
   let reloaded = false;
@@ -2354,6 +2357,7 @@ $("bBody").addEventListener("click", async (e) => {
   if (e.target.id === "bDossierPdf") return dossierPdf();
   if (e.target.id === "spSave") return stammSave();
   const dlb = e.target.closest("[data-dl]"); if (dlb) return dossierDownload(dlb.dataset.dl);
+  const mvb = e.target.closest("[data-mv]"); if (mvb) return dossierMove(mvb.dataset.mv, +mvb.dataset.dir);
   const bdel = e.target.closest("[data-bdel]");
   if (bdel) { BEW.doc.beilagen = (BEW.doc.beilagen || []).filter((b) => b.id !== bdel.dataset.bdel); renderDossier(); bewMark(); return; }
   const sadd = e.target.closest("[data-spadd]");
@@ -2751,7 +2755,9 @@ async function anschreibenBytes(ask = true) {
 // --- Personalien-Seite im Stil der Vorlage (Foto und Titel der Vorlage überdeckt) ---
 const dmyL = (iso) => { if (!iso) return ""; const m = String(iso).match(/^(\d{4})-(\d{2})(?:-(\d{2}))?/); if (!m) return String(iso);
   return m[3] ? `${+m[3]}.${+m[2]}.${m[1]}` : new Date(+m[1], +m[2] - 1, 1).toLocaleDateString("de-CH", { month: "long", year: "numeric" }); };
-const jobLine = (j) => [j.titel, j.arbeitgeber, j.pensum, j.seit ? "seit " + dmyL(j.seit) : "", j.bis ? "bis " + dmyL(j.bis) : ""].filter(Boolean).join(", ");
+// Zeile 1: Beruf, Arbeitgeber, seit · Zeile 2: Pensum, befristet bis
+const jobLine = (j) => [[j.titel, j.arbeitgeber, j.seit ? "seit " + dmyL(j.seit) : ""].filter(Boolean).join(", "),
+  [j.pensum, j.bis ? "befristet bis " + dmyL(j.bis) : ""].filter(Boolean).join(", ")].filter(Boolean).join("\n");
 async function personalienBytes() {
   const { pdf, pg, F } = await vorlagePage(), A = BEW.assets, st = BEW.ctx.stamm;
   const BG = [0.9373, 0.9216, 0.8941], ink = pcol(LAY.ink), acc = pcol(LAY.mark), hair = pcol([0.80, 0.78, 0.74]);
@@ -2784,7 +2790,7 @@ async function personalienBytes() {
   row("Heimatort", per((p) => [p.heimatort, p.nationalitaet].filter(Boolean).join(", ")));
   row("Telefon", per((p) => p.telefon || ""));
   row("E-Mail", per((p) => p.email || ""));
-  row("Beruf", per((p) => (p.jobs || []).map(jobLine).join("\n")));
+  row("Beruf", per((p) => (p.jobs || []).map(jobLine).join("\n\n")));
   row("Einkommen brutto", per((p) => p.einkommen || ""));
   pg.drawLine({ start: { x: 26, y: y + 2 }, end: { x: 557, y: y + 2 }, thickness: 0.5, color: hair });
   // Abschnitte; unten rechts liegt die blaue Fläche → dort schmaler setzen
@@ -2823,21 +2829,55 @@ function baustAlter(b) {
   const tage = Math.round((bis - new Date()) / 864e5);
   return { bis, tage, alt: tage < 0, bald: tage >= 0 && tage <= 14 };
 }
+// Reihenfolge: Bausteine wie in bausteine.json (gilt für alle); Beilagen einer Wohnung hängen hinter `nach` (Standard: Personalien)
 function dossierItems() {
   const bs = (BEW.ctx.bausteine || []).filter((b) => b.id !== "formular");
   const beil = (BEW.doc.beilagen || []).map((b) => ({ ...b, beilage: true }));
-  const i = bs.findIndex((b) => b.id === "personalien") + 1;
-  return [...bs.slice(0, i), ...beil, ...bs.slice(i)];
+  const out = beil.filter((b) => b.nach === "_start");
+  for (const b of bs) {
+    out.push(b);
+    out.push(...beil.filter((x) => (x.nach || "personalien") === b.id));
+  }
+  out.push(...beil.filter((x) => x.nach !== "_start" && !bs.some((b) => b.id === (x.nach || "personalien"))));
+  return out;
+}
+function reorderBy(list, order) {
+  const pos = new Map(order.map((id, i) => [id, i]));
+  const sorted = list.filter((b) => pos.has(b.id)).sort((a, b) => pos.get(a.id) - pos.get(b.id));
+  let k = 0; return list.map((b) => (pos.has(b.id) ? sorted[k++] : b));
+}
+const mvBtns = (attr, id, first, last) => `<span class="mv"><button type="button" ${attr}="${esc(id)}" data-dir="-1" aria-label="Nach oben"${first ? " disabled" : ""}>↑</button><button type="button" ${attr}="${esc(id)}" data-dir="1" aria-label="Nach unten"${last ? " disabled" : ""}>↓</button></span>`;
+let orderTimer = null;
+function dossierMove(id, dir) {
+  const items = dossierItems(), i = items.findIndex((x) => x.id === id), j = i + dir;
+  if (i < 0 || j < 0 || j >= items.length) return;
+  [items[i], items[j]] = [items[j], items[i]];
+  let prev = "_start"; const beil = [];
+  for (const it of items) { if (it.beilage) { const b = { ...BEW.doc.beilagen.find((x) => x.id === it.id), nach: prev }; beil.push(b); } else prev = it.id; }
+  const beilChanged = JSON.stringify(beil) !== JSON.stringify(BEW.doc.beilagen || []);
+  if (beil.length) BEW.doc.beilagen = beil;
+  const order = items.filter((x) => !x.beilage).map((x) => x.id);
+  const before = BEW.ctx.bausteine.filter((b) => b.id !== "formular").map((b) => b.id).join();
+  BEW.ctx.bausteine = reorderBy(BEW.ctx.bausteine, order);
+  renderDossier();
+  document.querySelector(`#bDossierList [data-mv="${CSS.escape(id)}"][data-dir="${dir}"]`)?.focus();
+  if (beilChanged) bewMark();
+  if (order.join() !== before) {
+    clearTimeout(orderTimer);
+    orderTimer = setTimeout(() => baustWrite((L) => { const r = reorderBy(L, order); L.splice(0, L.length, ...r); }, "Dossier-Reihenfolge geändert")
+      .then(() => toast("Reihenfolge gespeichert – gilt für alle Bewerbungen.", "ok")).catch((e) => toast("Reihenfolge nicht gespeichert: " + e.message, "err")), 1200);
+  }
 }
 const dossierOn = (b) => (BEW.doc.auswahl && b.id in BEW.doc.auswahl ? BEW.doc.auswahl[b.id] : b.beilage ? true : !!b.standard);
 function renderDossier() {
   const el = $("bDossierList"); if (!el) return;
-  el.innerHTML = dossierItems().map((b) => {
+  const all = dossierItems();
+  el.innerHTML = all.map((b, idx) => {
     const a = baustAlter(b);
     const chip = !a ? (b.datum ? `<small>${esc(dmyL(b.datum))}</small>` : "") : a.alt ? `<small class="old">zu alt seit ${esc(a.bis.toLocaleDateString("de-CH"))}</small>`
       : a.bald ? `<small class="soon">gültig bis ${esc(a.bis.toLocaleDateString("de-CH"))}</small>` : `<small>gültig bis ${esc(a.bis.toLocaleDateString("de-CH"))}</small>`;
     return `<div class="drow"><label><input type="checkbox" data-dsel="${esc(b.id)}"${dossierOn(b) ? " checked" : ""}><span>${esc(b.titel)}${chip}</span></label>
-      <button type="button" class="iconbtn" data-dl="${esc(b.id)}" aria-label="${esc(b.titel)} herunterladen">⬇</button>${b.beilage ? `<button type="button" class="iconbtn" data-bdel="${esc(b.id)}" aria-label="Entfernen">✕</button>` : ""}</div>`;
+      ${mvBtns("data-mv", b.id, idx === 0, idx === all.length - 1)}<button type="button" class="iconbtn" data-dl="${esc(b.id)}" aria-label="${esc(b.titel)} herunterladen">⬇</button>${b.beilage ? `<button type="button" class="iconbtn" data-bdel="${esc(b.id)}" aria-label="Entfernen">✕</button>` : ""}</div>`;
   }).join("");
 }
 async function itemBytes(b) {
@@ -2936,7 +2976,7 @@ function stammForm() {
     <button type="button" class="linkbtn" data-spadd="personen.${i}.jobs">+ Stelle hinzufügen</button>`).join("");
   const refs = (st.referenzen || []).map((r, k) => `<div class="jobbox">${inp(`referenzen.${k}.rolle`, "Rolle, z.B. Heutige Verwaltung")}
     <div class="row2">${inp(`referenzen.${k}.name`, "Name")}${inp(`referenzen.${k}.firma`, "Firma")}</div>
-    <div class="row2">${inp(`referenzen.${k}.telefon`, "Telefon", "tel")}${inp(`referenzen.${k}.email`, "E-Mail", "email")}</div>
+    <div class="row2">${inp(`referenzen.${k}.telefon`, "Telefon (mit Zusatz, z.B. «Teamleader»)")}${inp(`referenzen.${k}.email`, "E-Mail", "email")}</div>
     <button type="button" class="linkbtn" data-spdel="referenzen.${k}">Referenz entfernen</button></div>`).join("");
   return `${pers}
     <div class="ftitle sm">Haushalt</div>
@@ -2976,14 +3016,15 @@ async function baustRender() {
   if (!$("baustList")) return;
   try {
     const d = await baustLoad(); S.baust = d;
-    $("baustList").innerHTML = d.bausteine.filter((b) => b.datei).map((b) => {
+    const vis = d.bausteine.filter((b) => b.datei);
+    $("baustList").innerHTML = vis.map((b, idx) => {
       const a = baustAlter(b);
       return `<div class="drow"><label><input type="checkbox" data-bstd="${esc(b.id)}"${b.standard ? " checked" : ""}><span>${esc(b.titel)}
         <small class="${a?.alt ? "old" : a?.bald ? "soon" : ""}">${b.datum ? esc(dmyL(b.datum)) : "ohne Datum"}${a ? (a.alt ? " · zu alt" : " · gültig bis " + esc(a.bis.toLocaleDateString("de-CH"))) : ""}</small></span></label>
-        <button type="button" class="iconbtn" data-bview="${esc(b.datei)}" aria-label="Ansehen">👁</button>
+        ${mvBtns("data-bmv", b.id, idx === 0, idx === vis.length - 1)}<button type="button" class="iconbtn" data-bview="${esc(b.datei)}" aria-label="Ansehen">👁</button>
         <label class="iconbtn" aria-label="Ersetzen" title="Ersetzen">⟳<input type="file" accept="application/pdf,image/*" data-brep="${esc(b.id)}" hidden></label>
         <button type="button" class="iconbtn" data-bremove="${esc(b.id)}" aria-label="Löschen">✕</button></div>`;
-    }).join("") + '<p class="hint">Häkchen = standardmässig im Dossier.</p>';
+    }).join("") + '<p class="hint">Häkchen = standardmässig im Dossier. ↑↓ = Reihenfolge im Dossier (Anschreiben und Personalien stehen vorne; im Bewerbungs-Editor lässt sich alles verschieben).</p>';
   } catch (e) { $("baustList").innerHTML = `<p class="hint">Nicht ladbar: ${esc(e.message)}</p>`; }
 }
 async function toPdfBytes(file) {
@@ -3023,6 +3064,15 @@ $("baustList").addEventListener("change", async (e) => {
   }
 });
 $("baustList").addEventListener("click", async (e) => {
+  const mv = e.target.closest("[data-bmv]");
+  if (mv) {
+    const vis = (S.baust?.bausteine || []).filter((b) => b.datei).map((b) => b.id), i = vis.indexOf(mv.dataset.bmv), j = i + +mv.dataset.dir;
+    if (i < 0 || j < 0 || j >= vis.length) return;
+    [vis[i], vis[j]] = [vis[j], vis[i]];
+    try { await baustWrite((L) => { const r = reorderBy(L, vis); L.splice(0, L.length, ...r); }, "Dossier-Reihenfolge geändert"); toast("Reihenfolge gespeichert.", "ok"); }
+    catch (er) { toast(er.message, "err"); }
+    return;
+  }
   const v = e.target.closest("[data-bview]");
   if (v) { try { window.open(await repoFile("dossier/" + v.dataset.bview), "_blank"); } catch { toast("Nicht ladbar.", "err"); } return; }
   const del = e.target.closest("[data-bremove]");
