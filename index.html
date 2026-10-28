@@ -203,6 +203,7 @@ h2 { font: 20px/1.05 var(--display); letter-spacing: -.4px; text-transform: uppe
 .cform .btn { border: 0 }
 .ailine { margin: 8px 0 8px; padding: 8px 10px; background: var(--sunk); font: 600 14px/1.35 var(--body) }
 .ailine span { color: var(--accent); font-weight: 800 }
+.srchbtns { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px }
 .stline { display: flex; width: 100%; justify-content: space-between; align-items: center; gap: 8px; margin-top: 10px; padding: 10px 12px; background: var(--accent-soft); border: 0; border-left: 4px solid var(--accent); color: var(--fg); font: 600 14px var(--body); text-align: left; cursor: pointer }
 .stline b { font-weight: 800 }
 .standrow { display: grid; gap: 10px }
@@ -1107,6 +1108,7 @@ function renderDetail(x, a, d) {
     ${ownBlock(S.detailKey)}
     ${gal}
     ${facts}
+    ${searchPanel(x)}
     <div class="panel"><h2>Kontakt</h2><div class="contact">${lines.join("") || '<p class="hint">Keine Angaben.</p>'}${bookForm}</div></div>
     ${attrs ? `<div class="chips2">${attrs}</div>` : ""}
     ${desc ? `<div class="panel"><h2>Beschreibung</h2><div class="desc">${esc(desc)}</div></div>` : ""}
@@ -1255,6 +1257,28 @@ $("dBody").addEventListener("click", async (e) => {
   }
 });
 const firstUrl = (x) => (x.sources && x.sources[0] && x.sources[0].url) || x.url;
+// Tracking-Links aus Abo-Mails (z.B. Comparis), die Wollihood nicht auflösen kann
+const TRACK_RX = /links\.comparis\.ch|\/s\/c\/|list-manage\.com|mailchi\.mp|\/\/(click|clicks|track|trk|email)\.|sendgrid\.net/i;
+function unresolved(x) {
+  const all = [x.url, ...(x.sources || []).map((s) => s.url), ...(x.also_urls || [])].filter(Boolean);
+  return all.length > 0 && all.every((u) => TRACK_RX.test(u));
+}
+function searchPanel(x) {
+  if (!unresolved(x)) return "";
+  const plz = x.plz || "", street = x.street || "";
+  const g = (q) => "https://www.google.com/search?q=" + encodeURIComponent(q);
+  const links = [];
+  if (street) links.push(["Google", g(`"${street}" ${plz} Wohnung mieten`)]);
+  if (street) links.push(["Comparis", g(`"${street}" site:comparis.ch`)]);
+  if (/^80\d\d$/.test(plz)) {
+    links.push(["Homegate", `https://www.homegate.ch/rent/apartment/zip-${plz}/matching-list`]);
+    links.push(["ImmoScout24", `https://www.immoscout24.ch/en/flat/rent/postcode-${plz}-zuerich`]);
+  }
+  if (!links.length) return "";
+  return `<div class="panel"><h2>Inserat suchen</h2>
+    <p class="hint">Der Link aus der Abo-Mail lässt sich nicht direkt öffnen (Weiterleitung des Portals). Hier findest du das Inserat${street ? ` mit «${esc(street)}»` : ""} trotzdem:</p>
+    <div class="srchbtns">${links.map(([n, u]) => `<a class="btn" href="${esc(u)}" target="_blank" rel="noopener">${esc(n)}</a>`).join("")}</div></div>`;
+}
 // Fundstellen: zuerst gefunden zuerst, jede antippbar
 function sourcesHtml(x) {
   const list = (x.sources && x.sources.length ? x.sources : [{ portal: x.portal, url: x.url, at: x.first_seen }])
@@ -2101,7 +2125,7 @@ let installEvt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("installBtn").hidden = false; $("installHint").hidden = true; });
 $("installBtn").addEventListener("click", async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("installBtn").hidden = true; });
 if (window.matchMedia("(display-mode: standalone)").matches) { $("installHint").textContent = "Läuft als App."; }
-const APP_VERSION = "48 · 28.10.2026";
+const APP_VERSION = "49 · 28.10.2026";
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").then((reg) => { reg.update().catch(() => {}); }).catch(() => {});
   let reloaded = false;
