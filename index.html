@@ -376,6 +376,11 @@ textarea.bewnote { min-height: 220px; font: 15px/1.5 Georgia, "Times New Roman",
 .diff del { background: color-mix(in srgb, var(--bad) 22%, transparent) }
 .doclink { display: inline-block; margin: 10px 14px 0 0; color: var(--accent); font-weight: 800; text-decoration: none }
 .warnline { color: var(--warn); font-weight: 700 }
+.learn { border: 2px solid var(--accent); background: var(--accent-soft); padding: 10px 12px; margin-top: 10px }
+.lrule { display: flex; gap: 10px; align-items: flex-start; padding: 6px 0; font-size: 14px; line-height: 1.4 }
+.lrule input { margin-top: 3px; width: 18px; height: 18px; flex: none }
+.lrule small, .lrow small { display: block; color: var(--muted); font-size: 12.5px; margin-top: 2px }
+.lrow { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; padding: 8px 0; border-top: 1px solid var(--hair); font-size: 14px; line-height: 1.4 }
 </style>
 </head>
 <body>
@@ -523,6 +528,12 @@ textarea.bewnote { min-height: 220px; font: 15px/1.5 Georgia, "Times New Roman",
       <p class="hint">Für Entwurf, Hinweise und Rechtschreibprüfung im Bewerbungs-Editor. Der Schlüssel stammt aus console.anthropic.com (nicht vom Claude-Abo), wird im privaten Repo gespeichert und gilt für euch beide.</p>
       <label class="f" for="kiKey"><small>API-Schlüssel</small><input class="field" id="kiKey" type="password" autocomplete="off" placeholder="sk-ant-…"></label>
       <button class="btn primary" id="kiSave" type="button">Schlüssel prüfen und speichern</button>
+    </div>
+    <div class="panel" id="lernPanel">
+      <h2>Gelernte Schreibregeln</h2>
+      <p class="hint">Claude lernt aus euren Änderungen im Bewerbungs-Editor und hält sich bei jedem Text an diese Regeln. Gilt für euch beide.</p>
+      <div id="lernList"><p class="hint">Lade …</p></div>
+      <div class="addrow" style="margin-top:10px"><input class="field" id="lernNew" placeholder="Eigene Regel, z.B. «Nie ‹hiermit› schreiben»"><button class="btn" id="lernAdd" type="button">Hinzufügen</button></div>
     </div>
     <div class="panel" id="digestPanel">
         <h2>Tägliches Briefing</h2>
@@ -2153,7 +2164,7 @@ let installEvt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("installBtn").hidden = false; $("installHint").hidden = true; });
 $("installBtn").addEventListener("click", async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("installBtn").hidden = true; });
 if (window.matchMedia("(display-mode: standalone)").matches) { $("installHint").textContent = "Läuft als App."; }
-const APP_VERSION = "50 · 28.10.2026";
+const APP_VERSION = "51 · 28.10.2026";
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").then((reg) => { reg.update().catch(() => {}); }).catch(() => {});
   let reloaded = false;
@@ -2194,15 +2205,17 @@ async function repoText(path) { const d = await gh(path); return b64decode(d.con
 async function bewCtx() {
   if (BEW.ctx) return BEW.ctx;
   const [stamm, stil, vorlage] = await Promise.all([readJson("dossier/stammdaten.json"), repoText("dossier/stil/texte.md"), readJson("dossier/vorlage/anschreiben.json")]);
-  BEW.ctx = { stamm: stamm.data, stil, vorlage: vorlage.data, key: null };
+  BEW.ctx = { stamm: stamm.data, stil, vorlage: vorlage.data, key: null, regeln: [], fertige: [] };
   try { BEW.ctx.key = (await readJson("dossier/ki.json")).data.anthropic_key || null; } catch { }
+  try { BEW.ctx.regeln = (await readJson(LERN_PATH)).data.regeln || []; } catch { }
+  try { BEW.ctx.fertige = (await readJson(FERTIG_PATH)).data.anschreiben || []; } catch { }
   return BEW.ctx;
 }
 function bewNew() {
   const x = BEW.x, v = BEW.ctx.vorlage;
   const ort = [x.plz, (x.city || "Zürich").replace(/^Zurich$/, "Zürich")].filter(Boolean).join(" ");
   return { adresse: [x.street, ort].filter(Boolean).join(", ") || "[Adresse]", anrede: v.anrede || "Guten Tag", name: "",
-    text: v.text, bemerkung: "", hinweise: [], created: new Date().toISOString() };
+    text: v.text, bemerkung: "", hinweise: [], created: new Date().toISOString(), ki: { text: v.text, bemerkung: "" } };
 }
 function bewClose() { $("bew").hidden = true; if ($("detail").hidden) document.body.style.overflow = ""; refreshDetail(); }
 $("bClose").addEventListener("click", () => { bewRead(); bewSave(true).finally(bewClose); });
@@ -2217,6 +2230,7 @@ async function openBew(k) {
   $("bBody").innerHTML = '<p class="hint">Lade …</p>';
   try { await bewCtx(); } catch (e) { $("bBody").innerHTML = `<p class="hint">Dossier nicht ladbar: ${esc(e.message)}</p>`; return; }
   try { const r = await readJson(bewPath()); BEW.doc = r.data; BEW.sha = r.sha; } catch { BEW.doc = bewNew(); BEW.sha = null; }
+  if (!BEW.doc.ki) BEW.doc.ki = { text: BEW.doc.text, bemerkung: BEW.doc.bemerkung || "" };
   BEW.prev = null; BEW.saved = JSON.stringify(BEW.doc);
   renderBew();
 }
@@ -2245,11 +2259,13 @@ function renderBew() {
       </div>
       <div class="addrow"><input class="field" id="bInstr" placeholder="Anweisung, z.B. «kürze es»" enterkeyhint="send"><button type="button" class="btn" data-ki="anweisung">Anwenden</button></div>
       <p class="hint" id="bState" aria-live="polite"></p>
+      <div id="bLearn"></div>
       <div id="bTips"></div>
       <div id="bDiff"></div>
     </div>
     <div class="panel"><h2>PDF</h2>
       <div class="brow"><button type="button" class="btn primary" id="bPdf">PDF erstellen</button><button type="button" class="btn" id="bSave">Speichern</button></div>
+      <div class="brow"><button type="button" class="linkbtn" id="bGrund">Diese Fassung als Grundtext für künftige Bewerbungen übernehmen</button></div>
       <div id="bPdfLink">${doc.pdf ? `<a href="#" class="doclink" data-doc="${esc(doc.pdf)}">📄 Letztes PDF (${esc(ago(doc.pdf_at))})</a>` : ""}</div>
     </div>`;
   bewTips(); bewCount();
@@ -2278,7 +2294,9 @@ async function bewSave(quiet) {
   if (!quiet) toast("Gespeichert.", "ok");
 }
 $("bBody").addEventListener("click", async (e) => {
-  if (e.target.id === "bSave") return bewSave(false);
+  if (e.target.id === "bSave") { bewLearnMaybe(); return bewSave(false); }
+  if (e.target.id === "bGrund") return bewGrundtext();
+  if (e.target.id === "bLearnOk" || e.target.id === "bLearnNo") return bewLearnDecide(e.target.id === "bLearnOk");
   if (e.target.id === "bCopy") { try { await navigator.clipboard.writeText($("bNote").value); toast("Bemerkung kopiert.", "ok"); } catch { $("bNote").select(); toast("Markiert – jetzt kopieren.", ""); } return; }
   if (e.target.id === "bPdf") return bewPdf();
   if (e.target.id === "bUndo") { bewUndo(); return; }
@@ -2301,6 +2319,7 @@ Regeln:
 - Bei Genossenschaften das gemeinschaftliche Wohnen betonen, bei privaten Verwaltungen eher Verlässlichkeit und Stabilität.
 - Die Anrede steht NICHT im Anschreiben-Text (sie wird separat gewählt). Absätze im Anschreiben durch eine Leerzeile trennen; der Schluss ist «Über eine positive Rückmeldung …», dann «Freundliche Grüsse» und in der nächsten Zeile «Leonie, Pascal und Lio».
 - Hinweise (Stolpersteine): höchstens 6, kurz und konkret. Prüfe Widersprüche zwischen Anschreiben, Bemerkung, Stammdaten und Inserat, falsche oder veraltete Fakten, riskante oder missverständliche Sätze, Floskeln, Länge (das Anschreiben muss auf eine Seite passen: höchstens etwa 230 Wörter). «stelle» ist ein wörtliches, kurzes Zitat aus dem betroffenen Text (oder leer). Keine Hinweise auf offene [Platzhalter], die sind bekannt.
+- Die gelernten Regeln stammen aus Änderungen, die Leonie und Pascal von Hand gemacht haben. Sie haben Vorrang vor allgemeinen Stilregeln.
 - Antworte ausschliesslich mit dem Werkzeug «bewerbung».`;
 const BEW_TOOL = { name: "bewerbung", description: "Ergebnis: beide Texte (vollständig) und Hinweise.",
   input_schema: { type: "object", required: ["anschreiben", "bemerkung", "hinweise"], properties: {
@@ -2335,6 +2354,14 @@ ${JSON.stringify(c.stamm, null, 1)}
 ${c.stil}
 </stil_und_fruehere_texte>
 
+<gelernte_regeln>
+${(c.regeln || []).map((r) => "- " + r.regel).join("\n") || "(noch keine)"}
+</gelernte_regeln>
+
+<fertige_anschreiben_als_stilbeispiel>
+${(c.fertige || []).filter((f) => f.adresse !== doc.adresse).slice(0, 3).map((f) => `[${f.adresse}]\n${f.text}`).join("\n\n") || "(noch keine)"}
+</fertige_anschreiben_als_stilbeispiel>
+
 <vorlage_anschreiben>
 ${c.vorlage.text}
 </vorlage_anschreiben>
@@ -2359,16 +2386,19 @@ ${doc.bemerkung || "(noch leer)"}
 <auftrag>
 ${BEW_AUFTRAG[mode]}${instr ? `\nAnweisung: ${instr}` : ""}
 </auftrag>`;
+  return claudeTool(BEW_SYSTEM, user, BEW_TOOL, "anschreiben");
+}
+async function claudeTool(system, user, tool, need) {
   const r = await fetch("https://api.anthropic.com/v1/messages", { method: "POST",
-    headers: { "content-type": "application/json", "x-api-key": c.key, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
-    body: JSON.stringify({ model: S.config?.ai?.model || "claude-opus-5-5", max_tokens: 6000, system: BEW_SYSTEM, tools: [BEW_TOOL],
+    headers: { "content-type": "application/json", "x-api-key": BEW.ctx.key, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
+    body: JSON.stringify({ model: S.config?.ai?.model || "claude-opus-5-5", max_tokens: 6000, system, tools: [tool],
       tool_choice: { type: "auto" }, messages: [{ role: "user", content: user }] }) });
   let j = {}; try { j = await r.json(); } catch { }
   if (!r.ok) throw new Error(r.status === 401 ? "Der Claude-Schlüssel ist ungültig." : j?.error?.message || `Claude meldet Fehler ${r.status}.`);
   const tu = (j.content || []).find((b) => b.type === "tool_use");
-  if (tu?.input?.anschreiben != null) return tu.input;
+  if (tu?.input?.[need] != null) return tu.input;
   const t = (j.content || []).filter((b) => b.type === "text").map((b) => b.text).join("");
-  const m = t.match(/\{[\s\S]*\}/); if (m) { try { return JSON.parse(m[0]); } catch { } }
+  const m = t.match(/\{[\s\S]*\}/); if (m) { try { const o = JSON.parse(m[0]); if (o[need] != null) return o; } catch { } }
   throw new Error("Claude hat nicht im erwarteten Format geantwortet.");
 }
 async function bewKi(mode) {
@@ -2380,6 +2410,7 @@ async function bewKi(mode) {
   const label = { entwurf: "schreibt den Entwurf", anweisung: "setzt die Anweisung um", pruefen: "prüft die Rechtschreibung", hinweise: "sucht Stolpersteine" }[mode];
   $("bState").textContent = `Claude ${label} … (ca. 20–40 Sek.)`;
   const before = { text: bewRead().text, bemerkung: BEW.doc.bemerkung };
+  if (mode !== "hinweise") bewLearnMaybe();
   try {
     const res = await claudeCall(mode, instr);
     const text = String(res.anschreiben || "").replace(/\r/g, "").trim(), note = String(res.bemerkung || "").replace(/\r/g, "").trim();
@@ -2395,6 +2426,7 @@ async function bewKi(mode) {
     $("bState").textContent = mode === "pruefen" ? (changed ? "Korrekturen sind unten markiert." : "Keine Fehler gefunden.")
       : changed ? "Fertig. Änderungen sind unten markiert." : "Fertig.";
     if (mode === "anweisung") $("bInstr").value = "";
+    if (mode !== "hinweise") BEW.doc.ki = { text: BEW.doc.text, bemerkung: BEW.doc.bemerkung || "", at: new Date().toISOString() };
     bewSave(true);
   } catch (e) { $("bState").textContent = "Fehler: " + e.message; }
   finally { BEW.busy = false; document.querySelectorAll("#bClaude [data-ki]").forEach((b) => (b.disabled = false)); }
@@ -2438,8 +2470,103 @@ function bewUndo() {
   if (!BEW.prev) return;
   $("bText").value = BEW.prev.text; $("bNote").value = BEW.prev.bemerkung || "";
   BEW.prev = null; bewRead(); bewCount(); $("bDiff").innerHTML = ""; $("bState").textContent = "Rückgängig gemacht.";
+  BEW.doc.ki = { text: BEW.doc.text, bemerkung: BEW.doc.bemerkung || "", at: new Date().toISOString() };
   bewSave(true);
 }
+
+// --- Dazulernen aus Änderungen von Hand ---
+const LERN_PATH = "dossier/stil/gelernt.json", FERTIG_PATH = "dossier/stil/fertige.json";
+const LERN_SYSTEM = `Du lernst den Schreibstil von Leonie und Pascal für Wohnungsbewerbungen.
+Du bekommst eine Fassung (vorher, meist von Claude) und ihre von Hand bearbeitete Fassung (nachher).
+Leite daraus allgemeine Schreibregeln ab, die auch für künftige Bewerbungen gelten: Wortwahl, Ton, typische Formulierungen,
+was sie streichen, ergänzen oder umstellen, Länge, Zeichensetzung.
+Keine Regeln zu Inhalten, die nur diese Wohnung betreffen (Adresse, was ihnen gefallen hat, Ansprechperson, Bezugstermin)
+und keine einmaligen Fakten. Keine Regeln, die es schon gibt. Jede Regel als kurzer Satz in der Befehlsform auf Deutsch
+(Schweizer Schreibweise), dazu ein Beispiel «vorher → nachher». Höchstens 4 Regeln. Wenn nichts Allgemeines erkennbar ist,
+gib eine leere Liste zurück. Antworte nur mit dem Werkzeug «regeln».`;
+const LERN_TOOL = { name: "regeln", description: "Allgemeine Schreibregeln aus den Änderungen von Hand.",
+  input_schema: { type: "object", required: ["regeln"], properties: { regeln: { type: "array",
+    items: { type: "object", required: ["regel"], properties: { regel: { type: "string" }, beispiel: { type: "string" } } } } } } };
+function bewLearnMaybe() {
+  bewRead();
+  const base = BEW.doc.ki, cur = { text: BEW.doc.text, bemerkung: BEW.doc.bemerkung || "" };
+  if (!base || !BEW.ctx?.key) return;
+  if (base.text === cur.text && (base.bemerkung || "") === cur.bemerkung) return;
+  BEW.doc.ki = { ...cur, at: new Date().toISOString() };   // neue Basis: dieselben Änderungen nicht nochmals lernen
+  const part = (t, a, b) => (a || "") === (b || "") ? "" : `--- ${t} vorher ---\n${a || "(leer)"}\n--- ${t} nachher ---\n${b || "(leer)"}\n\n`;
+  const user = `<bestehende_regeln>\n${(BEW.ctx.regeln || []).map((r) => "- " + r.regel).join("\n") || "(noch keine)"}\n</bestehende_regeln>\n\n<aenderungen>\n${part("Anschreiben", base.text, cur.text)}${part("Bemerkung", base.bemerkung, cur.bemerkung)}</aenderungen>`;
+  claudeTool(LERN_SYSTEM, user, LERN_TOOL, "regeln").then((res) => {
+    const neu = (res.regeln || []).filter((r) => r && r.regel).slice(0, 4);
+    if (!neu.length || $("bew").hidden) return;
+    BEW.learn = neu; bewLearnShow();
+    toast("Claude hat aus euren Änderungen etwas gelernt – bitte bestätigen.", "", 6000);
+  }).catch(() => { });
+}
+function bewLearnShow() {
+  const L = BEW.learn || [];
+  $("bLearn").innerHTML = !L.length ? "" : `<div class="learn"><div class="ftitle sm">Das habe ich aus euren Änderungen gelernt – merken?</div>
+    ${L.map((r, i) => `<label class="lrule"><input type="checkbox" data-lr="${i}" checked><span>${esc(r.regel)}${r.beispiel ? `<small>${esc(r.beispiel)}</small>` : ""}</span></label>`).join("")}
+    <div class="brow"><button type="button" class="btn primary" id="bLearnOk">Merken</button><button type="button" class="btn" id="bLearnNo">Verwerfen</button></div></div>`;
+  $("bLearn").scrollIntoView({ block: "nearest", behavior: "smooth" });
+}
+async function bewLearnDecide(ok) {
+  const pick = ok ? [...document.querySelectorAll("#bLearn [data-lr]")].filter((c) => c.checked).map((c) => BEW.learn[+c.dataset.lr]) : [];
+  BEW.learn = null; $("bLearn").innerHTML = "";
+  if (!pick.length) return;
+  try {
+    await lernSave((list) => list.concat(pick.map((r) => ({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
+      regel: r.regel, beispiel: r.beispiel || "", by: S.person, at: new Date().toISOString() }))), "Schreibregel gelernt");
+    toast(pick.length === 1 ? "Regel gemerkt." : `${pick.length} Regeln gemerkt.`, "ok");
+  } catch (e) { toast("Merken fehlgeschlagen: " + e.message, "err"); }
+}
+async function lernSave(fn, msg) {
+  let sha = null, data = { regeln: [] };
+  try { const r = await readJson(LERN_PATH); sha = r.sha; data = r.data; } catch (e) { if (e.status !== 404) throw e; }
+  data.regeln = fn(data.regeln || []);
+  await writeJson(LERN_PATH, data, sha, msg);
+  if (BEW.ctx) BEW.ctx.regeln = data.regeln;
+  lernList(data.regeln);
+}
+async function bewFertig() {
+  let sha = null, data = { anschreiben: [] };
+  try { const r = await readJson(FERTIG_PATH); sha = r.sha; data = r.data; } catch (e) { if (e.status !== 404) throw e; }
+  const list = (data.anschreiben || []).filter((f) => f.adresse !== BEW.doc.adresse);
+  list.unshift({ adresse: BEW.doc.adresse, text: BEW.doc.text, at: new Date().toISOString() });
+  data.anschreiben = list.slice(0, 5);
+  await writeJson(FERTIG_PATH, data, sha, `Fertiges Anschreiben: ${BEW.doc.adresse}`);
+  BEW.ctx.fertige = data.anschreiben;
+}
+async function bewGrundtext() {
+  bewRead();
+  if (!confirm("Diese Fassung wird zum Grundtext für alle künftigen Bewerbungen. Adresse und Wohnungsspezifisches passt Claude beim nächsten Entwurf wieder an. Übernehmen?")) return;
+  try {
+    const r = await readJson("dossier/vorlage/anschreiben.json");
+    const street = (BEW.x.street || "").trim();
+    let text = BEW.doc.text;
+    if (street) text = text.split(street).join("[Strasse Nr.]");
+    r.data.text = text; r.data.grundtext_von = { adresse: BEW.doc.adresse, by: S.person, at: new Date().toISOString() };
+    await writeJson("dossier/vorlage/anschreiben.json", r.data, r.sha, `Neuer Grundtext (aus ${BEW.doc.adresse})`);
+    BEW.ctx.vorlage = r.data;
+    toast("Grundtext übernommen.", "ok");
+  } catch (e) { toast("Übernehmen fehlgeschlagen: " + e.message, "err"); }
+}
+// Optionen: gelernte Regeln ansehen, löschen, eigene ergänzen
+function lernList(list) {
+  if (!$("lernList")) return;
+  $("lernList").innerHTML = (list || []).length ? list.map((r) => `<div class="lrow"><span>${esc(r.regel)}${r.beispiel ? `<small>${esc(r.beispiel)}</small>` : ""}</span>
+    <button type="button" class="iconbtn" data-lrdel="${esc(r.id)}" aria-label="Regel löschen">✕</button></div>`).join("")
+    : '<p class="hint">Noch keine. Sobald ihr Claudes Text von Hand ändert, schlägt Claude hier Regeln vor.</p>';
+}
+async function lernLoad() { try { lernList((await readJson(LERN_PATH)).data.regeln); } catch { lernList([]); } }
+$("lernList").addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-lrdel]"); if (!b || !confirm("Diese Regel löschen?")) return;
+  try { await lernSave((l) => l.filter((r) => r.id !== b.dataset.lrdel), "Schreibregel gelöscht"); toast("Gelöscht.", "ok"); } catch (e2) { toast(e2.message, "err"); }
+});
+$("lernAdd").addEventListener("click", async () => {
+  const t = $("lernNew").value.trim(); if (!t) return;
+  try { await lernSave((l) => l.concat([{ id: Date.now().toString(36), regel: t, beispiel: "", by: S.person, at: new Date().toISOString() }]), "Schreibregel ergänzt");
+    $("lernNew").value = ""; toast("Regel ergänzt.", "ok"); } catch (e) { toast(e.message, "err"); }
+});
 
 // --- PDF auf der Canva-Vorlage (Masse aus der Vorlage gemessen, wie tools/anschreiben.py im privaten Repo) ---
 const PDFLIBS = ["https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js",
@@ -2527,7 +2654,9 @@ async function bewPdf() {
       body: JSON.stringify({ message: `Bewerbung PDF: ${BEW.x.street || BEW.k}`, content: await blobB64(blob), branch: "main", ...(sha ? { sha } : {}) }) });
     fileCache.delete(path);
     BEW.doc.pdf = path; BEW.doc.pdf_at = new Date().toISOString();
+    bewLearnMaybe();
     await bewSave(true);
+    bewFertig().catch(() => { });
     const url = URL.createObjectURL(blob);
     $("bPdfLink").innerHTML = `<a class="doclink" href="${url}" target="_blank" rel="noopener">📄 PDF öffnen</a> <a class="doclink" href="${url}" download="${esc(name)}">⬇ Herunterladen</a>`;
     toast("PDF erstellt und gespeichert.", "ok");
@@ -2553,7 +2682,7 @@ $("kiSave").addEventListener("click", async () => {
   } catch (e) { toast(e.message, "err"); }
   finally { $("kiSave").disabled = false; }
 });
-if (S.token) setTimeout(() => kiState(), 1200);
+if (S.token) setTimeout(() => { kiState(); lernLoad(); }, 1200);
 </script>
 </body>
 </html>
