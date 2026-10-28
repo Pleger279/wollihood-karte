@@ -1,0 +1,22 @@
+name: App-Check
+# Schutz vor kaputten Releases: Service Worker vorhanden und mit Push-Anzeige, Versionen passen zusammen.
+on: [push]
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          node -e '
+          const fs = require("fs");
+          const sw = fs.readFileSync("sw.js", "utf8"), html = fs.readFileSync("index.html", "utf8");
+          const fail = (m) => { console.error("FEHLER: " + m); process.exit(1); };
+          if (sw.trim().length < 500) fail("sw.js ist leer oder zu kurz");
+          for (const ev of ["install", "fetch", "push", "notificationclick"])
+            if (!sw.includes(`addEventListener("${ev}"`)) fail(`sw.js: Handler «${ev}» fehlt`);
+          new Function(sw);
+          const swv = (sw.match(/wollihood-v(\d+)/) || [])[1], appv = (html.match(/APP_VERSION = "(\d+)/) || [])[1];
+          if (!swv || swv !== appv) fail(`Versionen passen nicht: sw.js v${swv}, App v${appv}`);
+          const man = JSON.parse(fs.readFileSync("manifest.webmanifest", "utf8"));
+          if (!man.share_target) fail("manifest: share_target fehlt");
+          console.log("OK: App v" + appv);'
