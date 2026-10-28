@@ -366,6 +366,7 @@ details.adv:not([open]) { display: block }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important } }
 /* Bewerbung */
 .bewsheet { z-index: 60 }
+.toast.float { position: fixed; left: 16px; right: 16px; bottom: calc(env(safe-area-inset-bottom, 0px) + 16px); z-index: 95; box-shadow: 0 6px 20px rgba(0,0,0,.25) }
 .brow { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; align-items: center }
 .brow .btn { flex: 1 1 auto }
 textarea.bewtext { min-height: 62vh; font: 16px/1.55 Georgia, "Times New Roman", serif; margin-top: 10px }
@@ -699,14 +700,16 @@ function ago(iso) {
   return d.toLocaleDateString("de-CH", { day: "2-digit", month: "2-digit" });
 }
 let toastTimer;
+// Über offenen Fenstern (Details, Bewerbung) schwebt die Meldung, sonst sitzt sie in der Speicherleiste.
+const sheetOpen = () => [...document.querySelectorAll(".sheet")].some((s) => !s.hidden);
 function toastAction(text, label, fn, ms = 6000) {
-  const t = $("toast"); t.className = "toast act"; t.hidden = false;
+  const t = $("toast"); t.className = "toast act" + (sheetOpen() ? " float" : ""); t.hidden = false;
   t.innerHTML = `<span>${esc(text)}</span><button type="button" class="tbtn">${esc(label)}</button>`;
   t.querySelector("button").onclick = () => { t.hidden = true; fn(); };
   clearTimeout(toastTimer); toastTimer = setTimeout(() => (t.hidden = true), ms);
 }
 function toast(text, cls = "", ms = 4000) {
-  const t = $("toast"); t.textContent = text; t.className = "toast " + cls; t.hidden = false;
+  const t = $("toast"); t.textContent = text; t.className = "toast " + cls + (sheetOpen() ? " float" : ""); t.hidden = false;
   clearTimeout(toastTimer); if (ms) toastTimer = setTimeout(() => (t.hidden = true), ms);
 }
 const accent = () => getComputedStyle(document.documentElement).getPropertyValue("--accent").trim() || "#2F6B4F";
@@ -2188,7 +2191,7 @@ let installEvt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("installBtn").hidden = false; $("installHint").hidden = true; });
 $("installBtn").addEventListener("click", async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("installBtn").hidden = true; });
 if (window.matchMedia("(display-mode: standalone)").matches) { $("installHint").textContent = "Läuft als App."; }
-const APP_VERSION = "54 · 28.10.2026";
+const APP_VERSION = "55 · 29.10.2026";
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").then((reg) => { reg.update().catch(() => {}); }).catch(() => {});
   let reloaded = false;
@@ -2955,12 +2958,16 @@ function stammCollect() {
 }
 function renderStamm() { if ($("bStammBody")) $("bStammBody").innerHTML = stammForm(); }
 async function stammSave() {
+  const b = $("spSave"); if (b.disabled) return;
   stammCollect();
+  b.disabled = true; b.textContent = "Speichere …";
   try {
     const r = await readJson("dossier/stammdaten.json");
     await writeJson("dossier/stammdaten.json", BEW.ctx.stamm, r.sha, `Personalien geändert (${PEOPLE[S.person] || ""})`);
+    b.textContent = "Gespeichert ✓";
     toast("Personalien gespeichert – gelten für alle Bewerbungen.", "ok");
-  } catch (e) { toast("Speichern fehlgeschlagen: " + e.message, "err"); }
+  } catch (e) { b.textContent = "Personalien speichern"; toast("Speichern fehlgeschlagen: " + e.message, "err"); }
+  finally { b.disabled = false; setTimeout(() => { if ($("spSave")?.textContent === "Gespeichert ✓") $("spSave").textContent = "Personalien speichern"; }, 2500); }
 }
 
 // --- Optionen: Dossier-Bausteine verwalten ---
