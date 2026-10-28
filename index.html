@@ -388,8 +388,17 @@ textarea.bewnote { min-height: 220px; font: 15px/1.5 Georgia, "Times New Roman",
 .mv button { width: 34px; height: 21px; border: 1px solid var(--line); background: transparent; color: inherit; font: 800 13px/1 var(--body); cursor: pointer; padding: 0 }
 .mv button:disabled { opacity: .25; cursor: default }
 .drow .iconbtn { flex: none; display: inline-flex; align-items: center; justify-content: center; cursor: pointer }
-.jobbox { border-left: 3px solid var(--hair); padding: 2px 0 6px 10px; margin: 8px 0; display: grid; gap: 6px }
-#bStamm .f { margin-top: 4px }
+#bStamm .sf { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 10px; align-items: start; padding: 4px 0; border-bottom: 1px solid var(--hair) }
+#bStamm .sf > span { font: 600 12.5px/1.3 var(--body); color: var(--muted); padding-top: 7px; overflow-wrap: anywhere }
+#bStamm .sfin { font: 400 15px/1.35 var(--body); color: var(--fg); background: var(--surface); border: 1px solid var(--hair); border-radius: 0;
+  padding: 5px 8px; width: 100%; min-width: 0; resize: none; overflow: hidden; display: block }
+#bStamm select.sfin { appearance: auto; padding: 5px 6px }
+#bStamm .sfin:focus { border-color: var(--accent); outline: none }
+.sfhead { font: 800 12px var(--body); text-transform: uppercase; letter-spacing: .12em; margin: 18px 0 4px }
+.sfsub { font: 700 12px var(--body); color: var(--muted); margin-bottom: 2px }
+.sfbox { background: var(--sunk); padding: 8px 10px; margin: 8px 0 }
+.sfbox .sf { border-bottom-color: var(--bg) }
+.sfbox .linkbtn { margin-top: 6px }
 .learn { border: 2px solid var(--accent); background: var(--accent-soft); padding: 10px 12px; margin-top: 10px }
 .lrule { display: flex; gap: 10px; align-items: flex-start; padding: 6px 0; font-size: 14px; line-height: 1.4 }
 .lrule input { margin-top: 3px; width: 18px; height: 18px; flex: none }
@@ -2194,7 +2203,7 @@ let installEvt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("installBtn").hidden = false; $("installHint").hidden = true; });
 $("installBtn").addEventListener("click", async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("installBtn").hidden = true; });
 if (window.matchMedia("(display-mode: standalone)").matches) { $("installHint").textContent = "Läuft als App."; }
-const APP_VERSION = "57 · 29.10.2026";
+const APP_VERSION = "58 · 29.10.2026";
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").then((reg) => { reg.update().catch(() => {}); }).catch(() => {});
   let reloaded = false;
@@ -2374,7 +2383,10 @@ $("bBody").addEventListener("click", async (e) => {
   const ki = e.target.closest("[data-ki]"); if (ki) bewKi(ki.dataset.ki);
 });
 document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("bew").hidden) { e.stopImmediatePropagation(); bewTryClose(); } }, true);
-$("bBody").addEventListener("keydown", (e) => { if (e.target.id === "bInstr" && e.key === "Enter") { e.preventDefault(); bewKi("anweisung"); } });
+$("bBody").addEventListener("input", (e) => { if (e.target.matches("textarea.sfin")) sfFit(e.target); });
+$("bBody").addEventListener("toggle", (e) => { if (e.target.id === "bStamm" && e.target.open) sfFitAll(); }, true);
+$("bBody").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && e.target.matches("textarea.sfin")) { e.preventDefault(); return; } if (e.target.id === "bInstr" && e.key === "Enter") { e.preventDefault(); bewKi("anweisung"); } });
 
 // --- Claude ---
 const BEW_SYSTEM = `Du hilfst Leonie Meier und Pascal Stadelmann (mit Sohn Lio) bei Wohnungsbewerbungen in Zürich-Wollishofen.
@@ -2964,39 +2976,44 @@ const spGet = (o, p) => p.split(".").reduce((a, k) => (a == null ? a : a[k]), o)
 function spSet(o, p, v) { const ks = p.split("."); let a = o; ks.slice(0, -1).forEach((k, i) => { if (a[k] == null) a[k] = /^\d+$/.test(ks[i + 1]) ? [] : {}; a = a[k]; }); a[ks.at(-1)] = v; }
 function stammForm() {
   const st = BEW.ctx.stamm;
-  const inp = (p, label, type = "text") => `<label class="f"><small>${esc(label)}</small><input class="field" data-sp="${p}" type="${type}" value="${esc(spGet(st, p) ?? "")}"></label>`;
-  const yn = (p, label) => `<label class="f"><small>${esc(label)}</small><select class="field" data-sp="${p}" data-bool>${["nein", "ja"].map((o, i) => `<option value="${i}"${!!spGet(st, p) === !!i ? " selected" : ""}>${o}</option>`).join("")}</select></label>`;
-  const pers = (st.personen || []).map((p, i) => `<div class="ftitle sm">${esc(p.vorname)} ${esc(p.nachname)}</div>
-    <div class="row2">${inp(`personen.${i}.telefon`, "Telefon")}${inp(`personen.${i}.email`, "E-Mail", "email")}</div>
-    <div class="row2">${inp(`personen.${i}.zivilstand`, "Zivilstand")}${inp(`personen.${i}.einkommen`, "Einkommen brutto (Personalien)")}</div>
-    ${(p.jobs || []).map((j, k) => `<div class="jobbox"><div class="row2">${inp(`personen.${i}.jobs.${k}.titel`, "Beruf")}${inp(`personen.${i}.jobs.${k}.arbeitgeber`, "Arbeitgeber")}</div>
-      <div class="row2">${inp(`personen.${i}.jobs.${k}.pensum`, "Pensum")}${inp(`personen.${i}.jobs.${k}.brutto_pa`, "Einkommen (für Formulare)")}</div>
-      <div class="row2">${inp(`personen.${i}.jobs.${k}.seit`, "seit", "date")}${inp(`personen.${i}.jobs.${k}.bis`, "bis (leer = unbefristet)", "date")}</div>
+  // Kompakt: eine Spalte, Label links, Wert rechts; Text bricht um (Textfeld wächst mit)
+  const inp = (p, label, type = "text") => `<label class="sf"><span>${esc(label)}</span>${type === "date"
+    ? `<input class="sfin" data-sp="${p}" type="date" value="${esc(spGet(st, p) ?? "")}">`
+    : `<textarea class="sfin" data-sp="${p}" rows="1"${type === "number" ? ' inputmode="numeric" data-num' : ""}>${esc(spGet(st, p) ?? "")}</textarea>`}</label>`;
+  const yn = (p, label) => `<label class="sf"><span>${esc(label)}</span><select class="sfin" data-sp="${p}" data-bool>${["nein", "ja"].map((o, i) => `<option value="${i}"${!!spGet(st, p) === !!i ? " selected" : ""}>${o}</option>`).join("")}</select></label>`;
+  const pers = (st.personen || []).map((p, i) => `<div class="sfhead">${esc(p.vorname)} ${esc(p.nachname)}</div>
+    ${inp(`personen.${i}.telefon`, "Telefon")}${inp(`personen.${i}.email`, "E-Mail")}
+    ${inp(`personen.${i}.zivilstand`, "Zivilstand")}${inp(`personen.${i}.einkommen`, "Einkommen (Personalien)")}
+    ${(p.jobs || []).map((j, k) => `<div class="sfbox"><div class="sfsub">Stelle ${k + 1}</div>
+      ${inp(`personen.${i}.jobs.${k}.titel`, "Beruf")}${inp(`personen.${i}.jobs.${k}.arbeitgeber`, "Arbeitgeber")}
+      ${inp(`personen.${i}.jobs.${k}.pensum`, "Pensum")}${inp(`personen.${i}.jobs.${k}.brutto_pa`, "Einkommen (Formulare)")}
+      ${inp(`personen.${i}.jobs.${k}.seit`, "seit", "date")}${inp(`personen.${i}.jobs.${k}.bis`, "befristet bis", "date")}
       <button type="button" class="linkbtn" data-spdel="personen.${i}.jobs.${k}">Stelle entfernen</button></div>`).join("")}
     <button type="button" class="linkbtn" data-spadd="personen.${i}.jobs">+ Stelle hinzufügen</button>`).join("");
-  const refs = (st.referenzen || []).map((r, k) => `<div class="jobbox">${inp(`referenzen.${k}.rolle`, "Rolle, z.B. Heutige Verwaltung")}
-    <div class="row2">${inp(`referenzen.${k}.name`, "Name")}${inp(`referenzen.${k}.firma`, "Firma")}</div>
-    <div class="row2">${inp(`referenzen.${k}.telefon`, "Telefon (mit Zusatz, z.B. «Teamleader»)")}${inp(`referenzen.${k}.email`, "E-Mail", "email")}</div>
+  const refs = (st.referenzen || []).map((r, k) => `<div class="sfbox">
+    ${inp(`referenzen.${k}.rolle`, "Rolle")}${inp(`referenzen.${k}.name`, "Name")}${inp(`referenzen.${k}.firma`, "Firma")}
+    ${inp(`referenzen.${k}.telefon`, "Telefon")}${inp(`referenzen.${k}.email`, "E-Mail")}
     <button type="button" class="linkbtn" data-spdel="referenzen.${k}">Referenz entfernen</button></div>`).join("");
   return `${pers}
-    <div class="ftitle sm">Haushalt</div>
-    <div class="row2">${yn("haushalt.haustiere", "Haustiere")}${yn("haushalt.raucher", "Rauchen")}</div>
-    <div class="row2">${yn("haushalt.musikinstrumente", "Musikinstrumente")}${inp("haushalt.fahrzeug", "Fahrzeug")}</div>
-    <div class="ftitle sm">Heutige Wohnung</div>
-    ${inp("wohnen.adresse", "Adresse")}
-    <div class="row2">${inp("wohnen.seit", "seit", "date")}${inp("wohnen.miete_brutto", "Mietzins brutto (CHF)", "number")}</div>
-    ${inp("wohnen.vermieter", "Verwaltung")}
-    <div class="ftitle sm">Referenzen</div>${refs}
+    <div class="sfhead">Haushalt</div>
+    ${yn("haushalt.haustiere", "Haustiere")}${yn("haushalt.raucher", "Rauchen")}${yn("haushalt.musikinstrumente", "Musikinstrumente")}${inp("haushalt.fahrzeug", "Fahrzeug")}
+    <div class="sfhead">Heutige Wohnung</div>
+    ${inp("wohnen.adresse", "Adresse")}${inp("wohnen.seit", "seit", "date")}${inp("wohnen.miete_brutto", "Mietzins brutto (CHF)", "number")}${inp("wohnen.vermieter", "Verwaltung")}
+    <div class="sfhead">Referenzen</div><p class="hint">Zusätze wie «Teamleader» einfach ins Feld schreiben.</p>${refs}
     <button type="button" class="linkbtn" data-spadd="referenzen">+ Referenz hinzufügen</button>
     <div class="brow"><button type="button" class="btn primary" id="spSave">Personalien speichern</button></div>`;
 }
+function sfFit(el) { if (el.tagName !== "TEXTAREA") return; el.style.height = "auto"; el.style.height = el.scrollHeight + "px"; }
+const sfFitAll = () => document.querySelectorAll("#bStamm textarea.sfin").forEach(sfFit);
 function stammCollect() {
   document.querySelectorAll("#bStamm [data-sp]").forEach((el) => {
-    let v = el.value; if (el.hasAttribute("data-bool")) v = v === "1"; else if (el.type === "number") v = v === "" ? null : Number(v); else v = v.trim() || null;
+    let v = el.value; if (el.hasAttribute("data-bool")) v = v === "1";
+    else if (el.hasAttribute("data-num")) { const t = v.replace(/[^\d.]/g, ""); v = t === "" ? null : Number(t); }
+    else v = v.replace(/\s*\n\s*/g, " ").trim() || null;
     spSet(BEW.ctx.stamm, el.dataset.sp, v);
   });
 }
-function renderStamm() { if ($("bStammBody")) $("bStammBody").innerHTML = stammForm(); }
+function renderStamm() { if ($("bStammBody")) { $("bStammBody").innerHTML = stammForm(); requestAnimationFrame(sfFitAll); } }
 async function stammSave() {
   const b = $("spSave"); if (b.disabled) return;
   stammCollect();
