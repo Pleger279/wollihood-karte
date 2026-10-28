@@ -2164,7 +2164,7 @@ let installEvt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("installBtn").hidden = false; $("installHint").hidden = true; });
 $("installBtn").addEventListener("click", async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("installBtn").hidden = true; });
 if (window.matchMedia("(display-mode: standalone)").matches) { $("installHint").textContent = "Läuft als App."; }
-const APP_VERSION = "51 · 28.10.2026";
+const APP_VERSION = "52 · 28.10.2026";
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").then((reg) => { reg.update().catch(() => {}); }).catch(() => {});
   let reloaded = false;
@@ -2218,7 +2218,11 @@ function bewNew() {
     text: v.text, bemerkung: "", hinweise: [], created: new Date().toISOString(), ki: { text: v.text, bemerkung: "" } };
 }
 function bewClose() { $("bew").hidden = true; if ($("detail").hidden) document.body.style.overflow = ""; refreshDetail(); }
-$("bClose").addEventListener("click", () => { bewRead(); bewSave(true).finally(bewClose); });
+function bewTryClose() {
+  if (bewDirty() && !confirm("Ihr habt nicht gespeicherte Änderungen. Ohne Speichern schliessen?")) return;
+  bewClose();
+}
+$("bClose").addEventListener("click", bewTryClose);
 
 async function openBew(k) {
   if (needPerson()) return;
@@ -2231,7 +2235,7 @@ async function openBew(k) {
   try { await bewCtx(); } catch (e) { $("bBody").innerHTML = `<p class="hint">Dossier nicht ladbar: ${esc(e.message)}</p>`; return; }
   try { const r = await readJson(bewPath()); BEW.doc = r.data; BEW.sha = r.sha; } catch { BEW.doc = bewNew(); BEW.sha = null; }
   if (!BEW.doc.ki) BEW.doc.ki = { text: BEW.doc.text, bemerkung: BEW.doc.bemerkung || "" };
-  BEW.prev = null; BEW.saved = JSON.stringify(BEW.doc);
+  BEW.prev = null; BEW.saved = bewFields();
   renderBew();
 }
 function renderBew() {
@@ -2264,11 +2268,12 @@ function renderBew() {
       <div id="bDiff"></div>
     </div>
     <div class="panel"><h2>PDF</h2>
-      <div class="brow"><button type="button" class="btn primary" id="bPdf">PDF erstellen</button><button type="button" class="btn" id="bSave">Speichern</button></div>
+      <div class="brow"><button type="button" class="btn primary" id="bPdf">PDF erstellen</button><button type="button" class="btn" id="bSave">Gespeichert</button></div>
+      <p class="hint warnline" id="bDirty" hidden>Nicht gespeicherte Änderungen – «Speichern» tippen. «PDF erstellen» speichert auch.</p>
       <div class="brow"><button type="button" class="linkbtn" id="bGrund">Diese Fassung als Grundtext für künftige Bewerbungen übernehmen</button></div>
       <div id="bPdfLink">${doc.pdf ? `<a href="#" class="doclink" data-doc="${esc(doc.pdf)}">📄 Letztes PDF (${esc(ago(doc.pdf_at))})</a>` : ""}</div>
     </div>`;
-  bewTips(); bewCount();
+  bewTips(); bewCount(); bewMark();
 }
 function bewRead() {
   if (!$("bText")) return BEW.doc;
@@ -2277,11 +2282,19 @@ function bewRead() {
   return BEW.doc;
 }
 function bewCount() { const n = ($("bNote")?.value || "").length; if ($("bCount")) $("bCount").textContent = n ? `${n} Zeichen` : ""; }
-$("bBody").addEventListener("input", (e) => { if (e.target.id === "bNote") bewCount(); });
+$("bBody").addEventListener("input", (e) => { if (e.target.id === "bNote") bewCount(); if (/^b(Text|Note|Adr|Name)$/.test(e.target.id)) bewMark(); });
+$("bBody").addEventListener("change", (e) => { if (e.target.id === "bAnrede") bewMark(); });
+// Gespeichert wird nur mit «Speichern» (und beim PDF). Schliessen mit ✕ verwirft nach Rückfrage.
+const bewFields = () => { const d = BEW.doc || {}; return JSON.stringify([d.adresse, d.anrede, d.name, d.text, d.bemerkung || ""]); };
+function bewDirty() { if (!$("bText")) return false; bewRead(); return bewFields() !== BEW.saved; }
+function bewMark() {
+  const b = $("bSave"); if (!b) return;
+  const dirty = bewDirty();
+  b.classList.toggle("primary", dirty); b.textContent = dirty ? "Speichern" : "Gespeichert";
+  if ($("bDirty")) $("bDirty").hidden = !dirty;
+}
 async function bewSave(quiet) {
   bewRead();
-  const s = JSON.stringify(BEW.doc);
-  if (quiet && s === BEW.saved) return;
   BEW.doc.updated = new Date().toISOString(); BEW.doc.by = S.person;
   const msg = `Bewerbung: ${BEW.x.street || BEW.k}`;
   try { BEW.sha = await writeJson(bewPath(), BEW.doc, BEW.sha, msg); }
@@ -2290,7 +2303,7 @@ async function bewSave(quiet) {
     try { BEW.sha = (await readJson(bewPath())).sha; BEW.sha = await writeJson(bewPath(), BEW.doc, BEW.sha, msg); }
     catch (e2) { toast("Speichern fehlgeschlagen: " + e2.message, "err"); return; }
   }
-  BEW.saved = JSON.stringify(BEW.doc);
+  BEW.saved = bewFields(); bewMark();
   if (!quiet) toast("Gespeichert.", "ok");
 }
 $("bBody").addEventListener("click", async (e) => {
@@ -2305,7 +2318,7 @@ $("bBody").addEventListener("click", async (e) => {
   const tip = e.target.closest("[data-stelle]"); if (tip) { bewShow(tip.dataset.stelle); return; }
   const ki = e.target.closest("[data-ki]"); if (ki) bewKi(ki.dataset.ki);
 });
-document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("bew").hidden) { e.stopImmediatePropagation(); bewRead(); bewSave(true).finally(bewClose); } }, true);
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("bew").hidden) { e.stopImmediatePropagation(); bewTryClose(); } }, true);
 $("bBody").addEventListener("keydown", (e) => { if (e.target.id === "bInstr" && e.key === "Enter") { e.preventDefault(); bewKi("anweisung"); } });
 
 // --- Claude ---
@@ -2427,7 +2440,7 @@ async function bewKi(mode) {
       : changed ? "Fertig. Änderungen sind unten markiert." : "Fertig.";
     if (mode === "anweisung") $("bInstr").value = "";
     if (mode !== "hinweise") BEW.doc.ki = { text: BEW.doc.text, bemerkung: BEW.doc.bemerkung || "", at: new Date().toISOString() };
-    bewSave(true);
+    bewMark();
   } catch (e) { $("bState").textContent = "Fehler: " + e.message; }
   finally { BEW.busy = false; document.querySelectorAll("#bClaude [data-ki]").forEach((b) => (b.disabled = false)); }
 }
@@ -2471,7 +2484,7 @@ function bewUndo() {
   $("bText").value = BEW.prev.text; $("bNote").value = BEW.prev.bemerkung || "";
   BEW.prev = null; bewRead(); bewCount(); $("bDiff").innerHTML = ""; $("bState").textContent = "Rückgängig gemacht.";
   BEW.doc.ki = { text: BEW.doc.text, bemerkung: BEW.doc.bemerkung || "", at: new Date().toISOString() };
-  bewSave(true);
+  bewMark();
 }
 
 // --- Dazulernen aus Änderungen von Hand ---
