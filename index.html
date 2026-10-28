@@ -362,6 +362,20 @@ details.adv:not([open]) { display: block }
 .leaflet-control-layers { display: none }
 
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important } }
+/* Bewerbung */
+.bewsheet { z-index: 60 }
+.brow { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; align-items: center }
+.brow .btn { flex: 1 1 auto }
+textarea.bewtext { min-height: 62vh; font: 16px/1.55 Georgia, "Times New Roman", serif; margin-top: 10px }
+textarea.bewnote { min-height: 220px; font: 15px/1.5 Georgia, "Times New Roman", serif }
+#bClaude .addrow { margin-top: 10px }
+.tip { border-left: 4px solid var(--warn); background: var(--sunk); padding: 8px 10px; margin-top: 6px; font-size: 14px; line-height: 1.4 }
+.linkbtn { background: none; border: 0; color: var(--accent); font: 800 13px var(--body); padding: 0; cursor: pointer; text-decoration: underline }
+.diff { white-space: pre-wrap; font-size: 14px; line-height: 1.5; border: 1px solid var(--hair); padding: 8px 10px; overflow-wrap: anywhere }
+.diff ins { background: color-mix(in srgb, var(--ok) 28%, transparent); text-decoration: none }
+.diff del { background: color-mix(in srgb, var(--bad) 22%, transparent) }
+.doclink { display: inline-block; margin: 10px 14px 0 0; color: var(--accent); font-weight: 800; text-decoration: none }
+.warnline { color: var(--warn); font-weight: 700 }
 </style>
 </head>
 <body>
@@ -503,6 +517,13 @@ details.adv:not([open]) { display: block }
         <button class="btn" id="wpOff" type="button" hidden>Abmelden</button>
       </div>
     </div>
+    <div class="panel" id="kiPanel">
+      <h2>Claude für Bewerbungen</h2>
+      <p class="hint" id="kiState">Prüfe …</p>
+      <p class="hint">Für Entwurf, Hinweise und Rechtschreibprüfung im Bewerbungs-Editor. Der Schlüssel stammt aus console.anthropic.com (nicht vom Claude-Abo), wird im privaten Repo gespeichert und gilt für euch beide.</p>
+      <label class="f" for="kiKey"><small>API-Schlüssel</small><input class="field" id="kiKey" type="password" autocomplete="off" placeholder="sk-ant-…"></label>
+      <button class="btn primary" id="kiSave" type="button">Schlüssel prüfen und speichern</button>
+    </div>
     <div class="panel" id="digestPanel">
         <h2>Tägliches Briefing</h2>
         <p class="hint">Eine Mail mit allen neuen Wohnungen seit dem letzten Briefing, mit Foto und Link. Welche Wohnungen darin vorkommen, legst du unter Suche → «Push &amp; Mail» fest. Gilt für euch beide.</p>
@@ -555,6 +576,11 @@ details.adv:not([open]) { display: block }
   <div class="sheet" id="detail" hidden role="dialog" aria-modal="true" aria-labelledby="dTitle">
     <div class="sheethead"><b id="dTitle">Details</b><button type="button" class="iconbtn" id="dClose" aria-label="Schliessen">✕</button></div>
     <div class="sheetbody" id="dBody"></div>
+  </div>
+  <!-- Bewerbung -->
+  <div class="sheet bewsheet" id="bew" hidden role="dialog" aria-modal="true" aria-labelledby="bTitle">
+    <div class="sheethead"><b id="bTitle">Bewerbung</b><button type="button" class="iconbtn" id="bClose" aria-label="Schliessen">✕</button></div>
+    <div class="sheetbody" id="bBody"></div>
   </div>
   <div class="viewer" id="viewer" hidden role="dialog" aria-modal="true" aria-label="Bild gross">
     <div class="vtrack" id="vTrack"></div>
@@ -1105,6 +1131,7 @@ function renderDetail(x, a, d) {
   $("dBody").innerHTML = `
     ${onl || '<div class="onl">Noch nicht gesichert. Neue Treffer, Favoriten und Wohnungen mit Stand sichert Wollihood beim nächsten Suchlauf.</div>'}
     ${standPanel(S.detailKey)}
+    ${bewPanel()}
     ${ownBlock(S.detailKey)}
     ${gal}
     ${facts}
@@ -1116,6 +1143,7 @@ function renderDetail(x, a, d) {
     <div class="srcs" style="padding:0">Gefunden auf: ${sourcesHtml(x)}${mail ? " · " + mail : ""}</div>`;
   // Bilder aus dem privaten Repo nachladen
   $("dBody").querySelectorAll("img[data-src]").forEach((img) => repoFile(img.dataset.src).then((u) => (img.src = u)).catch(() => img.closest("figure")?.remove()));
+  bewProbe(S.detailKey);
 }
 // ---------- Eigene Dateien, Notiz, «Teilen → Wollihood» ----------
 async function aidOf(k) {
@@ -2125,7 +2153,7 @@ let installEvt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("installBtn").hidden = false; $("installHint").hidden = true; });
 $("installBtn").addEventListener("click", async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("installBtn").hidden = true; });
 if (window.matchMedia("(display-mode: standalone)").matches) { $("installHint").textContent = "Läuft als App."; }
-const APP_VERSION = "49 · 28.10.2026";
+const APP_VERSION = "50 · 28.10.2026";
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").then((reg) => { reg.update().catch(() => {}); }).catch(() => {});
   let reloaded = false;
@@ -2134,6 +2162,398 @@ if ("serviceWorker" in navigator) {
 
 $("appVersion").textContent = "App-Version " + APP_VERSION;
 S.token ? showApp() : showSetup();
+</script>
+<script>
+"use strict";
+// ---------- Bewerbung: Anschreiben + Bemerkung mit Claude, PDF auf der Canva-Vorlage ----------
+// Persönliche Daten (Stammdaten, Vorlage, Schriften, Claude-Schlüssel) liegen nur im privaten Repo unter dossier/.
+const BEW = { k: null, aid: null, x: null, d: null, doc: null, sha: null, ctx: null, prev: null, busy: false };
+const ANREDEN = ["Guten Tag", "Liebe Frau", "Lieber Herr", "Sehr geehrte Frau", "Sehr geehrter Herr", "Sehr geehrte Damen und Herren"];
+const bewPath = (f = "anschreiben.json") => `archiv/${BEW.aid}/bewerbung/${f}`;
+const anredeZeile = (a, n) => (n && a !== "Sehr geehrte Damen und Herren" ? `${a} ${n.trim()}` : a);
+
+function bewPanel() {
+  return `<div class="panel" id="dBew"><h2>Bewerbung</h2>
+    <p class="hint" id="dBewInfo">Anschreiben und Bemerkung mit Claude vorbereiten, PDF auf eurer Vorlage.</p>
+    <div class="brow"><button type="button" class="btn primary" data-bew>Bewerbung erstellen</button></div><div id="dBewPdf"></div></div>`;
+}
+async function bewProbe(k) {
+  try {
+    const aid = await aidOf(k);
+    const r = await readJson(`archiv/${aid}/bewerbung/anschreiben.json`);
+    if (S.detailKey !== k || !$("dBew")) return;
+    const doc = r.data;
+    $("dBew").querySelector("[data-bew]").textContent = "Bewerbung bearbeiten";
+    $("dBewInfo").textContent = `Zuletzt bearbeitet${doc.by ? " von " + (PEOPLE[doc.by] || doc.by) : ""}, ${ago(doc.updated)}.`;
+    if (doc.pdf) $("dBewPdf").innerHTML = `<a href="#" class="doclink" data-doc="${esc(doc.pdf)}">📄 Anschreiben (PDF, ${esc(ago(doc.pdf_at))})</a>`;
+  } catch { /* noch keine Bewerbung */ }
+}
+$("dBody").addEventListener("click", (e) => { if (e.target.closest("[data-bew]")) openBew(S.detailKey); });
+
+async function repoText(path) { const d = await gh(path); return b64decode(d.content); }
+async function bewCtx() {
+  if (BEW.ctx) return BEW.ctx;
+  const [stamm, stil, vorlage] = await Promise.all([readJson("dossier/stammdaten.json"), repoText("dossier/stil/texte.md"), readJson("dossier/vorlage/anschreiben.json")]);
+  BEW.ctx = { stamm: stamm.data, stil, vorlage: vorlage.data, key: null };
+  try { BEW.ctx.key = (await readJson("dossier/ki.json")).data.anthropic_key || null; } catch { }
+  return BEW.ctx;
+}
+function bewNew() {
+  const x = BEW.x, v = BEW.ctx.vorlage;
+  const ort = [x.plz, (x.city || "Zürich").replace(/^Zurich$/, "Zürich")].filter(Boolean).join(" ");
+  return { adresse: [x.street, ort].filter(Boolean).join(", ") || "[Adresse]", anrede: v.anrede || "Guten Tag", name: "",
+    text: v.text, bemerkung: "", hinweise: [], created: new Date().toISOString() };
+}
+function bewClose() { $("bew").hidden = true; if ($("detail").hidden) document.body.style.overflow = ""; refreshDetail(); }
+$("bClose").addEventListener("click", () => { bewRead(); bewSave(true).finally(bewClose); });
+
+async function openBew(k) {
+  if (needPerson()) return;
+  BEW.k = k; BEW.x = S.hits.find((h) => keyOf(h) === k) || {}; BEW.aid = await aidOf(k);
+  const a = archEntry(BEW.x); BEW.d = null;
+  if (a) { try { BEW.d = (await readJson(`archiv/${a.id}/data.json`)).data; } catch { } }
+  $("bTitle").textContent = "Bewerbung · " + (BEW.x.street || "Wohnung");
+  $("bew").hidden = false; document.body.style.overflow = "hidden";
+  $("bBody").innerHTML = '<p class="hint">Lade …</p>';
+  try { await bewCtx(); } catch (e) { $("bBody").innerHTML = `<p class="hint">Dossier nicht ladbar: ${esc(e.message)}</p>`; return; }
+  try { const r = await readJson(bewPath()); BEW.doc = r.data; BEW.sha = r.sha; } catch { BEW.doc = bewNew(); BEW.sha = null; }
+  BEW.prev = null; BEW.saved = JSON.stringify(BEW.doc);
+  renderBew();
+}
+function renderBew() {
+  const doc = BEW.doc;
+  $("bBody").innerHTML = `
+    <div class="panel"><h2>Anschreiben</h2>
+      <label class="f" for="bAdr"><small>Adresse unter «Wohnungsbewerbung»</small><input class="field" id="bAdr" value="${esc(doc.adresse)}"></label>
+      <div class="row2">
+        <label class="f" for="bAnrede"><small>Anrede</small><select class="field" id="bAnrede">${ANREDEN.map((a) => `<option${a === doc.anrede ? " selected" : ""}>${a}</option>`).join("")}</select></label>
+        <label class="f" for="bName"><small>Name</small><input class="field" id="bName" value="${esc(doc.name || "")}" placeholder="z.B. Muster"></label>
+      </div>
+      <textarea class="field bewtext" id="bText" spellcheck="true" lang="de-CH">${esc(doc.text)}</textarea>
+      <p class="hint">Absätze mit einer Leerzeile trennen. Text in [eckigen Klammern] ist noch offen und erscheint im PDF blau.</p>
+    </div>
+    <div class="panel"><h2>Bemerkung fürs Online-Formular</h2>
+      <textarea class="field bewnote" id="bNote" spellcheck="true" lang="de-CH" placeholder="Wird mit «Entwurf für diese Wohnung» erstellt.">${esc(doc.bemerkung || "")}</textarea>
+      <div class="brow"><button type="button" class="btn" id="bCopy">Kopieren</button><span class="hint" id="bCount"></span></div>
+    </div>
+    <div class="panel" id="bClaude"><h2>Claude</h2>
+      ${BEW.ctx.key ? "" : '<p class="hint warnline">Noch kein Claude-Schlüssel hinterlegt: Optionen → «Claude für Bewerbungen». Ihr könnt trotzdem schreiben und das PDF erstellen.</p>'}
+      <div class="brow">
+        <button type="button" class="btn primary" data-ki="entwurf">Entwurf für diese Wohnung</button>
+        <button type="button" class="btn" data-ki="hinweise">Stolpersteine prüfen</button>
+        <button type="button" class="btn" data-ki="pruefen">Rechtschreibung prüfen</button>
+      </div>
+      <div class="addrow"><input class="field" id="bInstr" placeholder="Anweisung, z.B. «kürze es»" enterkeyhint="send"><button type="button" class="btn" data-ki="anweisung">Anwenden</button></div>
+      <p class="hint" id="bState" aria-live="polite"></p>
+      <div id="bTips"></div>
+      <div id="bDiff"></div>
+    </div>
+    <div class="panel"><h2>PDF</h2>
+      <div class="brow"><button type="button" class="btn primary" id="bPdf">PDF erstellen</button><button type="button" class="btn" id="bSave">Speichern</button></div>
+      <div id="bPdfLink">${doc.pdf ? `<a href="#" class="doclink" data-doc="${esc(doc.pdf)}">📄 Letztes PDF (${esc(ago(doc.pdf_at))})</a>` : ""}</div>
+    </div>`;
+  bewTips(); bewCount();
+}
+function bewRead() {
+  if (!$("bText")) return BEW.doc;
+  Object.assign(BEW.doc, { adresse: $("bAdr").value.trim(), anrede: $("bAnrede").value, name: $("bName").value.trim(),
+    text: $("bText").value.replace(/\r/g, ""), bemerkung: $("bNote").value.replace(/\r/g, "") });
+  return BEW.doc;
+}
+function bewCount() { const n = ($("bNote")?.value || "").length; if ($("bCount")) $("bCount").textContent = n ? `${n} Zeichen` : ""; }
+$("bBody").addEventListener("input", (e) => { if (e.target.id === "bNote") bewCount(); });
+async function bewSave(quiet) {
+  bewRead();
+  const s = JSON.stringify(BEW.doc);
+  if (quiet && s === BEW.saved) return;
+  BEW.doc.updated = new Date().toISOString(); BEW.doc.by = S.person;
+  const msg = `Bewerbung: ${BEW.x.street || BEW.k}`;
+  try { BEW.sha = await writeJson(bewPath(), BEW.doc, BEW.sha, msg); }
+  catch (e) {
+    if (e.status !== 409) { toast("Speichern fehlgeschlagen: " + e.message, "err"); return; }
+    try { BEW.sha = (await readJson(bewPath())).sha; BEW.sha = await writeJson(bewPath(), BEW.doc, BEW.sha, msg); }
+    catch (e2) { toast("Speichern fehlgeschlagen: " + e2.message, "err"); return; }
+  }
+  BEW.saved = JSON.stringify(BEW.doc);
+  if (!quiet) toast("Gespeichert.", "ok");
+}
+$("bBody").addEventListener("click", async (e) => {
+  if (e.target.id === "bSave") return bewSave(false);
+  if (e.target.id === "bCopy") { try { await navigator.clipboard.writeText($("bNote").value); toast("Bemerkung kopiert.", "ok"); } catch { $("bNote").select(); toast("Markiert – jetzt kopieren.", ""); } return; }
+  if (e.target.id === "bPdf") return bewPdf();
+  if (e.target.id === "bUndo") { bewUndo(); return; }
+  const dl = e.target.closest("[data-doc]");
+  if (dl) { e.preventDefault(); try { window.open(await repoFile(dl.dataset.doc), "_blank"); } catch { toast("Dokument nicht ladbar.", "err"); } return; }
+  const tip = e.target.closest("[data-stelle]"); if (tip) { bewShow(tip.dataset.stelle); return; }
+  const ki = e.target.closest("[data-ki]"); if (ki) bewKi(ki.dataset.ki);
+});
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("bew").hidden) { e.stopImmediatePropagation(); bewRead(); bewSave(true).finally(bewClose); } }, true);
+$("bBody").addEventListener("keydown", (e) => { if (e.target.id === "bInstr" && e.key === "Enter") { e.preventDefault(); bewKi("anweisung"); } });
+
+// --- Claude ---
+const BEW_SYSTEM = `Du hilfst Leonie Meier und Pascal Stadelmann (mit Sohn Lio) bei Wohnungsbewerbungen in Zürich-Wollishofen.
+Du bearbeitest zwei Texte: das Anschreiben (PDF auf ihrer Vorlage) und die Bemerkung fürs Online-Formular der Verwaltung.
+Regeln:
+- Deutsch in Schweizer Schreibweise (ss statt ß, «» als Anführungszeichen), «wir»-Form, Verwaltung wird gesiezt.
+- Die Texte sollen nach Leonie und Pascal klingen, nicht nach KI: ihren Wortlaut und Satzbau so weit wie möglich behalten. Keine Floskeln, keine Superlative, keine Adjektivketten, keine Emojis.
+- Nichts erfinden. Fakten nur aus den Stammdaten, dem Inserat oder den bestehenden Texten. Was nur die beiden wissen (z.B. was ihnen an der Besichtigung gefallen hat, Name der Ansprechperson), bleibt als Platzhalter in [eckigen Klammern] stehen.
+- Alter aus den Geburtsdaten und dem heutigen Datum berechnen. Befristete oder endende Jobs nicht als dauerhaft darstellen (Datum beachten).
+- Bei Genossenschaften das gemeinschaftliche Wohnen betonen, bei privaten Verwaltungen eher Verlässlichkeit und Stabilität.
+- Die Anrede steht NICHT im Anschreiben-Text (sie wird separat gewählt). Absätze im Anschreiben durch eine Leerzeile trennen; der Schluss ist «Über eine positive Rückmeldung …», dann «Freundliche Grüsse» und in der nächsten Zeile «Leonie, Pascal und Lio».
+- Hinweise (Stolpersteine): höchstens 6, kurz und konkret. Prüfe Widersprüche zwischen Anschreiben, Bemerkung, Stammdaten und Inserat, falsche oder veraltete Fakten, riskante oder missverständliche Sätze, Floskeln, Länge (das Anschreiben muss auf eine Seite passen: höchstens etwa 230 Wörter). «stelle» ist ein wörtliches, kurzes Zitat aus dem betroffenen Text (oder leer). Keine Hinweise auf offene [Platzhalter], die sind bekannt.
+- Antworte ausschliesslich mit dem Werkzeug «bewerbung».`;
+const BEW_TOOL = { name: "bewerbung", description: "Ergebnis: beide Texte (vollständig) und Hinweise.",
+  input_schema: { type: "object", required: ["anschreiben", "bemerkung", "hinweise"], properties: {
+    anschreiben: { type: "string", description: "Vollständiger Anschreiben-Text ohne Anrede, Absätze durch Leerzeile getrennt" },
+    bemerkung: { type: "string", description: "Vollständige Bemerkung fürs Online-Formular (mit eigener Grusszeile am Anfang und Schluss)" },
+    hinweise: { type: "array", items: { type: "object", required: ["text"], properties: { stelle: { type: "string" }, text: { type: "string" } } } },
+    aenderungen: { type: "array", description: "Nur bei Rechtschreibprüfung: was korrigiert wurde", items: { type: "object", properties: { vorher: { type: "string" }, nachher: { type: "string" } } } } } } };
+const BEW_AUFTRAG = {
+  entwurf: `Erstelle beide Texte für diese Wohnung.
+Anschreiben: Gehe vom Grundtext der Vorlage aus und behalte Aufbau, Wortwahl und Ton. Passe an: die Adresse im ersten Satz (richtige Präposition, z.B. «am Elfenweg», «an der Thujastrasse»), Fakten, die heute nicht mehr stimmen, Widersprüche zum Inserat und, wo es diese Wohnung verlangt, die Gewichtung (Genossenschaft: Nachbarschaft und Mitmachen; private Verwaltung: Verlässlichkeit, sicheres Einkommen, langfristig bleiben). Frage dich: Was will diese Verwaltung lesen, um uns zu nehmen – ohne zu übertreiben? Der Grund für den Umzug (Grosseltern in Luzern betreuen Lio, von Wollishofen viel näher) bleibt immer drin. [Platzhalter] für das, was ihnen gefallen hat, stehen lassen. Falls das Inserat konkrete Merkmale nennt, schlage sie in einem Hinweis vor (nicht in den Text schreiben).
+Bemerkung: Gehe von der Vorlage-Bemerkung aus und passe sie an dieses Inserat an (Zimmerzahl, Strasse, Genossenschaft oder private Verwaltung). Den Satz zur Belegung nur, wenn das Inserat die Personenzahl begrenzt. Kurz halten.`,
+  anweisung: `Setze die Anweisung von Leonie/Pascal (unten) um. Ändere nur, was die Anweisung verlangt; alles andere bleibt wörtlich gleich. Gilt die Anweisung erkennbar nur für einen der Texte, bleibt der andere unverändert.`,
+  pruefen: `Prüfe beide Texte nur auf Rechtschreibung, Grammatik und Zeichensetzung (Schweizer Schreibweise). Keine stilistischen Änderungen, keine Umformulierungen. Liste jede Korrektur in «aenderungen». Inhaltliche Probleme nur als Hinweis, nicht im Text ändern.`,
+  hinweise: `Ändere die Texte nicht (gib sie wörtlich zurück). Liefere nur die Hinweise zu Stolpersteinen.`,
+};
+function bewInserat() {
+  const x = BEW.x, d = BEW.d || {}, f = d.facts || {};
+  const desc = (d.description || x.text || "").replace(/\*\*/g, "").slice(0, 5000);
+  return JSON.stringify({ titel: d.title || x.title, strasse: x.street, plz: x.plz, ort: x.city, zimmer: x.rooms, miete_brutto: x.rent || f.rent_gross,
+    flaeche_m2: x.m2 || f.livingspace, bezug: f.moving_date || x.moving_date, verwaltung: d.agency?.name || x.agency, portal: x.portal,
+    merkmale: d.attributes, einschaetzung_claude: x.ai?.text, haken: x.ai?.haken, beschreibung: desc, eigene_notiz: itemOf(BEW.k).note || undefined }, null, 1);
+}
+async function claudeCall(mode, instr) {
+  const c = BEW.ctx, doc = bewRead();
+  const user = `Heute ist ${new Date().toLocaleDateString("de-CH", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}.
+
+<stammdaten>
+${JSON.stringify(c.stamm, null, 1)}
+</stammdaten>
+
+<stil_und_fruehere_texte>
+${c.stil}
+</stil_und_fruehere_texte>
+
+<vorlage_anschreiben>
+${c.vorlage.text}
+</vorlage_anschreiben>
+
+<vorlage_bemerkung>
+${c.vorlage.bemerkung}
+</vorlage_bemerkung>
+
+<inserat>
+${bewInserat()}
+</inserat>
+
+<aktuell>
+Adresse: ${doc.adresse}
+Anrede: ${anredeZeile(doc.anrede, doc.name)}
+--- Anschreiben ---
+${doc.text}
+--- Bemerkung ---
+${doc.bemerkung || "(noch leer)"}
+</aktuell>
+
+<auftrag>
+${BEW_AUFTRAG[mode]}${instr ? `\nAnweisung: ${instr}` : ""}
+</auftrag>`;
+  const r = await fetch("https://api.anthropic.com/v1/messages", { method: "POST",
+    headers: { "content-type": "application/json", "x-api-key": c.key, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
+    body: JSON.stringify({ model: S.config?.ai?.model || "claude-opus-5-5", max_tokens: 6000, system: BEW_SYSTEM, tools: [BEW_TOOL],
+      tool_choice: { type: "auto" }, messages: [{ role: "user", content: user }] }) });
+  let j = {}; try { j = await r.json(); } catch { }
+  if (!r.ok) throw new Error(r.status === 401 ? "Der Claude-Schlüssel ist ungültig." : j?.error?.message || `Claude meldet Fehler ${r.status}.`);
+  const tu = (j.content || []).find((b) => b.type === "tool_use");
+  if (tu?.input?.anschreiben != null) return tu.input;
+  const t = (j.content || []).filter((b) => b.type === "text").map((b) => b.text).join("");
+  const m = t.match(/\{[\s\S]*\}/); if (m) { try { return JSON.parse(m[0]); } catch { } }
+  throw new Error("Claude hat nicht im erwarteten Format geantwortet.");
+}
+async function bewKi(mode) {
+  if (BEW.busy) return;
+  if (!BEW.ctx.key) { toast("Zuerst den Claude-Schlüssel hinterlegen (Optionen).", "err"); return; }
+  const instr = mode === "anweisung" ? $("bInstr").value.trim() : "";
+  if (mode === "anweisung" && !instr) { $("bInstr").focus(); return; }
+  BEW.busy = true; document.querySelectorAll("#bClaude [data-ki]").forEach((b) => (b.disabled = true));
+  const label = { entwurf: "schreibt den Entwurf", anweisung: "setzt die Anweisung um", pruefen: "prüft die Rechtschreibung", hinweise: "sucht Stolpersteine" }[mode];
+  $("bState").textContent = `Claude ${label} … (ca. 20–40 Sek.)`;
+  const before = { text: bewRead().text, bemerkung: BEW.doc.bemerkung };
+  try {
+    const res = await claudeCall(mode, instr);
+    const text = String(res.anschreiben || "").replace(/\r/g, "").trim(), note = String(res.bemerkung || "").replace(/\r/g, "").trim();
+    if (mode !== "hinweise") {
+      if (text) $("bText").value = text;
+      if (note) $("bNote").value = note;
+    }
+    BEW.doc.hinweise = (res.hinweise || []).filter((h) => h && h.text).slice(0, 8);
+    bewRead(); bewCount();
+    const changed = before.text !== BEW.doc.text || before.bemerkung !== BEW.doc.bemerkung;
+    BEW.prev = changed ? before : null;
+    bewTips(); bewDiff(before, res.aenderungen, mode);
+    $("bState").textContent = mode === "pruefen" ? (changed ? "Korrekturen sind unten markiert." : "Keine Fehler gefunden.")
+      : changed ? "Fertig. Änderungen sind unten markiert." : "Fertig.";
+    if (mode === "anweisung") $("bInstr").value = "";
+    bewSave(true);
+  } catch (e) { $("bState").textContent = "Fehler: " + e.message; }
+  finally { BEW.busy = false; document.querySelectorAll("#bClaude [data-ki]").forEach((b) => (b.disabled = false)); }
+}
+function bewTips() {
+  const h = BEW.doc.hinweise || [];
+  $("bTips").innerHTML = h.length ? `<div class="ftitle sm">Hinweise von Claude</div>` + h.map((t) =>
+    `<div class="tip">${esc(t.text)}${t.stelle ? ` <button type="button" class="linkbtn" data-stelle="${esc(t.stelle)}">Stelle zeigen</button>` : ""}</div>`).join("") : "";
+}
+function bewShow(q) {
+  for (const id of ["bText", "bNote"]) {
+    const el = $(id), i = el.value.indexOf(q);
+    if (i >= 0) { el.focus(); el.setSelectionRange(i, i + q.length); el.scrollIntoView({ block: "center", behavior: "smooth" }); return; }
+  }
+  toast("Stelle nicht mehr gefunden.", "");
+}
+function wdiff(a, b) {
+  const A = a.split(/(\s+)/), B = b.split(/(\s+)/), n = A.length, m = B.length;
+  if (n * m > 2.5e6) return esc(b);
+  const L = Array.from({ length: n + 1 }, () => new Uint16Array(m + 1));
+  for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--) L[i][j] = A[i] === B[j] ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
+  let i = 0, j = 0, out = "";
+  while (i < n && j < m) {
+    if (A[i] === B[j]) { out += esc(A[i]); i++; j++; }
+    else if (L[i + 1][j] >= L[i][j + 1]) { out += `<del>${esc(A[i++])}</del>`; }
+    else { out += `<ins>${esc(B[j++])}</ins>`; }
+  }
+  while (i < n) out += `<del>${esc(A[i++])}</del>`;
+  while (j < m) out += `<ins>${esc(B[j++])}</ins>`;
+  return out;
+}
+function bewDiff(before, aend) {
+  if (!BEW.prev) { $("bDiff").innerHTML = ""; return; }
+  const part = (t, a, b) => a === b ? "" : `<div class="ftitle sm">${t}</div><div class="diff">${wdiff(a, b)}</div>`;
+  $("bDiff").innerHTML = `<div class="ftitle sm">Was Claude geändert hat</div>
+    ${part("Anschreiben", before.text, BEW.doc.text)}${part("Bemerkung", before.bemerkung || "", BEW.doc.bemerkung)}
+    ${(aend || []).length ? `<p class="hint">${aend.map((x) => `${esc(x.vorher)} → ${esc(x.nachher)}`).join(" · ")}</p>` : ""}
+    <div class="brow"><button type="button" class="btn" id="bUndo">Rückgängig</button></div>`;
+}
+function bewUndo() {
+  if (!BEW.prev) return;
+  $("bText").value = BEW.prev.text; $("bNote").value = BEW.prev.bemerkung || "";
+  BEW.prev = null; bewRead(); bewCount(); $("bDiff").innerHTML = ""; $("bState").textContent = "Rückgängig gemacht.";
+  bewSave(true);
+}
+
+// --- PDF auf der Canva-Vorlage (Masse aus der Vorlage gemessen, wie tools/anschreiben.py im privaten Repo) ---
+const PDFLIBS = ["https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js",
+  "https://cdn.jsdelivr.net/npm/@pdf-lib/fontkit@1.1.1/dist/fontkit.umd.min.js"];
+function loadScript(src) { return new Promise((ok, no) => { const s = document.createElement("script"); s.src = src; s.onload = ok; s.onerror = () => no(new Error("Bibliothek nicht ladbar")); document.head.appendChild(s); }); }
+async function pdfLibs() { if (!window.PDFLib) await loadScript(PDFLIBS[0]); if (!window.fontkit) await loadScript(PDFLIBS[1]); }
+async function repoBytes(path) { const u = await repoFile(path); return new Uint8Array(await (await fetch(u)).arrayBuffer()); }
+const LAY = { x0: 26.05, xmax: 557.5, xmaxSchluss: 300, size: 12, lead: 16.5, firstTop: 287.2, base: 833.775, bodyMax: 650, pageMax: 800,
+  adrX: 278.06, adrY: 681.492, adrSize: 15.01, kontaktTop: 753.6, iconX: 360, textX: 375.5,
+  blob: [150 / 255, 180 / 255, 209 / 255], ink: [0.098, 0.1059, 0.1373], mark: [0.30, 0.45, 0.62] };
+const ICON_MAIL = ["M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z", "M22 7l-8.991 5.727a2 2 0 0 1-2.009 0L2 7"];
+const ICON_TEL = ["M13.832 16.568a1 1 0 0 0 1.213-.303l.355-.465A2 2 0 0 1 17 15h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2A18 18 0 0 1 2 4a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v3a2 2 0 0 1-.8 1.6l-.468.351a1 1 0 0 0-.292 1.233 14 14 0 0 0 6.392 6.384"];
+function splitParas(text) {
+  const paras = text.replace(/\r/g, "").split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+  let g = -1; paras.forEach((p, i) => { if (/^(Freundliche|Herzliche|Liebe|Beste|Viele)\s+Grüsse/i.test(p)) g = i; });
+  if (g < 0) return { body: paras, schluss: [] };
+  const s = g > 0 && paras[g - 1].length < 120 ? g - 1 : g;
+  return { body: paras.slice(0, s), schluss: paras.slice(s) };
+}
+function layoutPdf(doc, fonts) {
+  // liefert Zeilen [{top, x, segs:[{t, mark}]}] und Warnungen
+  const { R, I } = fonts, w = (t, mark) => (mark ? I : R).widthOfTextAtSize(t, LAY.size);
+  const lines = [], warn = [];
+  let top = LAY.firstTop, inPh = false;
+  const wrapLine = (txt, maxW) => {
+    const words = txt.split(/\s+/).filter(Boolean), out = []; let cur = "";
+    for (const wd of words) { const t = cur ? cur + " " + wd : wd; if (R.widthOfTextAtSize(t, LAY.size) <= maxW || !cur) cur = t; else { out.push(cur); cur = wd; } }
+    if (cur) out.push(cur); return out;
+  };
+  const pushLine = (txt) => {
+    const segs = []; let buf = "";
+    for (const ch of txt) {
+      if (ch === "[") { if (buf) segs.push({ t: buf, mark: inPh }); buf = "["; inPh = true; }
+      else if (ch === "]") { buf += "]"; segs.push({ t: buf, mark: true }); buf = ""; inPh = false; }
+      else buf += ch;
+    }
+    if (buf) segs.push({ t: buf, mark: inPh });
+    lines.push({ top, segs }); top += LAY.lead;
+  };
+  const para = (p, maxW) => { p.split("\n").forEach((l) => wrapLine(l.trim(), maxW).forEach(pushLine)); top += LAY.lead; };
+  const { body, schluss } = splitParas(doc.text);
+  para(anredeZeile(doc.anrede, doc.name), LAY.xmax - LAY.x0);
+  body.forEach((p) => para(p, LAY.xmax - LAY.x0));
+  if (top - LAY.lead > LAY.bodyMax) warn.push("Der Haupttext ist zu lang und läuft in die blaue Fläche. Bitte kürzen.");
+  schluss.forEach((p) => para(p, LAY.xmaxSchluss - LAY.x0));
+  if (top - LAY.lead > LAY.pageMax) warn.push("Der Text passt nicht auf die Seite. Bitte kürzen.");
+  lines.forEach((l) => l.segs.forEach((s) => (s.w = w(s.t, s.mark))));
+  return { lines, warn };
+}
+async function bewPdf() {
+  bewRead();
+  const offen = (BEW.doc.text + " " + BEW.doc.adresse + " " + BEW.doc.name).match(/\[[^\]]*\]/g);
+  if (offen && !confirm(`Noch offen: ${offen.join(", ")}\n\nTrotzdem ein PDF erstellen (z.B. zum Testen)?`)) return;
+  const btn = $("bPdf"); btn.disabled = true; btn.textContent = "Erstelle PDF …";
+  try {
+    await pdfLibs();
+    const { PDFDocument, rgb, LineCapStyle } = window.PDFLib;
+    const [tpl, fR, fI] = await Promise.all(["dossier/vorlage/canva-ohne-text.pdf", "dossier/schriften/OldStandard-Regular.ttf", "dossier/schriften/OldStandard-Italic.ttf"].map(repoBytes));
+    const pdf = await PDFDocument.load(tpl); pdf.registerFontkit(window.fontkit);
+    const R = await pdf.embedFont(fR, { subset: true }), I = await pdf.embedFont(fI, { subset: true });
+    const pg = pdf.getPage(0), col = (c) => rgb(c[0], c[1], c[2]);
+    const { lines, warn } = layoutPdf(BEW.doc, { R, I });
+    if (warn.length && !confirm(warn.join("\n") + "\n\nTrotzdem erstellen?")) return;
+    let adrSize = LAY.adrSize; while (R.widthOfTextAtSize(BEW.doc.adresse, adrSize) > 595.5 - LAY.adrX - 16 && adrSize > 10) adrSize -= 0.5;
+    pg.drawText(BEW.doc.adresse, { x: LAY.adrX, y: LAY.adrY, size: adrSize, font: R, color: col(LAY.ink) });
+    for (const l of lines) {
+      let x = LAY.x0;
+      for (const s of l.segs) { pg.drawText(s.t, { x, y: LAY.base - l.top, size: LAY.size, font: s.mark ? I : R, color: col(s.mark ? LAY.mark : LAY.ink) }); x += s.w; }
+    }
+    // Kontaktblock: Zeilen der Vorlage überdecken, mit Symbolen neu setzen
+    pg.drawRectangle({ x: 355, y: 41.8, width: 175, height: 51, color: col(LAY.blob) });
+    const k = BEW.ctx.vorlage.kontakt || {};
+    [[ICON_MAIL, k.email], ...(k.tel || []).map((t) => [ICON_TEL, t])].slice(0, 3).forEach(([ic, txt], j) => {
+      const base = LAY.base - (LAY.kontaktTop + j * LAY.lead);
+      ic.forEach((p) => pg.drawSvgPath(p, { x: LAY.iconX, y: base - 1.3 + 11, scale: 11 / 24, borderColor: rgb(1, 1, 1), borderWidth: 1.9, borderLineCap: LineCapStyle.Round }));
+      pg.drawText(txt || "", { x: LAY.textX, y: base, size: LAY.size, font: R, color: rgb(1, 1, 1) });
+    });
+    pdf.setTitle("Wohnungsbewerbung " + BEW.doc.adresse); pdf.setAuthor("Leonie Meier, Pascal Stadelmann");
+    const bytes = await pdf.save();
+    const blob = new Blob([bytes], { type: "application/pdf" });
+    const name = "Wohnungsbewerbung_" + (BEW.x.street || "Wohnung").replace(/[^\wäöüÄÖÜ]+/g, "_") + ".pdf";
+    const path = bewPath("Anschreiben.pdf");
+    let sha; try { sha = (await gh(path)).sha; } catch { }
+    await gh(path, { method: "PUT", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: `Bewerbung PDF: ${BEW.x.street || BEW.k}`, content: await blobB64(blob), branch: "main", ...(sha ? { sha } : {}) }) });
+    fileCache.delete(path);
+    BEW.doc.pdf = path; BEW.doc.pdf_at = new Date().toISOString();
+    await bewSave(true);
+    const url = URL.createObjectURL(blob);
+    $("bPdfLink").innerHTML = `<a class="doclink" href="${url}" target="_blank" rel="noopener">📄 PDF öffnen</a> <a class="doclink" href="${url}" download="${esc(name)}">⬇ Herunterladen</a>`;
+    toast("PDF erstellt und gespeichert.", "ok");
+  } catch (e) { toast("PDF fehlgeschlagen: " + e.message, "err"); }
+  finally { btn.disabled = false; btn.textContent = "PDF erstellen"; }
+}
+
+// --- Optionen: Claude-Schlüssel (liegt im privaten Repo, gilt für beide) ---
+async function kiState() {
+  try { const r = await readJson("dossier/ki.json"); S.kiSha = r.sha;
+    $("kiState").textContent = r.data.anthropic_key ? `Hinterlegt${r.data.by ? " von " + (PEOPLE[r.data.by] || r.data.by) : ""}, ${ago(r.data.at)}. Gilt für euch beide.` : "Noch kein Schlüssel hinterlegt.";
+  } catch (e) { S.kiSha = null; $("kiState").textContent = e.status === 404 ? "Noch kein Schlüssel hinterlegt." : "Status nicht ladbar: " + e.message; }
+}
+$("kiSave").addEventListener("click", async () => {
+  const key = $("kiKey").value.trim();
+  if (!/^sk-ant-/.test(key)) { toast("Das sieht nicht wie ein Claude-Schlüssel aus (beginnt mit sk-ant-).", "err"); return; }
+  $("kiSave").disabled = true;
+  try {
+    const t = await fetch("https://api.anthropic.com/v1/models", { headers: { "x-api-key": key, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" } });
+    if (!t.ok) throw new Error(t.status === 401 ? "Claude lehnt den Schlüssel ab." : `Prüfung fehlgeschlagen (${t.status}).`);
+    S.kiSha = await writeJson("dossier/ki.json", { anthropic_key: key, by: S.person, at: new Date().toISOString() }, S.kiSha, "Claude-Schlüssel für Bewerbungen");
+    $("kiKey").value = ""; BEW.ctx = null; toast("Schlüssel gespeichert.", "ok"); kiState();
+  } catch (e) { toast(e.message, "err"); }
+  finally { $("kiSave").disabled = false; }
+});
+if (S.token) setTimeout(() => kiState(), 1200);
 </script>
 </body>
 </html>
