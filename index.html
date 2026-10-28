@@ -86,7 +86,9 @@ h2 { font: 20px/1.05 var(--display); letter-spacing: -.4px; text-transform: uppe
 
 /* Trefferkarte */
 .card { background: var(--surface); border: 3px solid var(--line); display: grid; grid-template-columns: minmax(0, 1fr); min-width: 0 }
-.card .photo { display: block; aspect-ratio: 16 / 9; background: var(--sunk); position: relative; max-width: 100%; border-bottom: 3px solid var(--line) }
+.card .photo { display: block; aspect-ratio: 16 / 9; background: var(--sunk); position: relative; max-width: 100%; border-bottom: 3px solid var(--line); cursor: pointer }
+.card .facts[data-detail], .card .addr[data-detail] { cursor: pointer }
+.platlink { display: flex; justify-content: center; gap: 8px; text-decoration: none; color: var(--fg) }
 .card .photo img { width: 100%; height: 100%; object-fit: cover; display: block }
 .card .photo .ph { display: none }
 .card .photo.noimg { aspect-ratio: auto; min-height: 150px; background: var(--accent); color: #fff; text-decoration: none }
@@ -1141,6 +1143,7 @@ function renderDetail(x, a, d) {
   const mail = d?.mail ? `<a href="${esc(d.mail.link)}" target="_blank" rel="noopener">Original-Mail in Gmail öffnen ↗</a>` : "";
   $("dBody").innerHTML = `
     ${onl || '<div class="onl">Noch nicht gesichert. Neue Treffer, Favoriten und Wohnungen mit Stand sichert Wollihood beim nächsten Suchlauf.</div>'}
+    ${firstUrl(x) ? `<a class="btn platlink" href="${esc(firstUrl(x))}" target="_blank" rel="noopener">Inserat auf ${esc(x.sources?.[0]?.portal || x.portal || "der Plattform")} öffnen ${icon.open}</a>` : ""}
     ${standPanel(S.detailKey)}
     ${bewPanel()}
     ${ownBlock(S.detailKey)}
@@ -1403,15 +1406,15 @@ function renderHits() {
     const badge = st && st.value ? `<span class="badge stat st-${esc(st.value)}">${esc(statusLabel(st))}</span>`
       : fav ? '<span class="badge fav">Favorit</span>' : verdict(k) === "split" ? '<span class="badge split">Uneinig</span>' : "";
     return `<article class="card" data-key="${esc(k)}">
-      <a class="photo ${x.image ? "" : "noimg"}" href="${esc(x.url)}" target="_blank" rel="noopener" data-open>${photo}
+      <div class="photo ${x.image ? "" : "noimg"}" role="button" tabindex="0" aria-label="Details öffnen" data-detail>${photo}
         <span class="ph"><span class="k">${esc(x.plz || "")}${x.plz ? " · " : ""}kein Foto</span><span class="q">${esc(quarter || x.portal || "Wohnung")}</span><span class="r">${x.rooms != null ? esc(String(x.rooms)) + " Zimmer" : "Zimmerzahl fehlt"}</span></span>
-        ${placeTag ? `<span class="place">${esc(placeTag)}</span>` : ""}${isNew(x) ? '<span class="badge new">Neu</span>' : ""}${badge}</a>
-      <div class="facts">
+        ${placeTag ? `<span class="place">${esc(placeTag)}</span>` : ""}${isNew(x) ? '<span class="badge new">Neu</span>' : ""}${badge}</div>
+      <div class="facts" data-detail>
         <div class="pr"><div class="cap">Miete ${x.rent_note === "netto" ? "netto" : "brutto"}</div><b class="${x.rent ? "" : "na"}">${x.rent ? esc(fmtN(x.rent)) : "auf Anfrage"}</b></div>
         <div class="rm"><div><div class="cap">Zimmer</div><b>${x.rooms ?? "–"}</b></div><div><div class="cap">Fläche</div><b>${x.m2 ? esc(x.m2) + " m²" : "–"}</b></div></div>
       </div>
       <div class="body">
-        <div class="addr">${esc(x.street || x.title || place)}</div>
+        <div class="addr" data-detail>${esc(x.street || x.title || place)}</div>
         <div class="meta">${pubLabel(x)}${x.pushed ? " · Push gesendet" : x.push_skipped ? " · kein Push (" + esc(x.push_skipped) + ")" : ""}</div>
         ${x.ai && x.ai.text ? `<div class="ailine"><span aria-hidden="true">✦</span> ${esc(x.ai.text)}</div>` : ""}
         <div class="srcs">Gefunden auf: ${sourcesHtml(x)}${agencyOf(x) ? ` · Verwaltung: <b>${esc(agencyOf(x))}</b>` : ""}</div>
@@ -1423,7 +1426,7 @@ function renderHits() {
         ${stLine(k)}
         ${miniMap(x)}
       </div>
-      <div class="actions three"><a class="btn primary" href="${esc(firstUrl(x))}" target="_blank" rel="noopener" data-open>${icon.open} Inserat</a><button type="button" class="btn detbtn" data-detail aria-label="Details und Archiv">${icon.doc}<span>Details</span></button>${outBtn(k)}</div>
+      <div class="actions three"><button type="button" class="btn primary detbtn" data-detail aria-label="Details und Archiv">${icon.doc}<span>Details</span></button><a class="btn" href="${esc(firstUrl(x))}" target="_blank" rel="noopener" data-open aria-label="Inserat auf ${esc(x.sources?.[0]?.portal || x.portal || "der Plattform")} öffnen">Inserat ${icon.open}</a>${outBtn(k)}</div>
     </article>`;
   }).join("");
   mountMinis();
@@ -1451,6 +1454,7 @@ $("hitList").addEventListener("change", (e) => {
   if (e.target.matches("[data-when]") && e.target.value) setStatus(k, "besichtigung", new Date(e.target.value).toISOString());
 });
 $("hitList").addEventListener("keydown", (e) => {
+  if ((e.key === "Enter" || e.key === " ") && e.target.matches(".photo[data-detail]")) { e.preventDefault(); e.target.click(); return; }
   if (e.key === "Enter" && !e.shiftKey && e.target.matches("[data-cinput]")) {
     e.preventDefault(); const card = e.target.closest(".card"); addComment(card.dataset.key, e.target.value); e.target.value = "";
   }
@@ -1462,7 +1466,7 @@ $("hitList").addEventListener("click", (e) => {
   const vb = e.target.closest("[data-vote]"); if (vb) { setVote(k, vb.dataset.vote); return; }
   if (e.target.closest("[data-fav]")) { toggleFav(k); return; }
   const ob = e.target.closest("[data-out]"); if (ob) { setOut(k, ob.dataset.out === "1"); return; }
-  if (e.target.closest("[data-detail]")) { openDetail(k); return; }
+  if (e.target.closest("[data-detail]")) { if (!S.seen.has(k)) { S.seen.add(k); saveSeen(); setTimeout(renderHits, 400); } openDetail(k); return; }
   if (e.target.closest("[data-thread]")) { S.openThreads.has(k) ? S.openThreads.delete(k) : S.openThreads.add(k); renderHits();
     if (S.openThreads.has(k)) setTimeout(() => document.querySelector(`.card[data-key="${CSS.escape(k)}"] [data-cinput]`)?.focus(), 50); return; }
   if (e.target.closest("[data-csend]")) { const ta = card.querySelector("[data-cinput]"); addComment(k, ta.value); ta.value = ""; return; }
@@ -1580,7 +1584,7 @@ function renderMarkers() {
     const outPush = S.amode === "push" && S.work && hasFeat(S.work.push) && !inAreas(x.lat, x.lon, S.work.push);
     const c = outPush ? "#9a9a9a" : m === "fav" ? getComputedStyle(document.documentElement).getPropertyValue("--star").trim() : accent();
     S.markers[keyOf(x)] = L.circleMarker([x.lat, x.lon], { radius: 8, color: "#fff", weight: 2, fillColor: c, fillOpacity: 0.95, pmIgnore: true })
-      .bindPopup(`${x.image ? `<img src="${esc(x.image)}" alt="" style="width:200px;height:112px;object-fit:cover;border-radius:6px;display:block;margin-bottom:6px" referrerpolicy="no-referrer">` : ""}<b>${esc(chf(x.rent))} · ${esc(rooms(x.rooms))}${x.m2 ? " · " + esc(x.m2) + " m²" : ""}</b><br>${esc(x.street || "")}<br><a href="${esc(x.url)}" target="_blank" rel="noopener">Inserat öffnen</a>`, { maxWidth: 220 })
+      .bindPopup(`${x.image ? `<img src="${esc(x.image)}" alt="" style="width:200px;height:112px;object-fit:cover;border-radius:6px;display:block;margin-bottom:6px" referrerpolicy="no-referrer">` : ""}<b>${esc(chf(x.rent))} · ${esc(rooms(x.rooms))}${x.m2 ? " · " + esc(x.m2) + " m²" : ""}</b><br>${esc(x.street || "")}<br><a href="#" data-k="${esc(keyOf(x))}" onclick="openDetail(this.dataset.k);return false">Details</a> · <a href="${esc(x.url)}" target="_blank" rel="noopener">Inserat ↗</a>`, { maxWidth: 220 })
       .addTo(S.hitLayer);
   });
 }
@@ -2164,7 +2168,7 @@ let installEvt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("installBtn").hidden = false; $("installHint").hidden = true; });
 $("installBtn").addEventListener("click", async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("installBtn").hidden = true; });
 if (window.matchMedia("(display-mode: standalone)").matches) { $("installHint").textContent = "Läuft als App."; }
-const APP_VERSION = "52 · 28.10.2026";
+const APP_VERSION = "53 · 28.10.2026";
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").then((reg) => { reg.update().catch(() => {}); }).catch(() => {});
   let reloaded = false;
