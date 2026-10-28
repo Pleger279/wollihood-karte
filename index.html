@@ -378,6 +378,14 @@ textarea.bewnote { min-height: 220px; font: 15px/1.5 Georgia, "Times New Roman",
 .diff del { background: color-mix(in srgb, var(--bad) 22%, transparent) }
 .doclink { display: inline-block; margin: 10px 14px 0 0; color: var(--accent); font-weight: 800; text-decoration: none }
 .warnline { color: var(--warn); font-weight: 700 }
+.drow { display: flex; align-items: center; gap: 6px; padding: 6px 0; border-top: 1px solid var(--hair) }
+.drow label { display: flex; gap: 10px; align-items: flex-start; flex: 1; font-size: 14.5px; line-height: 1.35; cursor: pointer }
+.drow label input { width: 18px; height: 18px; margin-top: 2px; flex: none }
+.drow small { display: block; color: var(--muted); font-size: 12px; margin-top: 1px }
+.drow small.old { color: var(--bad); font-weight: 700 } .drow small.soon { color: var(--warn); font-weight: 700 }
+.drow .iconbtn { flex: none; display: inline-flex; align-items: center; justify-content: center; cursor: pointer }
+.jobbox { border-left: 3px solid var(--hair); padding: 2px 0 6px 10px; margin: 8px 0; display: grid; gap: 6px }
+#bStamm .f { margin-top: 4px }
 .learn { border: 2px solid var(--accent); background: var(--accent-soft); padding: 10px 12px; margin-top: 10px }
 .lrule { display: flex; gap: 10px; align-items: flex-start; padding: 6px 0; font-size: 14px; line-height: 1.4 }
 .lrule input { margin-top: 3px; width: 18px; height: 18px; flex: none }
@@ -530,6 +538,18 @@ textarea.bewnote { min-height: 220px; font: 15px/1.5 Georgia, "Times New Roman",
       <p class="hint">Für Entwurf, Hinweise und Rechtschreibprüfung im Bewerbungs-Editor. Der Schlüssel stammt aus console.anthropic.com (nicht vom Claude-Abo), wird im privaten Repo gespeichert und gilt für euch beide.</p>
       <label class="f" for="kiKey"><small>API-Schlüssel</small><input class="field" id="kiKey" type="password" autocomplete="off" placeholder="sk-ant-…"></label>
       <button class="btn primary" id="kiSave" type="button">Schlüssel prüfen und speichern</button>
+    </div>
+    <div class="panel" id="baustPanel">
+      <h2>Dossier-Bausteine</h2>
+      <p class="hint">Dokumente fürs Bewerbungsdossier, z.B. Betreibungsauszüge oder Lohnabrechnungen. Fotos werden automatisch zu PDF. Gilt für euch beide.</p>
+      <div id="baustList"><p class="hint">Lade …</p></div>
+      <div class="ftitle sm">Neuer Baustein</div>
+      <label class="f" for="baustTitle"><small>Titel</small><input class="field" id="baustTitle" placeholder="z.B. Lohnabrechnungen Pascal Schulsozialarbeit"></label>
+      <div class="row2"><label class="f" for="baustDate"><small>Ausgestellt am</small><input class="field" id="baustDate" type="date"></label>
+        <label class="f" for="baustValid"><small>Gültig (Monate)</small><select class="field" id="baustValid"><option value="">unbegrenzt</option><option value="3">3 Monate</option><option value="6">6 Monate</option><option value="12">12 Monate</option></select></label></div>
+      <label class="f" for="baustFile"><small>Datei (PDF oder Foto)</small><input class="field" id="baustFile" type="file" accept="application/pdf,image/*"></label>
+      <label class="switch" for="baustStd">Standardmässig im Dossier <input type="checkbox" id="baustStd" checked></label>
+      <button class="btn primary" id="baustAdd" type="button">Baustein hinzufügen</button>
     </div>
     <div class="panel" id="lernPanel">
       <h2>Gelernte Schreibregeln</h2>
@@ -2168,7 +2188,7 @@ let installEvt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("installBtn").hidden = false; $("installHint").hidden = true; });
 $("installBtn").addEventListener("click", async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("installBtn").hidden = true; });
 if (window.matchMedia("(display-mode: standalone)").matches) { $("installHint").textContent = "Läuft als App."; }
-const APP_VERSION = "53 · 28.10.2026";
+const APP_VERSION = "54 · 28.10.2026";
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").then((reg) => { reg.update().catch(() => {}); }).catch(() => {});
   let reloaded = false;
@@ -2213,6 +2233,7 @@ async function bewCtx() {
   try { BEW.ctx.key = (await readJson("dossier/ki.json")).data.anthropic_key || null; } catch { }
   try { BEW.ctx.regeln = (await readJson(LERN_PATH)).data.regeln || []; } catch { }
   try { BEW.ctx.fertige = (await readJson(FERTIG_PATH)).data.anschreiben || []; } catch { }
+  try { BEW.ctx.bausteine = (await readJson("dossier/bausteine.json")).data.bausteine || []; } catch { BEW.ctx.bausteine = []; }
   return BEW.ctx;
 }
 function bewNew() {
@@ -2276,8 +2297,18 @@ function renderBew() {
       <p class="hint warnline" id="bDirty" hidden>Nicht gespeicherte Änderungen – «Speichern» tippen. «PDF erstellen» speichert auch.</p>
       <div class="brow"><button type="button" class="linkbtn" id="bGrund">Diese Fassung als Grundtext für künftige Bewerbungen übernehmen</button></div>
       <div id="bPdfLink">${doc.pdf ? `<a href="#" class="doclink" data-doc="${esc(doc.pdf)}">📄 Letztes PDF (${esc(ago(doc.pdf_at))})</a>` : ""}</div>
-    </div>`;
-  bewTips(); bewCount(); bewMark();
+    </div>
+    <div class="panel" id="bDossier"><h2>Dossier</h2>
+      <p class="hint">Häkchen = kommt ins Dossier. Mit ⬇ lädst du jedes Dokument einzeln herunter, z.B. für Plattformen mit Einzel-Upload.</p>
+      <div id="bDossierList"></div>
+      <div class="brow"><label class="btn" for="bUpload">Formular / weiteres Dokument hinzufügen</label><input type="file" id="bUpload" accept="application/pdf,image/*" multiple hidden></div>
+      <div class="brow"><button type="button" class="btn primary" id="bDossierPdf">Dossier als ein PDF</button></div>
+      <div id="bDossierLink"></div>
+    </div>
+    <details class="panel adv" id="bStamm"><summary>Personalien &amp; Referenzen</summary>
+      <div class="advbody"><p class="hint">Gilt für alle Bewerbungen und für die Personalien-Seite im Dossier.</p><div id="bStammBody"></div></div>
+    </details>`;
+  bewTips(); bewCount(); renderDossier(); renderStamm(); bewMark();
 }
 function bewRead() {
   if (!$("bText")) return BEW.doc;
@@ -2287,9 +2318,13 @@ function bewRead() {
 }
 function bewCount() { const n = ($("bNote")?.value || "").length; if ($("bCount")) $("bCount").textContent = n ? `${n} Zeichen` : ""; }
 $("bBody").addEventListener("input", (e) => { if (e.target.id === "bNote") bewCount(); if (/^b(Text|Note|Adr|Name)$/.test(e.target.id)) bewMark(); });
-$("bBody").addEventListener("change", (e) => { if (e.target.id === "bAnrede") bewMark(); });
+$("bBody").addEventListener("change", (e) => {
+  if (e.target.id === "bAnrede") bewMark();
+  if (e.target.matches("[data-dsel]")) { BEW.doc.auswahl = { ...(BEW.doc.auswahl || {}), [e.target.dataset.dsel]: e.target.checked }; bewMark(); }
+  if (e.target.id === "bUpload" && e.target.files.length) { beilageUpload(e.target.files); e.target.value = ""; }
+});
 // Gespeichert wird nur mit «Speichern» (und beim PDF). Schliessen mit ✕ verwirft nach Rückfrage.
-const bewFields = () => { const d = BEW.doc || {}; return JSON.stringify([d.adresse, d.anrede, d.name, d.text, d.bemerkung || ""]); };
+const bewFields = () => { const d = BEW.doc || {}; return JSON.stringify([d.adresse, d.anrede, d.name, d.text, d.bemerkung || "", d.auswahl || {}, d.beilagen || []]); };
 function bewDirty() { if (!$("bText")) return false; bewRead(); return bewFields() !== BEW.saved; }
 function bewMark() {
   const b = $("bSave"); if (!b) return;
@@ -2313,6 +2348,15 @@ async function bewSave(quiet) {
 $("bBody").addEventListener("click", async (e) => {
   if (e.target.id === "bSave") { bewLearnMaybe(); return bewSave(false); }
   if (e.target.id === "bGrund") return bewGrundtext();
+  if (e.target.id === "bDossierPdf") return dossierPdf();
+  if (e.target.id === "spSave") return stammSave();
+  const dlb = e.target.closest("[data-dl]"); if (dlb) return dossierDownload(dlb.dataset.dl);
+  const bdel = e.target.closest("[data-bdel]");
+  if (bdel) { BEW.doc.beilagen = (BEW.doc.beilagen || []).filter((b) => b.id !== bdel.dataset.bdel); renderDossier(); bewMark(); return; }
+  const sadd = e.target.closest("[data-spadd]");
+  if (sadd) { stammCollect(); const L = spGet(BEW.ctx.stamm, sadd.dataset.spadd) || []; L.push({}); spSet(BEW.ctx.stamm, sadd.dataset.spadd, L); renderStamm(); return; }
+  const sdel = e.target.closest("[data-spdel]");
+  if (sdel) { stammCollect(); const p = sdel.dataset.spdel.split("."), i = +p.pop(); spGet(BEW.ctx.stamm, p.join(".")).splice(i, 1); renderStamm(); return; }
   if (e.target.id === "bLearnOk" || e.target.id === "bLearnNo") return bewLearnDecide(e.target.id === "bLearnOk");
   if (e.target.id === "bCopy") { try { await navigator.clipboard.writeText($("bNote").value); toast("Bemerkung kopiert.", "ok"); } catch { $("bNote").select(); toast("Markiert – jetzt kopieren.", ""); } return; }
   if (e.target.id === "bPdf") return bewPdf();
@@ -2639,30 +2683,8 @@ async function bewPdf() {
   if (offen && !confirm(`Noch offen: ${offen.join(", ")}\n\nTrotzdem ein PDF erstellen (z.B. zum Testen)?`)) return;
   const btn = $("bPdf"); btn.disabled = true; btn.textContent = "Erstelle PDF …";
   try {
-    await pdfLibs();
-    const { PDFDocument, rgb, LineCapStyle } = window.PDFLib;
-    const [tpl, fR, fI] = await Promise.all(["dossier/vorlage/canva-ohne-text.pdf", "dossier/schriften/OldStandard-Regular.ttf", "dossier/schriften/OldStandard-Italic.ttf"].map(repoBytes));
-    const pdf = await PDFDocument.load(tpl); pdf.registerFontkit(window.fontkit);
-    const R = await pdf.embedFont(fR, { subset: true }), I = await pdf.embedFont(fI, { subset: true });
-    const pg = pdf.getPage(0), col = (c) => rgb(c[0], c[1], c[2]);
-    const { lines, warn } = layoutPdf(BEW.doc, { R, I });
-    if (warn.length && !confirm(warn.join("\n") + "\n\nTrotzdem erstellen?")) return;
-    let adrSize = LAY.adrSize; while (R.widthOfTextAtSize(BEW.doc.adresse, adrSize) > 595.5 - LAY.adrX - 16 && adrSize > 10) adrSize -= 0.5;
-    pg.drawText(BEW.doc.adresse, { x: LAY.adrX, y: LAY.adrY, size: adrSize, font: R, color: col(LAY.ink) });
-    for (const l of lines) {
-      let x = LAY.x0;
-      for (const s of l.segs) { pg.drawText(s.t, { x, y: LAY.base - l.top, size: LAY.size, font: s.mark ? I : R, color: col(s.mark ? LAY.mark : LAY.ink) }); x += s.w; }
-    }
-    // Kontaktblock: Zeilen der Vorlage überdecken, mit Symbolen neu setzen
-    pg.drawRectangle({ x: 355, y: 41.8, width: 175, height: 51, color: col(LAY.blob) });
-    const k = BEW.ctx.vorlage.kontakt || {};
-    [[ICON_MAIL, k.email], ...(k.tel || []).map((t) => [ICON_TEL, t])].slice(0, 3).forEach(([ic, txt], j) => {
-      const base = LAY.base - (LAY.kontaktTop + j * LAY.lead);
-      ic.forEach((p) => pg.drawSvgPath(p, { x: LAY.iconX, y: base - 1.3 + 11, scale: 11 / 24, borderColor: rgb(1, 1, 1), borderWidth: 1.9, borderLineCap: LineCapStyle.Round }));
-      pg.drawText(txt || "", { x: LAY.textX, y: base, size: LAY.size, font: R, color: rgb(1, 1, 1) });
-    });
-    pdf.setTitle("Wohnungsbewerbung " + BEW.doc.adresse); pdf.setAuthor("Leonie Meier, Pascal Stadelmann");
-    const bytes = await pdf.save();
+    await pdfAssets();
+    const bytes = await anschreibenBytes(true); if (!bytes) return;
     const blob = new Blob([bytes], { type: "application/pdf" });
     const name = "Wohnungsbewerbung_" + (BEW.x.street || "Wohnung").replace(/[^\wäöüÄÖÜ]+/g, "_") + ".pdf";
     const path = bewPath("Anschreiben.pdf");
@@ -2680,6 +2702,341 @@ async function bewPdf() {
   } catch (e) { toast("PDF fehlgeschlagen: " + e.message, "err"); }
   finally { btn.disabled = false; btn.textContent = "PDF erstellen"; }
 }
+
+// --- PDF-Grundlagen: Vorlage, Schriften, Unterschriften (einmal laden) ---
+async function pdfAssets() {
+  if (BEW.assets) return BEW.assets;
+  await pdfLibs();
+  const files = ["dossier/vorlage/canva-ohne-text.pdf", "dossier/schriften/OldStandard-Regular.ttf", "dossier/schriften/OldStandard-Italic.ttf",
+    "dossier/schriften/OldStandard-Bold.ttf", "dossier/unterschriften/pascal.png", "dossier/unterschriften/leonie.png"];
+  const [tpl, fR, fI, fB, sigP, sigL] = await Promise.all(files.map(repoBytes));
+  BEW.assets = { tpl, fR, fI, fB, sigP, sigL };
+  return BEW.assets;
+}
+async function vorlagePage() {
+  const A = await pdfAssets(), { PDFDocument } = window.PDFLib;
+  const pdf = await PDFDocument.load(A.tpl); pdf.registerFontkit(window.fontkit);
+  const F = { R: await pdf.embedFont(A.fR, { subset: true }), I: await pdf.embedFont(A.fI, { subset: true }), B: await pdf.embedFont(A.fB, { subset: true }) };
+  return { pdf, pg: pdf.getPage(0), F };
+}
+const pcol = (c) => window.PDFLib.rgb(c[0], c[1], c[2]);
+function kontaktBlock(pg, F) {
+  const { rgb, LineCapStyle } = window.PDFLib;
+  pg.drawRectangle({ x: 355, y: 41.8, width: 175, height: 51, color: pcol(LAY.blob) });
+  const k = BEW.ctx.vorlage.kontakt || {};
+  [[ICON_MAIL, k.email], ...(k.tel || []).map((t) => [ICON_TEL, t])].slice(0, 3).forEach(([ic, txt], j) => {
+    const base = LAY.base - (LAY.kontaktTop + j * LAY.lead);
+    ic.forEach((p) => pg.drawSvgPath(p, { x: LAY.iconX, y: base - 1.3 + 11, scale: 11 / 24, borderColor: rgb(1, 1, 1), borderWidth: 1.9, borderLineCap: LineCapStyle.Round }));
+    pg.drawText(txt || "", { x: LAY.textX, y: base, size: LAY.size, font: F.R, color: rgb(1, 1, 1) });
+  });
+}
+async function anschreibenBytes(ask = true) {
+  const { pdf, pg, F } = await vorlagePage();
+  const { lines, warn } = layoutPdf(BEW.doc, F);
+  if (ask && warn.length && !confirm(warn.join("\n") + "\n\nTrotzdem erstellen?")) return null;
+  let adrSize = LAY.adrSize; while (F.R.widthOfTextAtSize(BEW.doc.adresse, adrSize) > 595.5 - LAY.adrX - 16 && adrSize > 10) adrSize -= 0.5;
+  pg.drawText(BEW.doc.adresse, { x: LAY.adrX, y: LAY.adrY, size: adrSize, font: F.R, color: pcol(LAY.ink) });
+  for (const l of lines) {
+    let x = LAY.x0;
+    for (const s of l.segs) { pg.drawText(s.t, { x, y: LAY.base - l.top, size: LAY.size, font: s.mark ? F.I : F.R, color: pcol(s.mark ? LAY.mark : LAY.ink) }); x += s.w; }
+  }
+  kontaktBlock(pg, F);
+  pdf.setTitle("Wohnungsbewerbung " + BEW.doc.adresse); pdf.setAuthor("Leonie Meier, Pascal Stadelmann");
+  return pdf.save();
+}
+
+// --- Personalien-Seite im Stil der Vorlage (Foto und Titel der Vorlage überdeckt) ---
+const dmyL = (iso) => { if (!iso) return ""; const m = String(iso).match(/^(\d{4})-(\d{2})(?:-(\d{2}))?/); if (!m) return String(iso);
+  return m[3] ? `${+m[3]}.${+m[2]}.${m[1]}` : new Date(+m[1], +m[2] - 1, 1).toLocaleDateString("de-CH", { month: "long", year: "numeric" }); };
+const jobLine = (j) => [j.titel, j.arbeitgeber, j.pensum, j.seit ? "seit " + dmyL(j.seit) : "", j.bis ? "bis " + dmyL(j.bis) : ""].filter(Boolean).join(", ");
+async function personalienBytes() {
+  const { pdf, pg, F } = await vorlagePage(), A = BEW.assets, st = BEW.ctx.stamm;
+  const BG = [0.9373, 0.9216, 0.8941], ink = pcol(LAY.ink), acc = pcol(LAY.mark), hair = pcol([0.80, 0.78, 0.74]);
+  pg.drawRectangle({ x: 14, y: 570, width: 250, height: 260, color: pcol(BG) });     // Foto
+  pg.drawRectangle({ x: 262, y: 676, width: 320, height: 60, color: pcol(BG) });     // «Wohnungsbewerbung»
+  const P = st.personen || [], X = [26, 160, 365], CW = [128, 195, 192];
+  const wrap1 = (txt, font, size, w) => { const out = []; let cur = "";
+    for (const wd of String(txt || "").split(/[ \t]+/).filter(Boolean)) { const t = cur ? cur + " " + wd : wd; if (font.widthOfTextAtSize(t, size) <= w || !cur) cur = t; else { out.push(cur); cur = wd; } }
+    if (cur) out.push(cur); return out.length ? out : [""]; };
+  const wrap = (txt, font, size, w) => String(txt || "").split("\n").flatMap((l) => wrap1(l, font, size, w));
+  let y = 772;
+  pg.drawText("Personalien", { x: 26, y, size: 30.6, font: F.R, color: ink });
+  y -= 24; pg.drawText(BEW.doc.adresse ? "Bewerbung " + BEW.doc.adresse : "", { x: 27, y, size: 13, font: F.R, color: ink });
+  y -= 36;
+  P.forEach((p, i) => pg.drawText(`${p.vorname} ${p.nachname}`, { x: X[i + 1], y, size: 12.5, font: F.B, color: ink }));
+  y -= 8;
+  const S10 = 10.5, LD = 13.5;
+  const row = (label, vals) => {
+    const cols = vals.map((v, i) => wrap(v, F.R, S10, CW[i + 1]));
+    const n = Math.max(1, ...cols.map((c) => c.length));
+    pg.drawLine({ start: { x: 26, y: y + 2 }, end: { x: 557, y: y + 2 }, thickness: 0.5, color: hair });
+    y -= LD;
+    pg.drawText(label, { x: X[0], y, size: S10, font: F.R, color: acc });
+    cols.forEach((c, i) => c.forEach((l, k) => pg.drawText(l, { x: X[i + 1], y: y - k * LD, size: S10, font: F.R, color: ink })));
+    y -= (n - 1) * LD + 5;
+  };
+  const per = (f) => P.map(f);
+  row("Geburtsdatum", per((p) => dmyL(p.geburtsdatum)));
+  row("Zivilstand", per((p) => p.zivilstand ? p.zivilstand[0].toUpperCase() + p.zivilstand.slice(1) : ""));
+  row("Heimatort", per((p) => [p.heimatort, p.nationalitaet].filter(Boolean).join(", ")));
+  row("Telefon", per((p) => p.telefon || ""));
+  row("E-Mail", per((p) => p.email || ""));
+  row("Beruf", per((p) => (p.jobs || []).map(jobLine).join("\n")));
+  row("Einkommen brutto", per((p) => p.einkommen || ""));
+  pg.drawLine({ start: { x: 26, y: y + 2 }, end: { x: 557, y: y + 2 }, thickness: 0.5, color: hair });
+  // Abschnitte; unten rechts liegt die blaue Fläche → dort schmaler setzen
+  const maxX = (yy) => (yy < 190 ? 290 : 557);
+  const section = (title) => { y -= 24; pg.drawText(title, { x: 26, y, size: 12, font: F.B, color: acc }); y -= 4; };
+  const para = (txt, font = F.R, size = S10) => wrap(txt, font, size, maxX(y - LD) - 26).forEach((l) => { y -= LD; pg.drawText(l, { x: 26, y, size, font, color: ink }); });
+  const h = st.haushalt || {}, w = st.wohnen || {}, yn = (v) => (v ? "ja" : "nein");
+  section("Haushalt");
+  para([...(st.kinder || []).map((k) => `Kind: ${k.vorname} (geboren ${dmyL(k.geburt)})`)].join(" · "));
+  para(`Haustiere: ${h.haustiere ? "ja" : "keine"} · Rauchen: ${yn(h.raucher)} · Musikinstrumente: ${yn(h.musikinstrumente)}${h.fahrzeug ? " · Fahrzeug: " + h.fahrzeug : ""}`);
+  section("Heutige Wohnung");
+  para([w.adresse, w.seit ? "seit " + dmyL(w.seit) : "", w.miete_brutto ? "Mietzins CHF " + Number(w.miete_brutto).toLocaleString("de-CH") + " brutto" : "", w.vermieter ? "Verwaltung: " + w.vermieter : ""].filter(Boolean).join(", "));
+  section("Referenzen");
+  (st.referenzen || []).forEach((r) => {
+    y -= 3; para(r.rolle || "", F.B, S10);
+    para([[r.name, r.firma].filter(Boolean).join(", "), r.telefon, r.email].filter(Boolean).join(" · "));
+  });
+  // Ort, Datum, Unterschriften (links unten, neben der blauen Fläche)
+  const sy = Math.min(y - 30, 128);
+  pg.drawText("Zürich, " + new Date().toLocaleDateString("de-CH"), { x: 26, y: sy, size: S10, font: F.R, color: ink });
+  const imgP = await pdf.embedPng(A.sigP), imgL = await pdf.embedPng(A.sigL), sw = 105, sh = sw * 560 / 1500;
+  pg.drawImage(imgP, { x: 22, y: sy - 12 - sh, width: sw, height: sh });
+  pg.drawImage(imgL, { x: 148, y: sy - 12 - sh, width: sw, height: sh });
+  pg.drawText(P[0] ? `${P[0].vorname} ${P[0].nachname}` : "", { x: 26, y: sy - 22 - sh, size: 9, font: F.R, color: ink });
+  pg.drawText(P[1] ? `${P[1].vorname} ${P[1].nachname}` : "", { x: 152, y: sy - 22 - sh, size: 9, font: F.R, color: ink });
+  kontaktBlock(pg, F);
+  pdf.setTitle("Personalien " + P.map((p) => p.vorname + " " + p.nachname).join(", "));
+  return pdf.save();
+}
+
+// --- Dossier: Auswahl, Einzel-Downloads, Gesamt-PDF ---
+const fileSlug = (s) => String(s || "").replace(/[«»"]/g, "").replace(/[^\wäöüÄÖÜ]+/g, "_").replace(/^_|_$/g, "");
+function baustAlter(b) {
+  if (!b.datum || !b.gueltig_monate) return null;
+  const d = new Date(b.datum), bis = new Date(d.getFullYear(), d.getMonth() + b.gueltig_monate, d.getDate());
+  const tage = Math.round((bis - new Date()) / 864e5);
+  return { bis, tage, alt: tage < 0, bald: tage >= 0 && tage <= 14 };
+}
+function dossierItems() {
+  const bs = (BEW.ctx.bausteine || []).filter((b) => b.id !== "formular");
+  const beil = (BEW.doc.beilagen || []).map((b) => ({ ...b, beilage: true }));
+  const i = bs.findIndex((b) => b.id === "personalien") + 1;
+  return [...bs.slice(0, i), ...beil, ...bs.slice(i)];
+}
+const dossierOn = (b) => (BEW.doc.auswahl && b.id in BEW.doc.auswahl ? BEW.doc.auswahl[b.id] : b.beilage ? true : !!b.standard);
+function renderDossier() {
+  const el = $("bDossierList"); if (!el) return;
+  el.innerHTML = dossierItems().map((b) => {
+    const a = baustAlter(b);
+    const chip = !a ? (b.datum ? `<small>${esc(dmyL(b.datum))}</small>` : "") : a.alt ? `<small class="old">zu alt seit ${esc(a.bis.toLocaleDateString("de-CH"))}</small>`
+      : a.bald ? `<small class="soon">gültig bis ${esc(a.bis.toLocaleDateString("de-CH"))}</small>` : `<small>gültig bis ${esc(a.bis.toLocaleDateString("de-CH"))}</small>`;
+    return `<div class="drow"><label><input type="checkbox" data-dsel="${esc(b.id)}"${dossierOn(b) ? " checked" : ""}><span>${esc(b.titel)}${chip}</span></label>
+      <button type="button" class="iconbtn" data-dl="${esc(b.id)}" aria-label="${esc(b.titel)} herunterladen">⬇</button>${b.beilage ? `<button type="button" class="iconbtn" data-bdel="${esc(b.id)}" aria-label="Entfernen">✕</button>` : ""}</div>`;
+  }).join("");
+}
+async function itemBytes(b) {
+  if (b.id === "anschreiben") return { bytes: await anschreibenBytes(false), type: "application/pdf" };
+  if (b.id === "personalien") return { bytes: await personalienBytes(), type: "application/pdf" };
+  const path = b.beilage ? b.datei : "dossier/" + b.datei;
+  const bytes = await repoBytes(path);
+  return { bytes, type: /\.pdf$/i.test(path) ? "application/pdf" : /\.png$/i.test(path) ? "image/png" : "image/jpeg" };
+}
+const itemName = (b, type) => {
+  const st = fileSlug(BEW.x.street || "Wohnung");
+  const base = b.id === "anschreiben" ? `Anschreiben_${st}` : b.id === "personalien" ? "Personalien_Meier_Stadelmann" : fileSlug(b.titel);
+  return base + (type === "application/pdf" ? ".pdf" : type === "image/png" ? ".png" : ".jpg");
+};
+function saveBlob(bytes, type, name) {
+  const url = URL.createObjectURL(new Blob([bytes], { type }));
+  const a = document.createElement("a"); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+async function dossierDownload(id) {
+  const b = dossierItems().find((x) => x.id === id); if (!b) return;
+  toast(`Bereite «${b.titel}» vor …`, "", 0);
+  try { await pdfAssets(); const { bytes, type } = await itemBytes(b); saveBlob(bytes, type, itemName(b, type)); toast("Heruntergeladen.", "ok"); }
+  catch (e) { toast("Nicht ladbar: " + e.message, "err"); }
+}
+async function dossierBytes() {
+  const { PDFDocument } = window.PDFLib, out = await PDFDocument.create();
+  for (const b of dossierItems().filter(dossierOn)) {
+    const { bytes, type } = await itemBytes(b);
+    if (type === "application/pdf") {
+      const src = await PDFDocument.load(bytes, { ignoreEncryption: true });
+      (await out.copyPages(src, src.getPageIndices())).forEach((p) => out.addPage(p));
+    } else {
+      const img = type === "image/png" ? await out.embedPng(bytes) : await out.embedJpg(bytes);
+      const pg = out.addPage([595.28, 841.89]), s = Math.min(555 / img.width, 800 / img.height, 1);
+      pg.drawImage(img, { x: (595.28 - img.width * s) / 2, y: (841.89 - img.height * s) / 2, width: img.width * s, height: img.height * s });
+    }
+  }
+  out.setTitle("Bewerbungsdossier " + BEW.doc.adresse); out.setAuthor("Leonie Meier, Pascal Stadelmann");
+  return out.save();
+}
+async function dossierPdf() {
+  bewRead();
+  const sel = dossierItems().filter(dossierOn);
+  if (!sel.length) { toast("Nichts ausgewählt.", "err"); return; }
+  const alt = sel.filter((b) => baustAlter(b)?.alt).map((b) => b.titel);
+  if (alt.length && !confirm(`Zu alt: ${alt.join(", ")}\n\nTrotzdem ins Dossier nehmen?`)) return;
+  const offen = (BEW.doc.text + " " + BEW.doc.name).match(/\[[^\]]*\]/g);
+  if (sel.some((b) => b.id === "anschreiben") && offen && !confirm(`Im Anschreiben noch offen: ${offen.join(", ")}\n\nTrotzdem erstellen?`)) return;
+  const btn = $("bDossierPdf"); btn.disabled = true; btn.textContent = "Erstelle Dossier …";
+  try {
+    await pdfAssets();
+    const bytes = await dossierBytes();
+    const name = `Bewerbungsdossier_${fileSlug(BEW.x.street || "Wohnung")}.pdf`;
+    const url = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
+    const mb = (bytes.length / 1048576).toFixed(1);
+    $("bDossierLink").innerHTML = `<a class="doclink" href="${url}" target="_blank" rel="noopener">📄 Dossier öffnen</a> <a class="doclink" href="${url}" download="${esc(name)}">⬇ Herunterladen</a>
+      <p class="hint">${sel.length} Teile, ${mb} MB${mb > 9 ? " – für manche Mail-Postfächer zu gross, dann einzeln senden" : ""}.</p>`;
+    toast("Dossier erstellt.", "ok");
+  } catch (e) { toast("Dossier fehlgeschlagen: " + e.message, "err"); }
+  finally { btn.disabled = false; btn.textContent = "Dossier als ein PDF"; }
+}
+async function beilageUpload(files) {
+  const added = [];
+  for (const [i, f] of [...files].entries()) {
+    if (f.size > 12e6) { toast(`«${f.name}» ist zu gross (max. 12 MB).`, "err"); continue; }
+    const pdf = f.type === "application/pdf", blob = pdf ? f : await shrinkImage(f);
+    const id = "beilage-" + Date.now().toString(36) + i, path = bewPath(`beilagen/${id}.${pdf ? "pdf" : "jpg"}`);
+    try {
+      await gh(path, { method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: `Bewerbung Beilage: ${BEW.x.street || BEW.k}`, content: await blobB64(blob), branch: "main" }) });
+      added.push({ id, titel: f.name.replace(/\.[^.]+$/, "") || "Dokument", datei: path });
+    } catch (e) { toast("Hochladen fehlgeschlagen: " + e.message, "err"); }
+  }
+  if (added.length) {
+    BEW.doc.beilagen = [...(BEW.doc.beilagen || []), ...added];
+    renderDossier(); bewMark();
+    toast(`${added.length} Dokument${added.length > 1 ? "e" : ""} hinzugefügt – Speichern nicht vergessen.`, "ok");
+  }
+}
+
+// --- Personalien & Referenzen bearbeiten (gilt für alle Bewerbungen) ---
+const spGet = (o, p) => p.split(".").reduce((a, k) => (a == null ? a : a[k]), o);
+function spSet(o, p, v) { const ks = p.split("."); let a = o; ks.slice(0, -1).forEach((k, i) => { if (a[k] == null) a[k] = /^\d+$/.test(ks[i + 1]) ? [] : {}; a = a[k]; }); a[ks.at(-1)] = v; }
+function stammForm() {
+  const st = BEW.ctx.stamm;
+  const inp = (p, label, type = "text") => `<label class="f"><small>${esc(label)}</small><input class="field" data-sp="${p}" type="${type}" value="${esc(spGet(st, p) ?? "")}"></label>`;
+  const yn = (p, label) => `<label class="f"><small>${esc(label)}</small><select class="field" data-sp="${p}" data-bool>${["nein", "ja"].map((o, i) => `<option value="${i}"${!!spGet(st, p) === !!i ? " selected" : ""}>${o}</option>`).join("")}</select></label>`;
+  const pers = (st.personen || []).map((p, i) => `<div class="ftitle sm">${esc(p.vorname)} ${esc(p.nachname)}</div>
+    <div class="row2">${inp(`personen.${i}.telefon`, "Telefon")}${inp(`personen.${i}.email`, "E-Mail", "email")}</div>
+    <div class="row2">${inp(`personen.${i}.zivilstand`, "Zivilstand")}${inp(`personen.${i}.einkommen`, "Einkommen brutto (Personalien)")}</div>
+    ${(p.jobs || []).map((j, k) => `<div class="jobbox"><div class="row2">${inp(`personen.${i}.jobs.${k}.titel`, "Beruf")}${inp(`personen.${i}.jobs.${k}.arbeitgeber`, "Arbeitgeber")}</div>
+      <div class="row2">${inp(`personen.${i}.jobs.${k}.pensum`, "Pensum")}${inp(`personen.${i}.jobs.${k}.brutto_pa`, "Einkommen (für Formulare)")}</div>
+      <div class="row2">${inp(`personen.${i}.jobs.${k}.seit`, "seit", "date")}${inp(`personen.${i}.jobs.${k}.bis`, "bis (leer = unbefristet)", "date")}</div>
+      <button type="button" class="linkbtn" data-spdel="personen.${i}.jobs.${k}">Stelle entfernen</button></div>`).join("")}
+    <button type="button" class="linkbtn" data-spadd="personen.${i}.jobs">+ Stelle hinzufügen</button>`).join("");
+  const refs = (st.referenzen || []).map((r, k) => `<div class="jobbox">${inp(`referenzen.${k}.rolle`, "Rolle, z.B. Heutige Verwaltung")}
+    <div class="row2">${inp(`referenzen.${k}.name`, "Name")}${inp(`referenzen.${k}.firma`, "Firma")}</div>
+    <div class="row2">${inp(`referenzen.${k}.telefon`, "Telefon", "tel")}${inp(`referenzen.${k}.email`, "E-Mail", "email")}</div>
+    <button type="button" class="linkbtn" data-spdel="referenzen.${k}">Referenz entfernen</button></div>`).join("");
+  return `${pers}
+    <div class="ftitle sm">Haushalt</div>
+    <div class="row2">${yn("haushalt.haustiere", "Haustiere")}${yn("haushalt.raucher", "Rauchen")}</div>
+    <div class="row2">${yn("haushalt.musikinstrumente", "Musikinstrumente")}${inp("haushalt.fahrzeug", "Fahrzeug")}</div>
+    <div class="ftitle sm">Heutige Wohnung</div>
+    ${inp("wohnen.adresse", "Adresse")}
+    <div class="row2">${inp("wohnen.seit", "seit", "date")}${inp("wohnen.miete_brutto", "Mietzins brutto (CHF)", "number")}</div>
+    ${inp("wohnen.vermieter", "Verwaltung")}
+    <div class="ftitle sm">Referenzen</div>${refs}
+    <button type="button" class="linkbtn" data-spadd="referenzen">+ Referenz hinzufügen</button>
+    <div class="brow"><button type="button" class="btn primary" id="spSave">Personalien speichern</button></div>`;
+}
+function stammCollect() {
+  document.querySelectorAll("#bStamm [data-sp]").forEach((el) => {
+    let v = el.value; if (el.hasAttribute("data-bool")) v = v === "1"; else if (el.type === "number") v = v === "" ? null : Number(v); else v = v.trim() || null;
+    spSet(BEW.ctx.stamm, el.dataset.sp, v);
+  });
+}
+function renderStamm() { if ($("bStammBody")) $("bStammBody").innerHTML = stammForm(); }
+async function stammSave() {
+  stammCollect();
+  try {
+    const r = await readJson("dossier/stammdaten.json");
+    await writeJson("dossier/stammdaten.json", BEW.ctx.stamm, r.sha, `Personalien geändert (${PEOPLE[S.person] || ""})`);
+    toast("Personalien gespeichert – gelten für alle Bewerbungen.", "ok");
+  } catch (e) { toast("Speichern fehlgeschlagen: " + e.message, "err"); }
+}
+
+// --- Optionen: Dossier-Bausteine verwalten ---
+async function baustLoad() { const r = await readJson("dossier/bausteine.json"); S.baustSha = r.sha; return r.data; }
+async function baustRender() {
+  if (!$("baustList")) return;
+  try {
+    const d = await baustLoad(); S.baust = d;
+    $("baustList").innerHTML = d.bausteine.filter((b) => b.datei).map((b) => {
+      const a = baustAlter(b);
+      return `<div class="drow"><label><input type="checkbox" data-bstd="${esc(b.id)}"${b.standard ? " checked" : ""}><span>${esc(b.titel)}
+        <small class="${a?.alt ? "old" : a?.bald ? "soon" : ""}">${b.datum ? esc(dmyL(b.datum)) : "ohne Datum"}${a ? (a.alt ? " · zu alt" : " · gültig bis " + esc(a.bis.toLocaleDateString("de-CH"))) : ""}</small></span></label>
+        <button type="button" class="iconbtn" data-bview="${esc(b.datei)}" aria-label="Ansehen">👁</button>
+        <label class="iconbtn" aria-label="Ersetzen" title="Ersetzen">⟳<input type="file" accept="application/pdf,image/*" data-brep="${esc(b.id)}" hidden></label>
+        <button type="button" class="iconbtn" data-bremove="${esc(b.id)}" aria-label="Löschen">✕</button></div>`;
+    }).join("") + '<p class="hint">Häkchen = standardmässig im Dossier.</p>';
+  } catch (e) { $("baustList").innerHTML = `<p class="hint">Nicht ladbar: ${esc(e.message)}</p>`; }
+}
+async function toPdfBytes(file) {
+  if (file.type === "application/pdf") return new Uint8Array(await file.arrayBuffer());
+  await pdfLibs();
+  const { PDFDocument } = window.PDFLib, out = await PDFDocument.create();
+  const blob = await shrinkImage(file), bytes = new Uint8Array(await blob.arrayBuffer());
+  const img = blob.type === "image/png" ? await out.embedPng(bytes) : await out.embedJpg(bytes);
+  const pg = out.addPage([595.28, 841.89]), s = Math.min(555 / img.width, 800 / img.height);
+  pg.drawImage(img, { x: (595.28 - img.width * s) / 2, y: (841.89 - img.height * s) / 2, width: img.width * s, height: img.height * s });
+  return out.save();
+}
+async function baustWrite(fn, msg) {
+  const d = await baustLoad(); fn(d.bausteine);
+  S.baustSha = await writeJson("dossier/bausteine.json", d, S.baustSha, msg);
+  if (BEW.ctx) BEW.ctx.bausteine = d.bausteine;
+  baustRender();
+}
+async function baustUpload(file, id, titel, datum, standard) {
+  const bytes = await toPdfBytes(file);
+  const fname = `bausteine/${fileSlug(id)}${datum ? "-" + datum : ""}-${Date.now().toString(36)}.pdf`;
+  await gh("dossier/" + fname, { method: "PUT", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message: `Baustein: ${titel}`, content: await blobB64(new Blob([bytes], { type: "application/pdf" })), branch: "main" }) });
+  return fname;
+}
+$("baustList").addEventListener("change", async (e) => {
+  const std = e.target.closest("[data-bstd]");
+  if (std) { try { await baustWrite((L) => { const b = L.find((x) => x.id === std.dataset.bstd); if (b) b.standard = std.checked; }, "Baustein Standard geändert"); toast("Gespeichert.", "ok"); } catch (er) { toast(er.message, "err"); } return; }
+  const rep = e.target.closest("[data-brep]");
+  if (rep && rep.files[0]) {
+    const b = (S.baust?.bausteine || []).find((x) => x.id === rep.dataset.brep); if (!b) return;
+    const datum = prompt("Ausstellungsdatum des neuen Dokuments (JJJJ-MM-TT):", new Date().toISOString().slice(0, 10)); if (datum === null) return;
+    toast("Lade hoch …", "", 0);
+    try { const f = await baustUpload(rep.files[0], b.id, b.titel, datum, b.standard);
+      await baustWrite((L) => { const x = L.find((y) => y.id === b.id); x.datei = f; x.datum = datum || null; }, `Baustein ersetzt: ${b.titel}`); toast("Ersetzt.", "ok"); }
+    catch (er) { toast("Ersetzen fehlgeschlagen: " + er.message, "err"); }
+  }
+});
+$("baustList").addEventListener("click", async (e) => {
+  const v = e.target.closest("[data-bview]");
+  if (v) { try { window.open(await repoFile("dossier/" + v.dataset.bview), "_blank"); } catch { toast("Nicht ladbar.", "err"); } return; }
+  const del = e.target.closest("[data-bremove]");
+  if (del && confirm("Diesen Baustein aus dem Dossier entfernen?")) {
+    try { await baustWrite((L) => { const i = L.findIndex((x) => x.id === del.dataset.bremove); if (i >= 0) L.splice(i, 1); }, "Baustein entfernt"); toast("Entfernt.", "ok"); }
+    catch (er) { toast(er.message, "err"); }
+  }
+});
+$("baustAdd").addEventListener("click", async () => {
+  const f = $("baustFile").files[0], titel = $("baustTitle").value.trim();
+  if (!f || !titel) { toast("Titel und Datei angeben.", "err"); return; }
+  const datum = $("baustDate").value || null, gueltig = $("baustValid").value ? Number($("baustValid").value) : null;
+  $("baustAdd").disabled = true; toast("Lade hoch …", "", 0);
+  try {
+    const id = fileSlug(titel).toLowerCase() + "-" + Date.now().toString(36);
+    const fname = await baustUpload(f, id, titel, datum, true);
+    await baustWrite((L) => L.push({ id, titel, datei: fname, ...(datum ? { datum } : {}), ...(gueltig ? { gueltig_monate: gueltig } : {}), standard: $("baustStd").checked }), `Baustein hinzugefügt: ${titel}`);
+    $("baustFile").value = ""; $("baustTitle").value = ""; $("baustDate").value = ""; toast("Baustein hinzugefügt.", "ok");
+  } catch (er) { toast("Hinzufügen fehlgeschlagen: " + er.message, "err"); }
+  finally { $("baustAdd").disabled = false; }
+});
 
 // --- Optionen: Claude-Schlüssel (liegt im privaten Repo, gilt für beide) ---
 async function kiState() {
@@ -2699,7 +3056,7 @@ $("kiSave").addEventListener("click", async () => {
   } catch (e) { toast(e.message, "err"); }
   finally { $("kiSave").disabled = false; }
 });
-if (S.token) setTimeout(() => { kiState(); lernLoad(); }, 1200);
+if (S.token) setTimeout(() => { kiState(); lernLoad(); baustRender(); }, 1200);
 </script>
 </body>
 </html>
