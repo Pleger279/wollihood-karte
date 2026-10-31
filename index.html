@@ -2399,7 +2399,7 @@ let installEvt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("installBtn").hidden = false; $("installHint").hidden = true; });
 $("installBtn").addEventListener("click", async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("installBtn").hidden = true; });
 if (window.matchMedia("(display-mode: standalone)").matches) { $("installHint").textContent = "Läuft als App."; }
-const APP_VERSION = "60 · 31.10.2026";
+const APP_VERSION = "61 · 31.10.2026";
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").then((reg) => { reg.update().catch(() => {}); }).catch(() => {});
   let reloaded = false;
@@ -2578,7 +2578,10 @@ $("bBody").addEventListener("click", async (e) => {
   const sdel = e.target.closest("[data-spdel]");
   if (sdel) { stammCollect(); const p = sdel.dataset.spdel.split("."), i = +p.pop(); spGet(BEW.ctx.stamm, p.join(".")).splice(i, 1); renderStamm(); return; }
   if (e.target.id === "bLearnOk" || e.target.id === "bLearnNo") return bewLearnDecide(e.target.id === "bLearnOk");
-  if (e.target.id === "bCopy") { try { await navigator.clipboard.writeText($("bNote").value); toast("Bemerkung kopiert.", "ok"); } catch { $("bNote").select(); toast("Markiert – jetzt kopieren.", ""); } return; }
+  if (e.target.id === "bCopy") {
+    const offen = ($("bNote").value.match(/\[[^\]]*\]/g) || []);
+    if (offen.length && !confirm(`In der Bemerkung steht noch: ${offen.join(", ")}\n\nTrotzdem kopieren?`)) return;
+    try { await navigator.clipboard.writeText($("bNote").value); toast("Bemerkung kopiert.", "ok"); } catch { $("bNote").select(); toast("Markiert – jetzt kopieren.", ""); } return; }
   if (e.target.id === "bPdf") return bewPdf();
   if (e.target.id === "bUndo") { bewUndo(); return; }
   const dl = e.target.closest("[data-doc]");
@@ -2603,7 +2606,12 @@ Du bearbeitest zwei Texte: das Anschreiben (PDF auf ihrer Vorlage) und die Bemer
 Regeln:
 - Deutsch in Schweizer Schreibweise (ss statt ß, «» als Anführungszeichen), «wir»-Form, Verwaltung wird gesiezt.
 - Die Texte sollen nach Leonie und Pascal klingen, nicht nach KI: ihren Wortlaut und Satzbau so weit wie möglich behalten. Keine Floskeln, keine Superlative, keine Adjektivketten, keine Emojis.
-- Nichts erfinden. Fakten nur aus den Stammdaten, dem Inserat oder den bestehenden Texten. Was nur die beiden wissen (z.B. was ihnen an der Besichtigung gefallen hat, Name der Ansprechperson), bleibt als Platzhalter in [eckigen Klammern] stehen.
+- Nichts erfinden. Fakten nur aus den Stammdaten, dem Inserat oder den bestehenden Texten. Was nur die beiden wissen (z.B. was ihnen an der Besichtigung gefallen hat, Name der Ansprechperson), bleibt als Platzhalter in [eckigen Klammern] stehen. Nie einen eigenen, unsicheren Satz in Klammern stehen lassen: was du nicht sicher weisst, lässt du weg.
+- Zuerst klären, wo sie stehen («stand» im Inserat):
+  · Noch nicht besichtigt (Erstkontakt): Sie kennen die Wohnung nur vom Inserat. Also Interesse zeigen und um eine Besichtigung bitten, nicht mit der Tür ins Haus fallen: nie «wir möchten die Wohnung übernehmen/mieten», «wir bewerben uns für», «sie hat uns gefallen». Kurz (Bemerkung höchstens ca. 100 Wörter): wer wir sind, ein konkreter Grund aus dem Inserat, warum sie uns anspricht, Bitte um Besichtigung. Keine Platzhalter für Eindrücke. Schluss: «Über einen Besichtigungstermin würden wir uns sehr freuen.»
+  · Besichtigt oder beworben: richtige Bewerbung wie in der Vorlage, Eindrücke der Besichtigung als [Platzhalter].
+- Sucht die heutige Mieterin oder der heutige Mieter selbst einen Nachmieter (Privatperson statt Verwaltung): persönlicher und kürzer, keine Dossier-Details (Arbeitgeber genügt, kein Pensum, keine Vertragsdetails). Passt der Bezugstermin und ist in den Stammdaten nicht klar, ob sie dann einziehen können, einen Hinweis geben (nicht behaupten).
+- Der Grosseltern-Grund (sie betreuen Lio in Luzern) gilt nur, wenn er für diese Lage stimmt: Wollishofen, Leimbach, Enge, Wiedikon, Friesenberg, Adliswil, Kilchberg und überhaupt Süden/Westen der Stadt sind näher Richtung Luzern als Schwamendingen. Liegt die Wohnung woanders (z.B. Zürichberg, Oerlikon, Altstetten Nord), den Grund weglassen, nicht umbiegen und keinen Platzhalter dafür.
 - Alter aus den Geburtsdaten und dem heutigen Datum berechnen. Befristete oder endende Jobs nicht als dauerhaft darstellen (Datum beachten).
 - Bei Genossenschaften das gemeinschaftliche Wohnen betonen, bei privaten Verwaltungen eher Verlässlichkeit und Stabilität.
 - Die Anrede steht NICHT im Anschreiben-Text (sie wird separat gewählt). Absätze im Anschreiben durch eine Leerzeile trennen; der Schluss ist «Über eine positive Rückmeldung …», dann «Freundliche Grüsse» und in der nächsten Zeile «Leonie, Pascal und Lio».
@@ -2618,7 +2626,7 @@ const BEW_TOOL = { name: "bewerbung", description: "Ergebnis: beide Texte (volls
     aenderungen: { type: "array", description: "Nur bei Rechtschreibprüfung: was korrigiert wurde", items: { type: "object", properties: { vorher: { type: "string" }, nachher: { type: "string" } } } } } } };
 const BEW_AUFTRAG = {
   entwurf: `Erstelle beide Texte für diese Wohnung.
-Anschreiben: Gehe vom Grundtext der Vorlage aus und behalte Aufbau, Wortwahl und Ton. Passe an: die Adresse im ersten Satz (richtige Präposition, z.B. «am Elfenweg», «an der Thujastrasse»), Fakten, die heute nicht mehr stimmen, Widersprüche zum Inserat und, wo es diese Wohnung verlangt, die Gewichtung (Genossenschaft: Nachbarschaft und Mitmachen; private Verwaltung: Verlässlichkeit, sicheres Einkommen, langfristig bleiben). Frage dich: Was will diese Verwaltung lesen, um uns zu nehmen – ohne zu übertreiben? Der Grund für den Umzug (Grosseltern in Luzern betreuen Lio, von Wollishofen viel näher) bleibt immer drin. [Platzhalter] für das, was ihnen gefallen hat, stehen lassen. Falls das Inserat konkrete Merkmale nennt, schlage sie in einem Hinweis vor (nicht in den Text schreiben).
+Anschreiben: Gehe vom Grundtext der Vorlage aus und behalte Aufbau, Wortwahl und Ton. Passe an: die Adresse im ersten Satz (richtige Präposition, z.B. «am Elfenweg», «an der Thujastrasse»), Fakten, die heute nicht mehr stimmen, Widersprüche zum Inserat und, wo es diese Wohnung verlangt, die Gewichtung (Genossenschaft: Nachbarschaft und Mitmachen; private Verwaltung: Verlässlichkeit, sicheres Einkommen, langfristig bleiben). Frage dich: Was will diese Verwaltung lesen, um uns zu nehmen – ohne zu übertreiben? Der Grund für den Umzug (Grosseltern in Luzern betreuen Lio, von Wollishofen viel näher) bleibt drin, wo er für die Lage stimmt (siehe Regeln). Nach einer Besichtigung [Platzhalter] für das, was ihnen gefallen hat, stehen lassen; vor der Besichtigung keine. Vor der Besichtigung ist der Schluss die Bitte um einen Besichtigungstermin statt «positive Rückmeldung». Falls das Inserat konkrete Merkmale nennt, schlage sie in einem Hinweis vor (nicht in den Text schreiben).
 Bemerkung: Gehe von der Vorlage-Bemerkung aus und passe sie an dieses Inserat an (Zimmerzahl, Strasse, Genossenschaft oder private Verwaltung). Den Satz zur Belegung nur, wenn das Inserat die Personenzahl begrenzt. Kurz halten.`,
   anweisung: `Setze die Anweisung von Leonie/Pascal (unten) um. Ändere nur, was die Anweisung verlangt; alles andere bleibt wörtlich gleich. Gilt die Anweisung erkennbar nur für einen der Texte, bleibt der andere unverändert.`,
   pruefen: `Prüfe beide Texte nur auf Rechtschreibung, Grammatik und Zeichensetzung (Schweizer Schreibweise). Keine stilistischen Änderungen, keine Umformulierungen. Liste jede Korrektur in «aenderungen». Inhaltliche Probleme nur als Hinweis, nicht im Text ändern.`,
@@ -2629,7 +2637,8 @@ function bewInserat() {
   const desc = (d.description || x.text || "").replace(/\*\*/g, "").slice(0, 5000);
   return JSON.stringify({ titel: d.title || x.title, strasse: x.street, plz: x.plz, ort: x.city, zimmer: x.rooms, miete_brutto: x.rent || f.rent_gross,
     flaeche_m2: x.m2 || f.livingspace, bezug: f.moving_date || x.moving_date, verwaltung: d.agency?.name || x.agency, portal: x.portal,
-    merkmale: d.attributes, einschaetzung_claude: x.ai?.text, haken: x.ai?.haken, beschreibung: desc, eigene_notiz: itemOf(BEW.k).note || undefined }, null, 1);
+    merkmale: d.attributes, einschaetzung_claude: x.ai?.text, haken: x.ai?.haken, beschreibung: desc, eigene_notiz: itemOf(BEW.k).note || undefined,
+    stand: ({ besichtigung: "Besichtigung vereinbart oder gemacht", beworben: "schon beworben", angefragt: "angefragt, noch nicht besichtigt" })[itemOf(BEW.k).status?.value] || "noch nicht besichtigt (Erstkontakt)" }, null, 1);
 }
 async function claudeCall(mode, instr) {
   const c = BEW.ctx, doc = bewRead();
