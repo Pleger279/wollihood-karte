@@ -523,6 +523,13 @@ details.adv-inner summary { font: 600 13.5px var(--body); text-transform: none; 
 .sheetbody { grid-auto-rows: max-content }
 .dcform textarea.field { min-height: 44px; height: 44px; resize: none }
 #ownNote { min-height: 64px }
+/* Eingabefelder schlicht: normale Schrift, gleiche Höhe und Innenabstand, Beschriftung klein darüber */
+.field, select.field, textarea.field, #bStamm .sfin, #bFormBody .sfin { font-weight: 400; font-family: var(--body); line-height: 1.4 }
+.field { padding: 10px 12px; min-height: 44px }
+.field::placeholder { color: var(--muted); opacity: .8; font-weight: 400 }
+label.f, div.f { gap: 6px; font-weight: 400 }
+label.f small, div.f small { color: var(--muted); font: 500 12.5px var(--body) }
+.dcform { align-items: stretch } .dcform .btn { min-height: 44px }
 .sheethead { border-bottom: 1px solid var(--line); background: var(--bar) }
 .sheethead b { font: 700 17px/1.2 var(--body); text-transform: none }
 .onl { border: 0; border-radius: 10px; font: 500 13px var(--body); text-transform: none; letter-spacing: 0; background: var(--sunk); color: var(--muted); padding: 8px 12px }
@@ -596,7 +603,7 @@ details.adv-inner summary { font: 600 13.5px var(--body); text-transform: none; 
 .quiet.back { color: var(--accent) }
 .detail-mini { border-radius: 14px; overflow: hidden; box-shadow: var(--shadow) }
 .detail-mini .mini { border-top: 0; height: 160px }
-.mini .lbl { font: 600 11.5px var(--body); text-transform: none; letter-spacing: 0; border-radius: 0 8px 0 0 }
+.mini .lbl { font: 600 12px var(--body); text-transform: none; letter-spacing: 0; border-radius: 8px; left: 8px; bottom: 8px; background: var(--surface); color: var(--accent); box-shadow: var(--shadow) }
 </style>
 </head>
 <body>
@@ -1193,11 +1200,11 @@ function standPanel(k) {
     ${firstUrl(x) ? `<a class="linkbtn" style="justify-self:center" href="${esc(firstUrl(x))}" target="_blank" rel="noopener">Inserat auf ${esc(x.sources?.[0]?.portal || x.portal || "der Plattform")} öffnen ↗</a>` : ""}
   </div>`;
 }
-// «Unter uns»: Daumen, Stern, Kommentare, Notiz und eigene Dateien an einem Ort
+// «Bewertung & Notizen»: Daumen, Stern, Kommentare, Notiz und eigene Dateien an einem Ort
 function usPanel(k) {
   const it = itemOf(k), mine = myVote(k), other = S.person ? otherOf(S.person) : null, ov = other ? (it.votes || {})[other] : null;
   const files = it.files || [];
-  return `<div class="panel" id="dUs"><h2>Unter uns</h2>
+  return `<div class="panel" id="dUs"><h2>Bewertung &amp; Notizen</h2>
     <div class="usrow"><span>Du</span><span class="vbs">
       <button type="button" class="vmini up" data-dvote="up" aria-pressed="${mine === "up"}" aria-label="Daumen hoch">${thumb("up")}</button>
       <button type="button" class="vmini down" data-dvote="down" aria-pressed="${mine === "down"}" aria-label="Daumen runter">${thumb("down")}</button>
@@ -1206,9 +1213,9 @@ function usPanel(k) {
     <div class="dthread">${(it.comments || []).map((c) => `<div class="cmt ${c.by === S.person ? "mine" : ""}">
         <div class="who">${esc(PEOPLE[c.by] || c.by)}<span>${esc(ago(c.at))}</span></div>
         <p>${esc(c.text)}</p>${c.by === S.person ? `<button type="button" class="del" data-ddel="${esc(c.id)}">löschen</button>` : ""}</div>`).join("")}</div>
-    <div class="dcform"><textarea class="field" rows="1" id="dCmt" placeholder="Kommentar${other ? " an " + esc(PEOPLE[other]) : ""} …"></textarea><button type="button" class="btn primary" id="dCmtSend">Senden</button></div>
-    <label class="f"><small>Notiz (Kontakt, Termine …) – wird beim Verlassen des Felds gespeichert</small>
-      <textarea class="field" id="ownNote" rows="2" placeholder="z.B. Frau Muster, 044 …, Besichtigung Do 18 Uhr">${esc(it.note || "")}</textarea></label>
+    <label class="f"><small>Kommentar${other ? " an " + esc(PEOPLE[other]) : ""}</small><div class="dcform"><textarea class="field" rows="1" id="dCmt" placeholder="Schreiben …"></textarea><button type="button" class="btn primary" id="dCmtSend">Senden</button></div></label>
+    <label class="f"><small>Notiz</small>
+      <textarea class="field" id="ownNote" rows="2" placeholder="Kontakt, Termine … (speichert sich selbst)">${esc(it.note || "")}</textarea></label>
     ${files.length ? `<div class="ownfiles">${files.map((f) => f.type === "application/pdf" ? `<a href="#" data-doc="${esc(f.path)}">📄 ${esc(f.name || "Dokument")}</a>`
       : `<img data-src="${esc(f.path)}" data-full="${esc(f.path)}" alt="${esc(f.name || "")}">`).join("")}</div>` : ""}
     <label class="linkbtn" for="ownFiles" style="cursor:pointer">+ Screenshot oder Dokument</label>
@@ -2649,7 +2656,7 @@ let installEvt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("installBtn").hidden = false; $("installHint").hidden = true; });
 $("installBtn").addEventListener("click", async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("installBtn").hidden = true; });
 if (window.matchMedia("(display-mode: standalone)").matches) { $("installHint").textContent = "Läuft als App."; }
-const APP_VERSION = "64 · 31.10.2026";
+const APP_VERSION = "65 · 31.10.2026";
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").then((reg) => { reg.update().catch(() => {}); }).catch(() => {});
   let reloaded = false;
