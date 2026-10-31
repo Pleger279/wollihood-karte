@@ -593,6 +593,7 @@ label.f small, div.f small { color: var(--muted); font: 500 12.5px var(--body) }
 .sdone .linkbtn { font-size: 12.5px; color: var(--muted) }
 #kText { min-height: 170px }
 .btn.ki { background: var(--accent-soft); color: var(--accent); border-color: transparent }
+.kbar { display: flex; gap: 10px; align-items: center } .kbar .btn { flex: none }
 .kmt { display: grid; gap: 8px; margin-top: 10px }
 .kmtbar { display: flex; gap: 10px; align-items: center } .kmtbar .btn { flex: none } .kmtbar .hint { font-size: 12.5px }
 .btn.sm { min-height: 36px; padding: 6px 12px; font-size: 13.5px }
@@ -1240,10 +1241,10 @@ function standPanel(k) {
   let body = "";
   if (tab === "kontakt") body = `<p class="hint">Kurze Nachricht fürs Kontaktfeld im Inserat – vor der Besichtigung.</p>
       <textarea class="field" id="kText" rows="7" spellcheck="true" lang="de-CH" placeholder="Lade …"></textarea>
+      <div class="kbar"><button type="button" class="btn sm" id="kCopy">Kopieren</button><span class="hint" id="kState"></span></div>
       ${kmtBlock("kontakt")}
       <button type="button" class="btn ki" id="kKi">✦ Neu schreiben lassen</button>
-      <p class="hint" id="kState"></p><div id="kTips"></div><div id="kLearn"></div>
-      <button type="button" class="btn primary" id="kCopy">Kopieren &amp; Inserat öffnen</button>
+      <div id="kTips"></div><div id="kLearn"></div>
       ${steps.kontakt ? doneLine("kontakt", "Angefragt") : `<button type="button" class="btn" data-step="kontakt">Als angefragt markieren</button>`}`;
   if (tab === "besichtigung") {
     const b = steps.besichtigung || {};
@@ -1888,8 +1889,7 @@ $("dBody").addEventListener("click", async (e) => {
     if (offen && !confirm(`In der Nachricht steht noch: ${offen.join(", ")}\n\nTrotzdem kopieren?`)) return;
     try { await navigator.clipboard.writeText(t); } catch { $("kText").select(); }
     if (t !== (KON.data?.text || "").trim()) kontaktSave(k0, t, true);
-    if (firstUrl(x)) window.open(firstUrl(x), "_blank", "noopener");
-    if (!stepsOf(k0).kontakt) setTimeout(() => toastAction("Nachricht kopiert. Geschickt?", "Als angefragt markieren", () => setStep(k0, "kontakt", {}), 15000), 600);
+    if (!stepsOf(k0).kontakt) toastAction("Kopiert. Nach dem Senden:", "Als angefragt markieren", () => setStep(k0, "kontakt", {}), 15000);
     else toast("Nachricht kopiert.", "ok");
     return;
   }
@@ -2822,7 +2822,7 @@ let installEvt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("installBtn").hidden = false; $("installHint").hidden = true; });
 $("installBtn").addEventListener("click", async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("installBtn").hidden = true; });
 if (window.matchMedia("(display-mode: standalone)").matches) { $("installHint").textContent = "Läuft als App."; }
-const APP_VERSION = "69 · 31.10.2026";
+const APP_VERSION = "70 · 31.10.2026";
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").then((reg) => { reg.update().catch(() => {}); }).catch(() => {});
   let reloaded = false;
