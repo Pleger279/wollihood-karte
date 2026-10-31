@@ -1001,7 +1001,7 @@ function mountMinis() {
 }
 function showOnMap(k) {
   const x = S.hits.find((h) => keyOf(h) === k); if (!x || x.lat == null) return;
-  if (!$("detail").hidden) closeDetail();
+  if (!$("detail").hidden) closeDetail(true);
   S.seen.add(k); saveSeen();
   S.focus = [x.lat, x.lon];
   setSearchMode("show"); showTab("search");
@@ -1241,7 +1241,7 @@ function standPanel(k) {
   let body = "";
   if (tab === "kontakt") body = `<p class="hint">Kurze Nachricht fürs Kontaktfeld im Inserat – vor der Besichtigung.</p>
       <textarea class="field" id="kText" rows="7" spellcheck="true" lang="de-CH" placeholder="Lade …"></textarea>
-      <div class="kbar"><button type="button" class="btn sm" id="kCopy">Kopieren</button><span class="hint" id="kState"></span></div>
+      <div class="kbar"><button type="button" class="btn sm" id="kCopy">Kopieren</button><button type="button" class="btn sm" id="kSave" disabled>Gespeichert</button><span class="hint" id="kState"></span></div>
       ${kmtBlock("kontakt")}
       <button type="button" class="btn ki" id="kKi">✦ Neu schreiben lassen</button>
       <div id="kTips"></div><div id="kLearn"></div>
@@ -1283,15 +1283,15 @@ async function kontaktLoad(k) {
     try { const r = await readJson(`archiv/${aid}/bewerbung/kontakt.json`); KON.data = r.data; KON.sha = r.sha; } catch { } }
   if (S.detailKey !== k || !$("kText")) return;
   kmtLoad(k);
-  $("kText").value = KON.data?.text || ""; $("kText").placeholder = "Eure Nachricht …";
-  if (KON.data?.text) $("kState").textContent = `Gespeichert${KON.data.by ? " von " + (PEOPLE[KON.data.by] || KON.data.by) : ""}, ${ago(KON.data.updated)}.`;
+  $("kText").value = KON.data?.text || ""; $("kText").placeholder = "Eure Nachricht …"; saveBtnState();
+  if (KON.data?.text) $("kState").textContent = `Gespeichert${KON.data.by ? " von " + (PEOPLE[KON.data.by] || KON.data.by) : ""}, ${ago(KON.data.updated)}`;
   else if (!KON.auto.has(k)) { KON.auto.add(k); kontaktKi(k); }
 }
 async function kontaktSave(k, text, quiet) {
   if (needPerson()) return;
   const aid = await aidOf(k);
   const data = { ...(KON.data || {}), text, by: S.person, updated: new Date().toISOString() };
-  try { KON.sha = await writeJson(`archiv/${aid}/bewerbung/kontakt.json`, data, KON.sha, `Kontakt-Nachricht (${PEOPLE[S.person]})`); KON.data = data;
+  try { KON.sha = await writeJson(`archiv/${aid}/bewerbung/kontakt.json`, data, KON.sha, `Kontakt-Nachricht (${PEOPLE[S.person]})`); KON.data = data; saveBtnState();
     if (!quiet) { toast("Nachricht gespeichert.", "ok"); if ($("kState")) $("kState").textContent = "Gespeichert."; }
   } catch (e) { toast("Nicht gespeichert: " + e.message, "err"); }
 }
@@ -1352,6 +1352,14 @@ ${instr}
   } catch (e) { if (st) st.textContent = "Claude: " + e.message; }
   finally { KON.busy = false; $("kKi") && ($("kKi").disabled = false); }
 }
+// Speichern-Knöpfe: «Speichern» sobald etwas geändert ist, sonst «Gespeichert»
+const noteDirty = () => !!$("ownNote") && $("ownNote").value.trim() !== (itemOf(S.detailKey).note || "").trim();
+const konDirty = () => !!$("kText") && KON.k === S.detailKey && $("kText").value.trim() !== (KON.data?.text || "").trim();
+function saveBtnState() {
+  const n = $("ownNoteSave"); if (n) { const d = noteDirty(); n.disabled = !d; n.textContent = d ? "Speichern" : "Gespeichert"; n.classList.toggle("primary", d); }
+  const c = $("kSave"); if (c) { const d = konDirty(); c.disabled = !d; c.textContent = d ? "Speichern" : "Gespeichert"; c.classList.toggle("primary", d); }
+}
+document.addEventListener("input", (e) => { if (e.target.id === "ownNote" || e.target.id === "kText") saveBtnState(); });
 // «Bewertung & Notizen»: Daumen, Stern, Kommentare, Notiz und eigene Dateien an einem Ort
 function usPanel(k) {
   const it = itemOf(k), mine = myVote(k), other = S.person ? otherOf(S.person) : null, ov = other ? (it.votes || {})[other] : null;
@@ -1367,7 +1375,8 @@ function usPanel(k) {
         <p>${esc(c.text)}</p>${c.by === S.person ? `<button type="button" class="del" data-ddel="${esc(c.id)}">löschen</button>` : ""}</div>`).join("")}</div>
     <label class="f"><small>Kommentar${other ? " an " + esc(PEOPLE[other]) : ""}</small><div class="dcform"><textarea class="field" rows="1" id="dCmt" placeholder="Schreiben …"></textarea><button type="button" class="btn primary" id="dCmtSend">Senden</button></div></label>
     <label class="f"><small>Notiz</small>
-      <textarea class="field" id="ownNote" rows="2" placeholder="Kontakt, Termine … (speichert sich selbst)">${esc(it.note || "")}</textarea></label>
+      <textarea class="field" id="ownNote" rows="2" placeholder="Kontakt, Termine …">${esc(it.note || "")}</textarea></label>
+    <div class="kbar"><button type="button" class="btn sm" id="ownNoteSave" disabled>Gespeichert</button></div>
     ${files.length ? `<div class="ownfiles">${files.map((f) => f.type === "application/pdf" ? `<a href="#" data-doc="${esc(f.path)}">📄 ${esc(f.name || "Dokument")}</a>`
       : `<img data-src="${esc(f.path)}" data-full="${esc(f.path)}" alt="${esc(f.name || "")}">`).join("")}</div>` : ""}
     <label class="linkbtn" for="ownFiles" style="cursor:pointer">+ Screenshot oder Dokument</label>
@@ -1505,7 +1514,9 @@ const vz = (() => {
   return { reset };
 })();
 
-function closeDetail() { $("detail").hidden = true; document.body.style.overflow = ""; if (location.hash.startsWith("#d=")) history.replaceState(null, "", location.pathname); }
+function closeDetail(force) {
+  if (force !== true && (noteDirty() || konDirty()) && !confirm("Notiz oder Nachricht ist nicht gespeichert. Trotzdem schliessen?")) return;
+  $("detail").hidden = true; document.body.style.overflow = ""; if (location.hash.startsWith("#d=")) history.replaceState(null, "", location.pathname); }
 $("dClose").addEventListener("click", closeDetail);
 document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("detail").hidden) closeDetail(); });
 async function openDetail(k) {
@@ -1649,15 +1660,7 @@ async function refreshDetail() {
 }
 $("dBody").addEventListener("change", (e) => {
   const k = S.detailKey; if (!k) return;
-  if (e.target.id === "ownNote") {
-    if (needPerson()) return;
-    const val = e.target.value.trim();
-    if (val === (itemOf(k).note || "").trim()) return;
-    socialOp(`${PEOPLE[S.person]} Notiz`, (items) => { const it = items[k] || (items[k] = { votes: {}, comments: [] }); it.note = val; it.updated = new Date().toISOString(); });
-    toast("Notiz gespeichert.", "ok"); return;
-  }
   if (e.target.matches("[data-swhen]")) { setStep(k, "besichtigung", { when: e.target.value ? new Date(e.target.value).toISOString() : null }); return; }
-  if (e.target.id === "kText") { const t = e.target.value.trim(); if (t !== (KON.data?.text || "").trim()) kontaktSave(k, t, true); return; }
 });
 $("dBody").addEventListener("change", async (e) => {
   if (e.target.id !== "ownFiles" || !e.target.files.length) return;
@@ -1903,8 +1906,9 @@ $("dBody").addEventListener("click", async (e) => {
     if (needPerson()) return;
     const k = S.detailKey, val = $("ownNote").value.trim();
     socialOp(`${PEOPLE[S.person]} Notiz`, (items) => { const it = items[k] || (items[k] = { votes: {}, comments: [] }); it.note = val; it.updated = new Date().toISOString(); });
-    toast("Notiz gespeichert.", "ok"); return;
+    saveBtnState(); toast("Notiz gespeichert.", "ok"); return;
   }
+  if (e.target.id === "kSave" && S.detailKey) { await kontaktSave(S.detailKey, $("kText").value.trim(), false); saveBtnState(); return; }
   const zimg = e.target.closest(".gal img, .ownfiles img");
   if (zimg && zimg.src) { openViewer(zimg); return; }
   const doc = e.target.closest("[data-doc]");
@@ -2822,7 +2826,7 @@ let installEvt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("installBtn").hidden = false; $("installHint").hidden = true; });
 $("installBtn").addEventListener("click", async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("installBtn").hidden = true; });
 if (window.matchMedia("(display-mode: standalone)").matches) { $("installHint").textContent = "Läuft als App."; }
-const APP_VERSION = "70 · 31.10.2026";
+const APP_VERSION = "71 · 31.10.2026";
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").then((reg) => { reg.update().catch(() => {}); }).catch(() => {});
   let reloaded = false;
