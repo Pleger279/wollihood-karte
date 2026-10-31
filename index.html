@@ -518,6 +518,9 @@ details.adv-inner summary { font: 600 13.5px var(--body); text-transform: none; 
 .tab { border-right: 0; font: 500 11px var(--body); text-transform: none; letter-spacing: 0 }
 .tabbar { grid-template-columns: repeat(3, 1fr) }
 /* «Mehr»: Gruppen und einklappbare Bereiche */
+.maplegend { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; font-size: 12.5px; color: var(--muted); margin-bottom: 8px }
+.maplegend span { display: inline-flex; gap: 5px; align-items: center } .maplegend i { width: 10px; height: 10px; border-radius: 50%; display: inline-block }
+.maplegend .linkbtn { margin-left: auto; font-size: 12.5px }
 .pushbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: var(--accent-soft); border-radius: 12px; padding: 10px 12px }
 .mgrp { margin: 14px 4px -4px; font: 600 13px var(--body); color: var(--muted); text-transform: none; letter-spacing: 0 }
 .mgrp:first-child { margin-top: 2px }
@@ -725,6 +728,8 @@ label.f small, div.f small { color: var(--muted); font: 500 12.5px var(--body) }
       <div class="arow one" id="searchAreaBtns" hidden>
         <button class="btn" type="button" id="saCopy">Gebiet von «Push &amp; Mail» übernehmen</button>
       </div>
+      <div class="maplegend"><span><i style="background:var(--accent)"></i>offen</span><span><i style="background:var(--star)"></i>Favorit</span><span><i style="background:var(--ok)"></i>läuft</span>
+        <button type="button" class="linkbtn" id="outToggle" hidden></button></div>
       <div id="map"></div>
     </div>
 
@@ -1181,7 +1186,7 @@ function socialOp(label, apply) {
         const items = cur.data.items || {};
         apply(items);
         S.socialSha = await writeJson("social.json", { items }, cur.sha, "Reaktion: " + label);
-        S.social = items; renderHits();
+        S.social = items; renderHits(); renderMarkers();
         return;
       } catch (e) {
         if (!(e.status === 409 || e.status === 422) || i === 3) { toast("Nicht gespeichert: " + e.message, "err", 7000); return; }
@@ -2249,6 +2254,7 @@ function setSearchMode(m) {
   if (S.map && S.work) setAreaMode(m === "notify" ? "push" : "search"); else S.amode = m === "notify" ? "push" : "search";
   renderAreaUi();
 }
+$("v-search").addEventListener("click", (e) => { if (e.target.id === "outToggle") { S.showOutOnMap = !S.showOutOnMap; renderMarkers(); } });
 $("v-search").addEventListener("click", (e) => { const b = e.target.closest("[data-stab]"); if (b) { setSearchMode(b.dataset.stab); window.scrollTo(0, 0); } });
 $("paCopy").addEventListener("click", () => { if (!S.work) return; grabWork(); S.work.push = JSON.parse(JSON.stringify(S.work.search)); paintAreas(true); markAreaDirty(); toast("Gebiet von «Suche» übernommen. Unten «Speichern» tippen."); });
 $("saCopy").addEventListener("click", () => { if (!S.work) return; grabWork(); if (!hasFeat(S.work.push)) { toast("«Push & Mail» hat noch kein eigenes Gebiet.", "err"); return; } S.work.search = JSON.parse(JSON.stringify(S.work.push)); paintAreas(true); markAreaDirty(); toast("Gebiet von «Push & Mail» übernommen. Unten «Speichern» tippen."); });
@@ -2268,15 +2274,23 @@ function renderMarkers() {
   if (!S.hitLayer) return;
   S.hitLayer.clearLayers();
   S.markers = {};
+  const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+  let nOut = 0;
   S.hits.forEach((x) => {
-    const m = isFav(keyOf(x)) ? "fav" : "";
+    const k = keyOf(x);
     if (x.lat == null || !inSavedArea(x)) return;
+    const out = verdict(k) === "out";
+    if (out) { nOut++; if (!S.showOutOnMap) return; }
+    const st = itemOf(k).status?.value;
     const outPush = S.amode === "push" && S.work && hasFeat(S.work.push) && !inAreas(x.lat, x.lon, S.work.push);
-    const c = outPush ? "#9a9a9a" : m === "fav" ? getComputedStyle(document.documentElement).getPropertyValue("--star").trim() : accent();
-    S.markers[keyOf(x)] = L.circleMarker([x.lat, x.lon], { radius: 8, color: "#fff", weight: 2, fillColor: c, fillOpacity: 0.95, pmIgnore: true })
+    // Farbe mit Bedeutung: grau = aussortiert / ausserhalb Push, grün = läuft schon, gelb = Favorit, blau = offen
+    const c = out || outPush ? "#9a9a9a" : st ? css("--ok") : isFav(k) ? css("--star") : accent();
+    S.markers[k] = L.circleMarker([x.lat, x.lon], { radius: out ? 6 : 8, color: "#fff", weight: 2, fillColor: c, fillOpacity: out ? 0.6 : 0.95, pmIgnore: true })
       .bindPopup(`${x.image ? `<img src="${esc(x.image)}" alt="" style="width:200px;height:112px;object-fit:cover;border-radius:6px;display:block;margin-bottom:6px" referrerpolicy="no-referrer">` : ""}<b>${esc(chf(x.rent))} · ${esc(rooms(x.rooms))}${x.m2 ? " · " + esc(x.m2) + " m²" : ""}</b><br>${esc(x.street || "")}<br><a href="#" data-k="${esc(keyOf(x))}" onclick="openDetail(this.dataset.k);return false">Details</a> · <a href="${esc(x.url)}" target="_blank" rel="noopener">Inserat ↗</a>`, { maxWidth: 220 })
       .addTo(S.hitLayer);
   });
+  const t = $("outToggle");
+  if (t) { t.hidden = !nOut; t.textContent = S.showOutOnMap ? `Aussortierte ausblenden (${nOut})` : `Aussortierte zeigen (${nOut})`; }
 }
 function collectFromMap() {
   const features = [];
@@ -2866,7 +2880,7 @@ let installEvt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("installBtn").hidden = false; $("installHint").hidden = true; });
 $("installBtn").addEventListener("click", async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("installBtn").hidden = true; });
 if (window.matchMedia("(display-mode: standalone)").matches) { $("installHint").textContent = "Läuft als App."; }
-const APP_VERSION = "73 · 31.10.2026";
+const APP_VERSION = "74 · 31.10.2026";
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").then((reg) => { reg.update().catch(() => {}); }).catch(() => {});
   let reloaded = false;
