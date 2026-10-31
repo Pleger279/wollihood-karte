@@ -516,6 +516,16 @@ details.adv-inner summary { font: 600 13.5px var(--body); text-transform: none; 
 /* Tableiste */
 .tabbar { background: var(--surface); color: var(--muted); border-top: 1px solid var(--line) }
 .tab { border-right: 0; font: 500 11px var(--body); text-transform: none; letter-spacing: 0 }
+.tabbar { grid-template-columns: repeat(3, 1fr) }
+/* «Mehr»: Gruppen und einklappbare Bereiche */
+.pushbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: var(--accent-soft); border-radius: 12px; padding: 10px 12px }
+.mgrp { margin: 14px 4px -4px; font: 600 13px var(--body); color: var(--muted); text-transform: none; letter-spacing: 0 }
+.mgrp:first-child { margin-top: 2px }
+.panel.fold > h2 { cursor: pointer; display: flex; justify-content: space-between; align-items: center; margin: 0 }
+.panel.fold > h2::after { content: "+"; font: 400 22px/1 var(--body); color: var(--muted) }
+.panel.fold.open > h2::after { content: "–" }
+.panel.fold:not(.open) > :not(h2) { display: none !important }
+#sources:not(.showsub) .src.sub { display: none }
 .tab[aria-selected="true"] { color: var(--accent); box-shadow: none; font-weight: 600 }
 .tab .count { border-radius: 9px; font: 600 11px var(--body); top: 5px }
 /* Fenster (Details, Bewerbung) */
@@ -593,7 +603,26 @@ label.f small, div.f small { color: var(--muted); font: 500 12.5px var(--body) }
 .sdone .linkbtn { font-size: 12.5px; color: var(--muted) }
 #kText { min-height: 170px }
 .btn.ki { background: var(--accent-soft); color: var(--accent); border-color: transparent }
-.kbar { display: flex; gap: 10px; align-items: center } .kbar .btn { flex: none }
+.kbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap } .kbar .btn { flex: none }
+/* Bewerbung: drei Schritte, Fusszeile mit Speichern/Weiter */
+.stabs.three { grid-template-columns: repeat(3, minmax(0, 1fr)) }
+#bBody section { display: grid; gap: 14px } #bBody section[hidden] { display: none }
+.bewfoot { position: sticky; bottom: calc(-1 * (env(safe-area-inset-bottom, 0px) + 28px)); margin: 0 -16px calc(-1 * (env(safe-area-inset-bottom, 0px) + 28px)); padding: 10px 16px calc(env(safe-area-inset-bottom, 0px) + 12px);
+  background: var(--surface); border-top: 1px solid var(--line); display: flex; gap: 8px; align-items: center; justify-content: flex-end; z-index: 4 }
+.bewfoot #bDirty { margin-right: auto; font-size: 13px } .bewfoot .btn { flex: none }
+#bClaude > :empty { display: none }
+.dosdet summary { cursor: pointer; list-style: none; font-size: 14.5px; display: flex; justify-content: space-between; gap: 8px; padding: 4px 0 }
+.dosdet summary .chg { color: var(--accent); font-weight: 600; white-space: nowrap }
+.dosdet[open] summary .chg { visibility: hidden }
+/* Dossier-Zeilen: kleine eckige Knöpfe, Aktionen im Menü */
+.drow .iconbtn { width: 36px; height: 36px; border-radius: 9px; box-shadow: none; border: 1px solid var(--line); background: var(--surface); font-size: 15px }
+.dmenu { position: relative; flex: none }
+.dmenu summary { list-style: none; width: 36px; height: 36px; border-radius: 9px; border: 1px solid var(--line); display: grid; place-items: center; cursor: pointer; font-size: 18px; line-height: 1 }
+.dmenu-list { position: absolute; right: 0; top: 40px; z-index: 6; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 6px 20px rgba(0,0,0,.15); display: grid; min-width: 140px; overflow: hidden }
+.dmenu-list > * { border: 0; background: none; text-align: left; padding: 11px 14px; font: 500 14px var(--body); color: var(--fg); cursor: pointer; border-top: 1px solid var(--hair) }
+.dmenu-list > *:first-child { border-top: 0 } .dmenu-list .bad { color: var(--bad) }
+/* Eckdaten: letztes Feld allein → ganze Breite */
+.dfacts div:last-child:nth-child(odd) { grid-column: 1 / -1; border-right: 0 }
 .kmt { display: grid; gap: 8px; margin-top: 10px }
 .kmtbar { display: flex; gap: 10px; align-items: center } .kmtbar .btn { flex: none } .kmtbar .hint { font-size: 12.5px }
 .btn.sm { min-height: 36px; padding: 6px 12px; font-size: 13.5px }
@@ -669,19 +698,20 @@ label.f small, div.f small { color: var(--muted); font: 500 12.5px var(--body) }
     </div>
     <div class="panel whoami" id="whoPanel" hidden>
       <div class="ftitle">Wer nutzt dieses Handy?</div>
-      <p class="hint">Damit eure Daumen und Kommentare richtig zugeordnet werden. Du kannst das unter Optionen jederzeit ändern.</p>
+      <p class="hint">Damit eure Daumen und Kommentare richtig zugeordnet werden. Du kannst das unter Mehr jederzeit ändern.</p>
       <div class="seg"><button type="button" class="opt" data-who="pascal">Pascal</button><button type="button" class="opt" data-who="leonie">Leonie</button></div>
     </div>
     <div id="hitList" class="view"></div>
     <button class="btn" id="allSeenBtn" type="button" hidden>Alle als gelesen markieren</button>
   </section>
 
-  <!-- Suche: Gebiet + Kriterien, je für «Anzeigen» und «Push & Mail» -->
+  <!-- Suche: Gebiet + Kriterien, je für «Suche» und «Push & Mail» -->
   <section class="view" id="v-search" hidden>
-    <div class="seg tabs2" id="searchTabs" role="tablist">
+    <div class="seg tabs2" id="searchTabs" role="tablist" hidden>
       <button type="button" class="opt" data-stab="show" aria-pressed="true">Anzeigen</button>
       <button type="button" class="opt" data-stab="notify" aria-pressed="false">Push &amp; Mail</button>
     </div>
+    <div class="pushbar" id="pushBar" hidden><button type="button" class="linkbtn" data-stab="show">‹ Zurück zur Suche</button><b>Push &amp; Mail</b></div>
     <div class="summary" id="sumShowBox"><span class="sumlabel">Angezeigt werden</span><span id="sumSearch"></span></div>
     <div class="summary" id="sumNotifyBox" hidden><span class="sumlabel">Push &amp; Mail bei</span><span id="sumNotify"></span><span class="sw-sub" id="sumNotifyDiff"></span></div>
     <p class="hint" id="modeHint"></p>
@@ -690,7 +720,7 @@ label.f small, div.f small { color: var(--muted); font: 500 12.5px var(--body) }
       <div class="ftitle">Gebiet</div>
       <p class="hint" id="areaHint"></p>
       <div class="arow one" id="pushAreaBtns" hidden>
-        <button class="btn" type="button" id="paCopy">Gebiet von «Anzeigen» übernehmen</button>
+        <button class="btn" type="button" id="paCopy">Gebiet von «Suche» übernehmen</button>
       </div>
       <div class="arow one" id="searchAreaBtns" hidden>
         <button class="btn" type="button" id="saCopy">Gebiet von «Push &amp; Mail» übernehmen</button>
@@ -699,13 +729,16 @@ label.f small, div.f small { color: var(--muted); font: 500 12.5px var(--body) }
     </div>
 
     <div class="view" id="cs-search">
-      <div class="panel copyrow"><button class="btn" id="copyCritBack" type="button">Kriterien von «Push &amp; Mail» übernehmen</button></div>
       <div class="view" id="critS"></div>
       <p class="hint" id="recheckHint"></p>
+      <div class="panel" id="pushInfo"><h2>Push &amp; Mail</h2>
+        <p class="hint" id="pushInfoText"></p>
+        <div class="kbar"><button type="button" class="btn sm" data-stab="notify">Für Push &amp; Mail enger einstellen ›</button></div>
+        <button class="linkbtn" id="copyCritBack" type="button" style="justify-self:start">Kriterien von «Push &amp; Mail» hierher übernehmen</button></div>
     </div>
 
     <div class="view" id="cs-notify" hidden>
-      <div class="panel copyrow"><button class="btn" id="copyCrit" type="button">Kriterien von «Anzeigen» übernehmen</button></div>
+      <div class="panel copyrow"><button class="btn" id="copyCrit" type="button">Kriterien von «Suche» übernehmen</button></div>
       <div class="view" id="critN"></div>
 
     </div>
@@ -717,22 +750,42 @@ label.f small, div.f small { color: var(--muted); font: 500 12.5px var(--body) }
   </section>
 
   <!-- Status -->
-  <section class="view" id="v-status" hidden>
-    <div class="stats" id="stats"></div>
-    <button class="btn primary" id="runBtn" type="button">Jetzt suchen</button>
-    <div class="panel"><h2>Quellen</h2><div id="sources"></div>
-      <a class="btn" id="gmailBtn" href="https://mail.google.com/mail/u/meierstadelmann@gmail.com/#label/Wollihood" target="_blank" rel="noopener">Gmail-Postfach öffnen ↗</a></div>
-    <div class="panel"><h2>Versand</h2><div id="delivery"></div></div>
-    <p class="hint center" id="appVersion"></p>
-  </section>
+  <section class="view" id="v-status" hidden></section>
 
   <!-- Einstellungen -->
   <section class="view" id="v-settings" hidden>
+    <h3 class="mgrp">Wir</h3>
     <div class="panel">
       <h2>Ich bin</h2>
       <div class="seg" id="whoStatus"><button type="button" class="opt" data-who="pascal">Pascal</button><button type="button" class="opt" data-who="leonie">Leonie</button></div>
     </div>
-    <div class="panel" id="myPushPanel">
+    <div class="panel fold" id="kiPanel">
+      <h2>Claude für Bewerbungen</h2>
+      <p class="hint" id="kiState">Prüfe …</p>
+      <p class="hint">Für Entwurf, Hinweise und Rechtschreibprüfung im Bewerbungs-Editor. Der Schlüssel stammt aus console.anthropic.com (nicht vom Claude-Abo), wird im privaten Repo gespeichert und gilt für euch beide.</p>
+      <label class="f" for="kiKey"><small>API-Schlüssel</small><input class="field" id="kiKey" type="password" autocomplete="off" placeholder="sk-ant-…"></label>
+      <button class="btn primary" id="kiSave" type="button">Schlüssel prüfen und speichern</button>
+    </div>
+    <div class="panel fold" id="baustPanel">
+      <h2>Dossier-Bausteine</h2>
+      <p class="hint">Dokumente fürs Bewerbungsdossier, z.B. Betreibungsauszüge oder Lohnabrechnungen. Fotos werden automatisch zu PDF. Gilt für euch beide.</p>
+      <div id="baustList"><p class="hint">Lade …</p></div>
+      <div class="ftitle sm">Neuer Baustein</div>
+      <label class="f" for="baustTitle"><small>Titel</small><input class="field" id="baustTitle" placeholder="z.B. Lohnabrechnungen Pascal Schulsozialarbeit"></label>
+      <div class="row2"><label class="f" for="baustDate"><small>Ausgestellt am</small><input class="field" id="baustDate" type="date"></label>
+        <label class="f" for="baustValid"><small>Gültig (Monate)</small><select class="field" id="baustValid"><option value="">unbegrenzt</option><option value="3">3 Monate</option><option value="6">6 Monate</option><option value="12">12 Monate</option></select></label></div>
+      <label class="f" for="baustFile"><small>Datei (PDF oder Foto)</small><input class="field" id="baustFile" type="file" accept="application/pdf,image/*"></label>
+      <label class="switch" for="baustStd">Standardmässig im Dossier <input type="checkbox" id="baustStd" checked></label>
+      <button class="btn primary" id="baustAdd" type="button">Baustein hinzufügen</button>
+    </div>
+    <div class="panel fold" id="lernPanel">
+      <h2>Gelernte Schreibregeln</h2>
+      <p class="hint">Claude lernt aus euren Änderungen im Bewerbungs-Editor und hält sich bei jedem Text an diese Regeln. Gilt für euch beide.</p>
+      <div id="lernList"><p class="hint">Lade …</p></div>
+      <div class="addrow" style="margin-top:10px"><input class="field" id="lernNew" placeholder="Eigene Regel, z.B. «Nie ‹hiermit› schreiben»"><button class="btn" id="lernAdd" type="button">Hinzufügen</button></div>
+    </div>
+    <h3 class="mgrp">Meldungen</h3>
+    <div class="panel fold" id="myPushPanel">
       <h2>Meine Push-Mitteilungen</h2>
       <p class="hint" id="myPushHint">Gilt für alle deine Geräte.</p>
       <div class="ftitle sm">Neue Inserate</div>
@@ -754,7 +807,7 @@ label.f small, div.f small { color: var(--muted); font: 500 12.5px var(--body) }
       </div>
       <button class="btn primary" id="myPushSave" type="button">Meine Einstellungen speichern</button>
     </div>
-    <div class="panel">
+    <div class="panel fold">
       <h2>Push auf diesem Gerät</h2>
       <p class="hint" id="wpState">Prüfe …</p>
       <div class="actions" style="margin-top:0">
@@ -763,32 +816,7 @@ label.f small, div.f small { color: var(--muted); font: 500 12.5px var(--body) }
         <button class="btn" id="wpOff" type="button" hidden>Abmelden</button>
       </div>
     </div>
-    <div class="panel" id="kiPanel">
-      <h2>Claude für Bewerbungen</h2>
-      <p class="hint" id="kiState">Prüfe …</p>
-      <p class="hint">Für Entwurf, Hinweise und Rechtschreibprüfung im Bewerbungs-Editor. Der Schlüssel stammt aus console.anthropic.com (nicht vom Claude-Abo), wird im privaten Repo gespeichert und gilt für euch beide.</p>
-      <label class="f" for="kiKey"><small>API-Schlüssel</small><input class="field" id="kiKey" type="password" autocomplete="off" placeholder="sk-ant-…"></label>
-      <button class="btn primary" id="kiSave" type="button">Schlüssel prüfen und speichern</button>
-    </div>
-    <div class="panel" id="baustPanel">
-      <h2>Dossier-Bausteine</h2>
-      <p class="hint">Dokumente fürs Bewerbungsdossier, z.B. Betreibungsauszüge oder Lohnabrechnungen. Fotos werden automatisch zu PDF. Gilt für euch beide.</p>
-      <div id="baustList"><p class="hint">Lade …</p></div>
-      <div class="ftitle sm">Neuer Baustein</div>
-      <label class="f" for="baustTitle"><small>Titel</small><input class="field" id="baustTitle" placeholder="z.B. Lohnabrechnungen Pascal Schulsozialarbeit"></label>
-      <div class="row2"><label class="f" for="baustDate"><small>Ausgestellt am</small><input class="field" id="baustDate" type="date"></label>
-        <label class="f" for="baustValid"><small>Gültig (Monate)</small><select class="field" id="baustValid"><option value="">unbegrenzt</option><option value="3">3 Monate</option><option value="6">6 Monate</option><option value="12">12 Monate</option></select></label></div>
-      <label class="f" for="baustFile"><small>Datei (PDF oder Foto)</small><input class="field" id="baustFile" type="file" accept="application/pdf,image/*"></label>
-      <label class="switch" for="baustStd">Standardmässig im Dossier <input type="checkbox" id="baustStd" checked></label>
-      <button class="btn primary" id="baustAdd" type="button">Baustein hinzufügen</button>
-    </div>
-    <div class="panel" id="lernPanel">
-      <h2>Gelernte Schreibregeln</h2>
-      <p class="hint">Claude lernt aus euren Änderungen im Bewerbungs-Editor und hält sich bei jedem Text an diese Regeln. Gilt für euch beide.</p>
-      <div id="lernList"><p class="hint">Lade …</p></div>
-      <div class="addrow" style="margin-top:10px"><input class="field" id="lernNew" placeholder="Eigene Regel, z.B. «Nie ‹hiermit› schreiben»"><button class="btn" id="lernAdd" type="button">Hinzufügen</button></div>
-    </div>
-    <div class="panel" id="digestPanel">
+    <div class="panel fold" id="digestPanel">
         <h2>Tägliches Briefing</h2>
         <p class="hint">Eine Mail mit allen neuen Wohnungen seit dem letzten Briefing, mit Foto und Link. Welche Wohnungen darin vorkommen, legst du unter Suche → «Push &amp; Mail» fest. Gilt für euch beide.</p>
         <label class="switch" for="dgOn"><span><b>Briefing aktiv</b></span><input type="checkbox" id="dgOn"></label>
@@ -813,6 +841,13 @@ label.f small, div.f small { color: var(--muted); font: 500 12.5px var(--body) }
         </div>
         <button class="btn primary" type="button" data-save>Briefing speichern</button>
       </div>
+    <h3 class="mgrp">System</h3>
+    <div class="stats" id="stats"></div>
+    <button class="btn primary" id="runBtn" type="button">Jetzt suchen</button>
+    <div class="panel"><h2>Quellen</h2><div id="sources"></div><button type="button" class="linkbtn" id="subToggle" style="justify-self:start">Einzelne Abos zeigen</button>
+      <a class="btn" id="gmailBtn" href="https://mail.google.com/mail/u/meierstadelmann@gmail.com/#label/Wollihood" target="_blank" rel="noopener">Gmail-Postfach öffnen ↗</a></div>
+    <div class="panel"><h2>Versand</h2><div id="delivery"></div></div>
+    
     <details class="panel adv" id="advPanel">
       <summary>Erweitert</summary>
       <div class="advbody">
@@ -833,6 +868,7 @@ label.f small, div.f small { color: var(--muted); font: 500 12.5px var(--body) }
       <button class="btn" id="logoutBtn" type="button">GitHub-Schlüssel auf diesem Gerät entfernen</button>
       </div>
     </details>
+    <p class="hint center" id="appVersion"></p>
   </section>
 
   <div class="toast" id="toast" hidden></div>
@@ -861,11 +897,8 @@ label.f small, div.f small { color: var(--muted); font: 500 12.5px var(--body) }
   <button class="tab" role="tab" data-tab="search" aria-selected="false">
     <span class="pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg></span>Suche
   </button>
-  <button class="tab" role="tab" data-tab="status" aria-selected="false">
-    <span class="pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3-7 4 14 3-7h4"/></svg></span>Status
-  </button>
   <button class="tab" role="tab" data-tab="settings" aria-selected="false">
-    <span class="pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg></span>Optionen
+    <span class="pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg></span>Mehr
   </button>
 </nav>
 
@@ -1304,7 +1337,7 @@ async function kontaktKi(k, instr) {
   const st = $("kState");
   try {
     const c = await bewCtx();
-    if (!c.key) { if (st) st.textContent = "Kein Claude-Schlüssel (Optionen → «Claude für Bewerbungen»). Schreibt die Nachricht selbst."; return; }
+    if (!c.key) { if (st) st.textContent = "Kein Claude-Schlüssel (Mehr → «Claude für Bewerbungen»). Schreibt die Nachricht selbst."; return; }
     KON.busy = true; if (st) st.textContent = instr ? "Claude überarbeitet die Nachricht … (ca. 15–30 Sek.)" : "Claude schreibt die Nachricht … (ca. 15–30 Sek.)"; $("kKi") && ($("kKi").disabled = true);
     BEW.k = k; BEW.x = S.hits.find((h) => keyOf(h) === k) || {}; BEW.d = S.detailData || null;
     const user = `Heute ist ${new Date().toLocaleDateString("de-CH", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}.
@@ -1727,7 +1760,7 @@ const MAN_TOOL = { name: "inserat", description: "Angaben aus dem Wohnungsinsera
     required: ["strasse"] } };
 async function manualReadShots(files) {
   const key = await kiKey();
-  if (!key) throw new Error("Kein Claude-Schlüssel (Optionen → «Claude für Bewerbungen»).");
+  if (!key) throw new Error("Kein Claude-Schlüssel (Mehr → «Claude für Bewerbungen»).");
   const content = [];
   for (const f of [...files].filter((f) => f.type.startsWith("image/")).slice(0, 4)) {
     const b = await shrinkImage(f);
@@ -2033,7 +2066,7 @@ function hitCard(x, withNext) {
     : `<div class="cfoot">
         <button type="button" class="vmini up" data-vote="up" aria-pressed="${mine === "up"}" aria-label="Daumen hoch">${thumb("up")}</button>
         <button type="button" class="vmini down" data-vote="down" aria-pressed="${mine === "down"}" aria-label="Daumen runter">${thumb("down")}</button>
-        ${other ? `<span class="ochip ${ov || ""}">${esc(PEOPLE[other])} ${ov ? thumb(ov) : "·"}</span>` : ""}
+        ${other ? `<span class="ochip ${ov || ""}">${esc(PEOPLE[other])} ${ov ? thumb(ov) : "offen"}</span>` : ""}
         ${manualTag(x)}${x.swap ? '<span class="tag swap">Tausch</span>' : ""}
         ${n ? `<span class="cchip" data-detail>${bubble}${n}</span>` : ""}
       </div>`;
@@ -2043,7 +2076,7 @@ function hitCard(x, withNext) {
       <div class="cinfo">
         <div class="l1"><b class="${x.rent ? "" : "na"}">${x.rent ? "CHF " + esc(fmtN(x.rent)) : "Preis offen"}</b>${pill}</div>
         <div class="l2">${esc(l2)}</div>
-        <div class="l3">${esc(placeName(x))} · ${esc(ago(x.published || x.first_seen))}</div>
+        <div class="l3">${esc(x.street || x.sources?.[0]?.portal || x.portal || "")}${x.street || x.sources?.[0]?.portal || x.portal ? " · " : ""}${esc(ago(x.published || x.first_seen))}</div>
         ${x.ai && x.ai.text ? `<div class="l4">${haken ? '<span class="warn">!</span>' : '<span class="ai">✦</span>'} ${esc(x.ai.text)}</div>` : ""}
         ${ns ? `<div class="next${ns.wait ? " wait" : ""}">${esc(ns.t)}</div>` : ""}
         ${foot}
@@ -2191,8 +2224,8 @@ function renderAreaUi() {
   fitMap();
   $("areaHint").textContent = S.amode === "search"
     ? "Mit dem Fünfeck links zeichnen, mit dem Stift anpassen, mit dem Radiergummi löschen. Gestrichelt: das Gebiet von «Push & Mail»."
-    : own ? "Gestrichelt: das Gebiet von «Anzeigen». Ausserhalb davon wird nicht gesucht."
-      : "Noch keine Fläche: Zeichne eine oder übernimm das Gebiet von «Anzeigen». Bis dahin gilt dieses.";
+    : own ? "Gestrichelt: das Gebiet von «Suche». Ausserhalb davon wird nicht gesucht."
+      : "Noch keine Fläche: Zeichne eine oder übernimm das Gebiet von «Suche». Bis dahin gilt dieses.";
 }
 function grabWork() {
   if (!S.map || !S.work) return;
@@ -2208,15 +2241,16 @@ function setSearchMode(m) {
   F.ctab = m === "notify" ? "notify" : "search";
   $("cs-search").hidden = m === "notify"; $("cs-notify").hidden = m !== "notify";
   $("sumShowBox").hidden = m === "notify"; $("sumNotifyBox").hidden = m !== "notify";
-  document.querySelectorAll("[data-stab]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.stab === m)));
+  $("pushBar").hidden = m !== "notify";
+  document.querySelectorAll("#v-search [data-stab]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.stab === m)));
   $("modeHint").textContent = m === "notify"
     ? "Push-Mitteilungen und das tägliche Briefing per Mail kommen nur für Wohnungen, die auch angezeigt werden. Gebiet und Kriterien hier also gleich oder enger setzen."
     : "Nur in diesem Gebiet und mit diesen Kriterien wird gesucht. Das erscheint in der Trefferliste.";
   if (S.map && S.work) setAreaMode(m === "notify" ? "push" : "search"); else S.amode = m === "notify" ? "push" : "search";
   renderAreaUi();
 }
-$("searchTabs").addEventListener("click", (e) => { const b = e.target.closest("[data-stab]"); if (b) setSearchMode(b.dataset.stab); });
-$("paCopy").addEventListener("click", () => { if (!S.work) return; grabWork(); S.work.push = JSON.parse(JSON.stringify(S.work.search)); paintAreas(true); markAreaDirty(); toast("Gebiet von «Anzeigen» übernommen. Unten «Speichern» tippen."); });
+$("v-search").addEventListener("click", (e) => { const b = e.target.closest("[data-stab]"); if (b) { setSearchMode(b.dataset.stab); window.scrollTo(0, 0); } });
+$("paCopy").addEventListener("click", () => { if (!S.work) return; grabWork(); S.work.push = JSON.parse(JSON.stringify(S.work.search)); paintAreas(true); markAreaDirty(); toast("Gebiet von «Suche» übernommen. Unten «Speichern» tippen."); });
 $("saCopy").addEventListener("click", () => { if (!S.work) return; grabWork(); if (!hasFeat(S.work.push)) { toast("«Push & Mail» hat noch kein eigenes Gebiet.", "err"); return; } S.work.search = JSON.parse(JSON.stringify(S.work.push)); paintAreas(true); markAreaDirty(); toast("Gebiet von «Push & Mail» übernommen. Unten «Speichern» tippen."); });
 // Karte genau zwischen Knöpfen oben und «Gebiet speichern» einpassen
 function fitMap() {
@@ -2442,13 +2476,14 @@ function renderSummary() {
   else if (F.recips.length) chans.push(`Briefing ${F.days === "weekdays" ? "Mo–Fr" : "täglich"} ${$("dgTime").value} an ${F.recips.length}`);
   const sa = S.work ? S.work.search : S.config.areas, pa = S.work ? S.work.push : pushAreasOf(S.config);
   const ownArea = pa && JSON.stringify(pa) !== JSON.stringify(sa) ? ["eigenes Gebiet"] : [];
-  $("sumNotifyDiff").textContent = (diff.length || ownArea.length ? "Enger als «Anzeigen»: " + [...diff, ...ownArea].join(" · ") : "Gleich wie «Anzeigen»") + (chans.length ? " · " + chans.join(" · ") : "");
+  $("sumNotifyDiff").textContent = (diff.length || ownArea.length ? "Enger als «Suche»: " + [...diff, ...ownArea].join(" · ") : "Gleich wie «Suche»") + (chans.length ? " · " + chans.join(" · ") : "");
+  if ($("pushInfoText")) $("pushInfoText").textContent = (diff.length || ownArea.length ? "Push und Briefing nur bei: " + [...diff, ...ownArea].join(" · ") : "Push und Briefing kommen für alle Treffer, die hier angezeigt werden.") + (chans.length ? " · " + chans.join(" · ") : "");
 }
-$("copyCrit").addEventListener("click", () => { setCrit("n", getCrit("s")); renderSummary(); toast("Kriterien von «Anzeigen» übernommen. Anpassen und speichern."); });
+$("copyCrit").addEventListener("click", () => { setCrit("n", getCrit("s")); renderSummary(); toast("Kriterien von «Suche» übernommen. Anpassen und speichern."); });
 $("copyCritBack").addEventListener("click", () => { setCrit("s", getCrit("n")); renderSummary(); toast("Kriterien von «Push & Mail» übernommen. Anpassen und speichern."); });
 
 function renderRecheckHint() {
-  $("recheckHint").textContent = `Beim Speichern prüft Wollihood auch die aussortierten Inserate der letzten ${$("recheckDays").value || 14} Tage nochmals. Ändern unter Optionen → Erweitert.`;
+  $("recheckHint").textContent = `Beim Speichern prüft Wollihood auch die aussortierten Inserate der letzten ${$("recheckDays").value || 14} Tage nochmals. Ändern unter Mehr → Erweitert.`;
 }
 $("recheckDays").addEventListener("change", renderRecheckHint);
 function fillForm() {
@@ -2683,15 +2718,20 @@ async function load() {
 }
 function showTab(t) {
   if (t === "map" || t === "criteria") t = "search";
+  if (t === "status") t = "settings";            // Status ist seit v73 Teil von «Mehr»
   if (S.tab === "search" && t !== "search" && S.areasDirty) toast("Achtung: Das geänderte Gebiet ist noch nicht gespeichert.", "err", 6000);
   S.tab = t; store.set("wh_tab", t);
   ["hits", "search", "status", "settings"].forEach((n) => ($("v-" + n).hidden = n !== t));
   document.querySelectorAll(".tab").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.tab === t)));
   if (t === "search") { ensureMap(); setTimeout(fitMap, 0); }
-  if (t === "settings") renderPush();
+  if (t === "settings") { renderPush(); renderStatus(); }
   window.scrollTo(0, 0);
 }
 document.querySelectorAll(".tab").forEach((b) => b.addEventListener("click", () => showTab(b.dataset.tab)));
+document.addEventListener("click", (e) => {
+  const h = e.target.closest(".panel.fold > h2"); if (h) { h.parentElement.classList.toggle("open"); return; }
+  if (e.target.id === "subToggle") { const on = $("sources").classList.toggle("showsub"); e.target.textContent = on ? "Einzelne Abos ausblenden" : "Einzelne Abos zeigen"; }
+});
 $("refreshBtn").addEventListener("click", () => S.token && load());
 function showSetup(err) {
   $("setup").hidden = false; $("tabbar").hidden = true;
@@ -2826,7 +2866,7 @@ let installEvt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("installBtn").hidden = false; $("installHint").hidden = true; });
 $("installBtn").addEventListener("click", async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("installBtn").hidden = true; });
 if (window.matchMedia("(display-mode: standalone)").matches) { $("installHint").textContent = "Läuft als App."; }
-const APP_VERSION = "71 · 31.10.2026";
+const APP_VERSION = "73 · 31.10.2026";
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").then((reg) => { reg.update().catch(() => {}); }).catch(() => {});
   let reloaded = false;
@@ -2889,7 +2929,7 @@ $("bClose").addEventListener("click", bewTryClose);
 
 async function openBew(k) {
   if (needPerson()) return;
-  BEW.k = k; BEW.x = S.hits.find((h) => keyOf(h) === k) || {}; BEW.aid = await aidOf(k);
+  BEW.k = k; BEW.x = S.hits.find((h) => keyOf(h) === k) || {}; BEW.aid = await aidOf(k); BEW.step = "text";
   const a = archEntry(BEW.x); BEW.d = null;
   if (a) { try { BEW.d = (await readJson(`archiv/${a.id}/data.json`)).data; } catch { } }
   $("bTitle").textContent = "Bewerbung · " + (BEW.x.street || "Wohnung");
@@ -2902,8 +2942,18 @@ async function openBew(k) {
   renderBew(); formLoad(); kmtLoad(k);
 }
 function renderBew() {
-  const doc = BEW.doc;
+  const doc = BEW.doc, st = BEW.step || "text";
   $("bBody").innerHTML = `
+    <div class="stabs three" role="tablist" aria-label="Schritte der Bewerbung">${[["text", "1 Text"], ["unterlagen", "2 Unterlagen"], ["senden", "3 Senden"]]
+      .map(([v, l]) => `<button type="button" role="tab" data-bstep="${v}" aria-selected="${v === st}">${l}</button>`).join("")}</div>
+    <section data-bsec="text"${st === "text" ? "" : " hidden"}>
+    <div class="panel" id="bClaude">
+      ${BEW.ctx.key ? "" : '<p class="hint warnline">Noch kein Claude-Schlüssel hinterlegt: Mehr → «Claude für Bewerbungen». Ihr könnt trotzdem schreiben.</p>'}
+      <button type="button" class="btn ki" data-ki="entwurf">✦ Entwurf für diese Wohnung</button>
+      <div class="kbar"><button type="button" class="btn sm" data-ki="hinweise">Stolpersteine</button><button type="button" class="btn sm" data-ki="pruefen">Rechtschreibung</button></div>
+      <p class="hint" id="bState" aria-live="polite"></p>
+      <div id="bLearn"></div><div id="bTips"></div><div id="bDiff"></div>
+    </div>
     <div class="panel"><h2>Anschreiben</h2>
       <label class="f" for="bAdr"><small>Adresse unter «Wohnungsbewerbung»</small><input class="field" id="bAdr" value="${esc(doc.adresse)}"></label>
       <div class="row2">
@@ -2913,42 +2963,54 @@ function renderBew() {
       <textarea class="field bewtext" id="bText" spellcheck="true" lang="de-CH">${esc(doc.text)}</textarea>
       <p class="hint">Absätze mit einer Leerzeile trennen. Text in [eckigen Klammern] ist noch offen und erscheint im PDF blau.</p>
       ${kmtBlock("text")}
+      <button type="button" class="linkbtn" id="bGrund" style="justify-self:start">Diese Fassung als Grundtext für künftige Bewerbungen übernehmen</button>
     </div>
     <div class="panel"><h2>Bemerkung fürs Online-Formular</h2>
       <textarea class="field bewnote" id="bNote" spellcheck="true" lang="de-CH" placeholder="Wird mit «Entwurf für diese Wohnung» erstellt.">${esc(doc.bemerkung || "")}</textarea>
-      <div class="brow"><button type="button" class="btn" id="bCopy">Kopieren</button><span class="hint" id="bCount"></span></div>
+      <div class="kbar"><button type="button" class="btn sm" id="bCopy">Kopieren</button><span class="hint" id="bCount"></span></div>
       ${kmtBlock("bemerkung")}
     </div>
-    <div class="panel" id="bClaude"><h2>Claude</h2>
-      ${BEW.ctx.key ? "" : '<p class="hint warnline">Noch kein Claude-Schlüssel hinterlegt: Optionen → «Claude für Bewerbungen». Ihr könnt trotzdem schreiben und das PDF erstellen.</p>'}
-      <div class="brow">
-        <button type="button" class="btn primary" data-ki="entwurf">Entwurf für diese Wohnung</button>
-        <button type="button" class="btn" data-ki="hinweise">Stolpersteine prüfen</button>
-        <button type="button" class="btn" data-ki="pruefen">Rechtschreibung prüfen</button>
-      </div>
-      <p class="hint" id="bState" aria-live="polite"></p>
-      <div id="bLearn"></div>
-      <div id="bTips"></div>
-      <div id="bDiff"></div>
-    </div>
-    <div class="panel"><h2>PDF</h2>
-      <div class="brow"><button type="button" class="btn primary" id="bPdf">PDF erstellen</button><button type="button" class="btn" id="bSave">Gespeichert</button></div>
-      <p class="hint warnline" id="bDirty" hidden>Nicht gespeicherte Änderungen – «Speichern» tippen. «PDF erstellen» speichert auch.</p>
-      <div class="brow"><button type="button" class="linkbtn" id="bGrund">Diese Fassung als Grundtext für künftige Bewerbungen übernehmen</button></div>
-      <div id="bPdfLink">${doc.pdf ? `<a href="#" class="doclink" data-doc="${esc(doc.pdf)}">📄 Letztes PDF (${esc(ago(doc.pdf_at))})</a>` : ""}</div>
+    </section>
+    <section data-bsec="unterlagen"${st === "unterlagen" ? "" : " hidden"}>
+    <div class="panel" id="bDossier"><h2>Dossier</h2>
+      <details class="dosdet" id="bDossierDet"><summary id="bDossierSum">Dokumente</summary>
+        <p class="hint">Häkchen = kommt ins Dossier. ⬇ lädt ein Dokument einzeln herunter (für Plattformen mit Einzel-Upload).</p>
+        <div id="bDossierList"></div></details>
+      <div class="kbar"><label class="btn sm" for="bUpload">+ Weiteres Dokument</label><input type="file" id="bUpload" accept="application/pdf,image/*" multiple hidden></div>
     </div>
     ${formPanel()}
-    <div class="panel" id="bDossier"><h2>Dossier</h2>
-      <p class="hint">Häkchen = kommt ins Dossier. Mit ⬇ lädst du jedes Dokument einzeln herunter, z.B. für Plattformen mit Einzel-Upload.</p>
-      <div id="bDossierList"></div>
-      <div class="brow"><label class="btn" for="bUpload">Formular / weiteres Dokument hinzufügen</label><input type="file" id="bUpload" accept="application/pdf,image/*" multiple hidden></div>
-      <div class="brow"><button type="button" class="btn primary" id="bDossierPdf">Dossier als ein PDF</button></div>
-      <div id="bDossierLink"></div>
-    </div>
     <details class="panel adv" id="bStamm"><summary>Personalien &amp; Referenzen</summary>
       <div class="advbody"><p class="hint">Gilt für alle Bewerbungen und für die Personalien-Seite im Dossier.</p><div id="bStammBody"></div></div>
-    </details>`;
-  bewTips(); bewCount(); renderDossier(); renderStamm(); renderForm(); renderCopy(); bewMark();
+    </details>
+    </section>
+    <section data-bsec="senden"${st === "senden" ? "" : " hidden"}>
+    <div class="panel"><h2>Anschreiben als PDF</h2>
+      <button type="button" class="btn primary" id="bPdf">PDF erstellen</button>
+      <div id="bPdfLink">${doc.pdf ? `<a href="#" class="doclink" data-doc="${esc(doc.pdf)}">📄 Letztes PDF (${esc(ago(doc.pdf_at))})</a>` : ""}</div>
+    </div>
+    <div class="panel"><h2>Ganzes Dossier</h2>
+      <p class="hint" id="bDossierSum2"></p>
+      <button type="button" class="btn" id="bDossierPdf">Dossier als ein PDF</button>
+      <div id="bDossierLink"></div>
+    </div>
+    <div class="panel"><h2>Bemerkung</h2><p class="hint">Für das Feld «Bemerkung» im Online-Formular der Verwaltung.</p>
+      <div class="kbar"><button type="button" class="btn sm" data-copynote>Bemerkung kopieren</button></div></div>
+    </section>
+    <div class="bewfoot"><span class="hint warnline" id="bDirty" hidden>Nicht gespeichert</span><button type="button" class="btn sm" id="bSave">Gespeichert</button>
+      ${st !== "senden" ? `<button type="button" class="btn sm primary" data-bstep="${st === "text" ? "unterlagen" : "senden"}">Weiter: ${st === "text" ? "Unterlagen" : "Senden"} ›</button>` : ""}</div>`;
+  bewTips(); bewCount(); renderDossier(); renderStamm(); renderForm(); renderCopy(); bewMark(); dossierSum();
+}
+// Zusammenfassung des Dossiers: «11 Dokumente · alles gültig»
+function dossierSum() {
+  const items = dossierItems().filter(dossierOn), old = items.filter((b) => baustAlter(b)?.alt).length;
+  const t = `${items.length} Dokument${items.length === 1 ? "" : "e"} im Dossier · ${old ? `${old} zu alt` : "alles gültig"}`;
+  if ($("bDossierSum")) $("bDossierSum").innerHTML = `${esc(t)} <span class="chg">ändern ›</span>`;
+  if ($("bDossierSum2")) $("bDossierSum2").textContent = t;
+  $("bDossierSum")?.classList.toggle("warnline", !!old);
+}
+function bewStep(v) {
+  bewRead(); BEW.step = v;
+  const sc = $("bBody").scrollTop; renderBew(); $("bBody").scrollTop = 0; void sc;
 }
 function bewRead() {
   if (!$("bText")) return BEW.doc;
@@ -2958,9 +3020,13 @@ function bewRead() {
 }
 function bewCount() { const n = ($("bNote")?.value || "").length; if ($("bCount")) $("bCount").textContent = n ? `${n} Zeichen` : ""; }
 $("bBody").addEventListener("input", (e) => { if (e.target.id === "bNote") bewCount(); if (/^b(Text|Note|Adr|Name)$/.test(e.target.id)) bewMark(); });
+$("bBody").addEventListener("click", (e) => {
+  const bs = e.target.closest("[data-bstep]"); if (bs) { bewStep(bs.dataset.bstep); return; }
+  if (e.target.closest("[data-copynote]")) { $("bCopy").click(); }
+});
 $("bBody").addEventListener("change", (e) => {
   if (e.target.id === "bAnrede") bewMark();
-  if (e.target.matches("[data-dsel]")) { BEW.doc.auswahl = { ...(BEW.doc.auswahl || {}), [e.target.dataset.dsel]: e.target.checked }; bewMark(); }
+  if (e.target.matches("[data-dsel]")) { BEW.doc.auswahl = { ...(BEW.doc.auswahl || {}), [e.target.dataset.dsel]: e.target.checked }; bewMark(); dossierSum(); }
   if (e.target.id === "bUpload" && e.target.files.length) { beilageUpload(e.target.files); e.target.value = ""; }
   if (e.target.id === "bFormFile" && e.target.files.length) { const f = e.target.files[0]; e.target.value = ""; formStart(f); }
 });
@@ -3135,7 +3201,7 @@ async function claudeTool(system, user, tool, need) {
 }
 async function bewKi(mode, instrIn, kfeld) {
   if (BEW.busy) return;
-  if (!BEW.ctx.key) { toast("Zuerst den Claude-Schlüssel hinterlegen (Optionen).", "err"); return; }
+  if (!BEW.ctx.key) { toast("Zuerst den Claude-Schlüssel hinterlegen (Mehr).", "err"); return; }
   const instr = mode === "anweisung" ? (instrIn || "").trim() : "";
   if (mode === "anweisung" && !instr) return;
   BEW.busy = true; document.querySelectorAll("#bClaude [data-ki]").forEach((b) => (b.disabled = true));
@@ -3795,9 +3861,10 @@ async function baustRender() {
       const a = baustAlter(b);
       return `<div class="drow"><label><input type="checkbox" data-bstd="${esc(b.id)}"${b.standard ? " checked" : ""}><span>${esc(b.titel)}
         <small class="${a?.alt ? "old" : a?.bald ? "soon" : ""}">${b.datum ? esc(dmyL(b.datum)) : "ohne Datum"}${a ? (a.alt ? " · zu alt" : " · gültig bis " + esc(a.bis.toLocaleDateString("de-CH"))) : ""}</small></span></label>
-        ${mvBtns("data-bmv", b.id, idx === 0, idx === vis.length - 1)}<button type="button" class="iconbtn" data-bview="${esc(b.datei)}" aria-label="Ansehen">👁</button>
-        <label class="iconbtn" aria-label="Ersetzen" title="Ersetzen">⟳<input type="file" accept="application/pdf,image/*" data-brep="${esc(b.id)}" hidden></label>
-        <button type="button" class="iconbtn" data-bremove="${esc(b.id)}" aria-label="Löschen">✕</button></div>`;
+        ${mvBtns("data-bmv", b.id, idx === 0, idx === vis.length - 1)}<details class="dmenu"><summary aria-label="Aktionen für ${esc(b.titel)}">⋯</summary><div class="dmenu-list">
+        <button type="button" data-bview="${esc(b.datei)}">Ansehen</button>
+        <label>Ersetzen<input type="file" accept="application/pdf,image/*" data-brep="${esc(b.id)}" hidden></label>
+        <button type="button" class="bad" data-bremove="${esc(b.id)}">Löschen</button></div></details></div>`;
     }).join("") + '<p class="hint">Häkchen = standardmässig im Dossier. ↑↓ = Reihenfolge im Dossier (Anschreiben und Personalien stehen vorne; im Bewerbungs-Editor lässt sich alles verschieben).</p>';
   } catch (e) { $("baustList").innerHTML = `<p class="hint">Nicht ladbar: ${esc(e.message)}</p>`; }
 }
@@ -3986,7 +4053,7 @@ function scanLook(cv) {   // wie ein Graustufen-Scan: Papierweiss pro Block sch�
 
 // --- Ablauf: Foto/PDF → Claude → entzerren → prüfen ---
 async function formStart(file) {
-  if (!BEW.ctx.key) { toast("Zuerst den Claude-Schlüssel hinterlegen (Optionen).", "err"); return; }
+  if (!BEW.ctx.key) { toast("Zuerst den Claude-Schlüssel hinterlegen (Mehr).", "err"); return; }
   if (FORM.data && !confirm("Das bisherige Formular wird ersetzt. Weiter?")) return;
   setFormState("Bereite das Formular vor …");
   try {
@@ -4125,7 +4192,7 @@ function renderForm() {
   const el = $("bFormBody"); if (!el) return;
   const pick = (label, cls = "btn") => `<label class="${cls}" for="bFormFile">${label}</label><input type="file" id="bFormFile" accept="image/*,application/pdf" hidden>`;
   if (FORM.state) { el.innerHTML = `<p class="hint fstate" aria-live="polite">${esc(FORM.state)}</p>`; return; }
-  if (!FORM.data) { el.innerHTML = `<div class="brow">${pick("Formular ausfüllen (Foto oder PDF)", "btn primary")}</div>${BEW.ctx.key ? "" : '<p class="hint warnline">Braucht den Claude-Schlüssel (Optionen).</p>'}`; return; }
+  if (!FORM.data) { el.innerHTML = `<div class="brow">${pick("Formular ausfüllen (Foto oder PDF)", "btn")}</div>${BEW.ctx.key ? "" : '<p class="hint warnline">Braucht den Claude-Schlüssel (Mehr).</p>'}`; return; }
   const F = FORM.data, firstOf = (f, i) => !f.gruppe || F.felder.findIndex((g) => g.gruppe === f.gruppe) === i;
   el.innerHTML = `${F.typ === "scan" ? `<div class="fprev"><canvas id="bFormCv" aria-label="Vorschau des ausgefüllten Formulars"></canvas></div>` : '<p class="hint">Ausfüllbares PDF erkannt – die Werte werden direkt in die Felder geschrieben.</p>'}
     ${(F.hinweise || []).length ? `<div class="ftitle sm">Hinweise von Claude</div>${F.hinweise.map((h) => `<div class="tip">${esc(h)}</div>`).join("")}` : ""}
