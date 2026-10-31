@@ -83,6 +83,11 @@ h2 { font: 20px/1.05 var(--display); letter-spacing: -.4px; text-transform: uppe
 .sortrow .hint { font: 700 10.5px var(--body); text-transform: uppercase; letter-spacing: .14em; margin-right: 8px }
 .sortbtn { border: 0; background: none; padding: 6px 8px; font: 800 12px var(--body); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); cursor: pointer; border-bottom: 3px solid transparent }
 .sortbtn[aria-pressed="true"] { color: var(--fg); border-bottom-color: var(--accent) }
+.sortbtn.addlink { margin-left: auto; color: var(--accent) }
+.tag.hand { border-color: var(--accent); color: var(--accent) }
+.manform { display: grid; gap: 12px }
+.manform .row3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px }
+.manthumbs { display: flex; gap: 6px; flex-wrap: wrap } .manthumbs img { width: 64px; height: 64px; object-fit: cover; border: 1px solid var(--line) }
 
 /* Trefferkarte */
 .card { background: var(--surface); border: 3px solid var(--line); display: grid; grid-template-columns: minmax(0, 1fr); min-width: 0 }
@@ -462,6 +467,7 @@ textarea.bewnote { min-height: 220px; font: 15px/1.5 Georgia, "Times New Roman",
       <button class="sortbtn" type="button" data-sort="new">Neueste</button>
       <button class="sortbtn" type="button" data-sort="price">Günstigste</button>
       <button class="sortbtn" type="button" data-sort="size">Grösste</button>
+      <button class="sortbtn addlink" type="button" id="addLinkBtn">＋ Per Link</button>
     </div>
     <div class="panel whoami" id="whoPanel" hidden>
       <div class="ftitle">Wer nutzt dieses Handy?</div>
@@ -840,7 +846,7 @@ if (navigator.serviceWorker) navigator.serviceWorker.addEventListener("message",
   if (e.data && e.data.type === "deeplink") { S.deep = parseDeep(e.data.url); applyDeep(false); if (S.token) load(); }
 });
 function inSavedArea(x) {
-  return x.lat == null || !S.config?.areas?.features?.length || inAreas(x.lat, x.lon, S.config.areas);
+  return !!x.manual || x.lat == null || !S.config?.areas?.features?.length || inAreas(x.lat, x.lon, S.config.areas);
 }
 // Zeitpunkt des Aussortierens: von Hand gesetzt, sonst letzte Änderung (zweiter Daumen runter)
 function outTime(k) { const it = itemOf(k); return new Date(it.out?.at || it.updated || 0).getTime() || 0; }
@@ -1282,6 +1288,166 @@ $("dBody").addEventListener("change", async (e) => {
   toast(n ? `${n} Datei${n > 1 ? "en" : ""} gespeichert.` : "Nichts gespeichert.", n ? "ok" : "err");
   setTimeout(refreshDetail, 300);
 });
+// ---------- Wohnung per Link (von Hand, ohne Suchraster) ----------
+// Schlüssel wie im Suchskript (wollihood/sources/manual.py → key_for). Beide Seiten gleich halten!
+const MAN_PATTERNS = [
+  ["Homegate", /homegate\.ch\/(?:[a-z]{2}\/)?(?:mieten|rent|louer|affittare)\/(\d{6,12})/i, "smg", "https://www.homegate.ch/mieten/{id}"],
+  ["ImmoScout24", /immoscout24\.ch\/(?:[a-z]{2}\/)?(?:d\/[^/?#\s]+\/|rent\/|mieten\/)(\d{6,12})/i, "smg", "https://www.immoscout24.ch/rent/{id}"],
+  ["Newhome", /newhome\.ch\/[^\s?#]*?\/detail\/([A-Za-z0-9\-]{4,40})/i, "newhome", null],
+  ["Comparis", /comparis\.ch\/immobilien\/[^\s?#]*?\/details\/show\/(\d{5,12})/i, "comparis", "https://www.comparis.ch/immobilien/marktplatz/details/show/{id}"],
+  ["Flatfox", /flatfox\.ch\/[^\s?#]*?\/(\d{4,10})\/?(?:[?#\s]|$)/i, "flatfox", "https://flatfox.ch/de/flat/{id}/"],
+];
+const firstLink = (t) => { const m = String(t || "").match(/https?:\/\/[^\s<>"']+/); return m ? m[0].replace(/[.,;)]+$/, "") : ""; };
+async function manualKey(url) {
+  for (const [portal, rx, prefix, canon] of MAN_PATTERNS) {
+    const m = url.match(rx);
+    if (m) return { key: `${prefix}:${m[1]}`, portal, url: canon ? canon.replace("{id}", m[1]) : url };
+  }
+  const norm = url.split(/[?#]/)[0].replace(/\/+$/, "").toLowerCase();
+  const h = await crypto.subtle.digest("SHA-1", new TextEncoder().encode(norm));
+  let host = ""; try { host = new URL(url).hostname.replace(/^www\./, ""); } catch { }
+  return { key: "manual:" + [...new Uint8Array(h)].map((b) => b.toString(16).padStart(2, "0")).join("").slice(0, 12), portal: host || "Link", url };
+}
+const hitByKey = (k) => S.hits.find((h) => keyOf(h) === k || (h.keys || []).includes(k));
+const normUrl = (u) => String(u || "").split(/[?#]/)[0].replace(/\/+$/, "").replace(/^https?:\/\/(www\.)?/i, "").toLowerCase();
+const hitByUrl = (...us) => { const want = new Set(us.map(normUrl).filter(Boolean));
+  return S.hits.find((h) => [h.url, ...(h.also_urls || []), ...(h.sources || []).map((s) => s.url)].some((u) => want.has(normUrl(u)))); };
+function manualTag(x) {
+  if (!x.manual) return "";
+  const who = PEOPLE[x.manual.by] || "";
+  return `<span class="tag hand">von Hand${who ? " · " + esc(who) : ""}</span>${x.manual.pending ? `<span class="tag">${x.manual.error ? "Fehler: " + esc(x.manual.error) : "wird geholt …"}</span>` : ""}`;
+}
+// Noch nicht verarbeitete Einträge aus manual.json gleich als Karte zeigen (auch auf dem anderen Handy)
+function mergeManual() {
+  const done = S.health?.manual_done || {};
+  for (const it of S.manual || []) {
+    if (!it.key || hitByKey(it.key)) continue;
+    const d = done[it.id];
+    if (d && d.ok) continue;    // verarbeitet, aber (noch) nicht in der Liste: nicht doppelt zeigen
+    S.hits.unshift({ keys: [it.key], url: it.url, portal: it.portal, title: it.street || it.portal, street: it.street || null,
+      plz: it.plz || null, city: it.city || null, rooms: it.rooms ?? null, rent: it.rent ?? null, m2: it.m2 ?? null,
+      first_seen: it.at, published: it.at, published_precision: "found", sources: [{ portal: it.portal, url: it.url, at: it.at }],
+      manual: { by: it.by, at: it.at, pending: true, error: d && !d.ok ? (d.error || "unbekannt") : null } });
+  }
+}
+const numIn = (v) => { const n = parseFloat(String(v || "").replace(/['’\s]/g, "").replace(",", ".")); return Number.isFinite(n) ? n : null; };
+async function kiKey() {
+  if (S.kiKey !== undefined) return S.kiKey;
+  try { S.kiKey = (await readJson("dossier/ki.json")).data.anthropic_key || null; } catch { S.kiKey = null; }
+  return S.kiKey;
+}
+// Claude liest Adresse, Zimmer, Miete aus Screenshots
+const MAN_TOOL = { name: "inserat", description: "Angaben aus dem Wohnungsinserat (Screenshots).",
+  input_schema: { type: "object", properties: {
+    strasse: { type: "string", description: "Strasse und Hausnummer, leer wenn nicht sichtbar" }, plz: { type: "string" }, ort: { type: "string" },
+    zimmer: { type: "number" }, miete_brutto: { type: "number", description: "Monatsmiete brutto in CHF (sonst netto)" },
+    netto: { type: "boolean", description: "true, wenn nur die Nettomiete sichtbar ist" }, flaeche_m2: { type: "number" },
+    text: { type: "string", description: "kurze Zusammenfassung des sichtbaren Inseratetexts (Bezug, Befristung, Besonderes), max. 400 Zeichen" } },
+    required: ["strasse"] } };
+async function manualReadShots(files) {
+  const key = await kiKey();
+  if (!key) throw new Error("Kein Claude-Schlüssel (Optionen → «Claude für Bewerbungen»).");
+  const content = [];
+  for (const f of [...files].filter((f) => f.type.startsWith("image/")).slice(0, 4)) {
+    const b = await shrinkImage(f);
+    content.push({ type: "image", source: { type: "base64", media_type: "image/jpeg", data: await blobB64(b) } });
+  }
+  if (!content.length) throw new Error("Keine Bilder zum Lesen.");
+  content.push({ type: "text", text: "Lies aus diesen Screenshots eines Wohnungsinserats die Angaben heraus und gib sie mit dem Werkzeug «inserat» zurück. Nur, was sichtbar ist; nichts erfinden." });
+  const r = await fetch("https://api.anthropic.com/v1/messages", { method: "POST",
+    headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
+    body: JSON.stringify({ model: S.config?.ai?.model || "claude-opus-5-5", max_tokens: 1500, tools: [MAN_TOOL], tool_choice: { type: "auto" },
+      messages: [{ role: "user", content }] }) });
+  let j = {}; try { j = await r.json(); } catch { }
+  if (!r.ok) throw new Error(r.status === 401 ? "Der Claude-Schlüssel ist ungültig." : j?.error?.message || `Claude meldet Fehler ${r.status}.`);
+  const tu = (j.content || []).find((b) => b.type === "tool_use");
+  if (tu?.input) return tu.input;
+  const t = (j.content || []).filter((b) => b.type === "text").map((b) => b.text).join(""); const m = t.match(/\{[\s\S]*\}/);
+  if (m) { try { return JSON.parse(m[0]); } catch { } }
+  throw new Error("Claude hat nicht im erwarteten Format geantwortet.");
+}
+async function saveManualItem(item) {
+  for (let i = 0; i < 4; i++) {
+    try {
+      let cur = { data: { items: [] }, sha: null };
+      try { cur = await readJson("manual.json"); } catch (e) { if (e.status !== 404) throw e; }
+      const items = (cur.data.items || []).filter((x) => x.id !== item.id);
+      items.push(item);
+      await writeJson("manual.json", { items }, cur.sha, `Wohnung von Hand: ${item.street || item.portal} (${PEOPLE[item.by]})`);
+      S.manual = items; return;
+    } catch (e) {
+      if (!(e.status === 409 || e.status === 422) || i === 3) throw e;
+      await new Promise((r) => setTimeout(r, 400 * (i + 1)));
+    }
+  }
+}
+function openManual(pre = {}) {
+  if (needPerson()) return;
+  S.detailKey = null; S.manFiles = [...(pre.files || [])];
+  $("dTitle").textContent = "Wohnung per Link";
+  $("detail").hidden = false; document.body.style.overflow = "hidden";
+  $("dBody").innerHTML = `<div class="panel manform">
+    <p class="hint">Kommt in die Treffer, egal was das Suchraster sagt. Bei Flatfox holt Wollihood alle Angaben selbst; bei Homegate, ImmoScout24 &amp; Co. zählen eure Angaben und Screenshots.</p>
+    <label class="f">Link zum Inserat<input class="field" id="mUrl" type="url" inputmode="url" placeholder="https://…" value="${esc(pre.url || "")}"></label>
+    <div class="f"><small>Screenshots (optional)</small>
+      <div class="manthumbs" id="mThumbs"></div>
+      <label class="btn" for="mFiles">Screenshots wählen</label><input type="file" id="mFiles" accept="image/*,application/pdf" multiple hidden>
+      <p class="hint" id="mKi" hidden></p></div>
+    <label class="f">Strasse und Nr.<input class="field" id="mStreet" autocomplete="off"></label>
+    <div class="row2"><label class="f">PLZ<input class="field" id="mPlz" inputmode="numeric" maxlength="4"></label><label class="f">Ort<input class="field" id="mCity" value="Zürich"></label></div>
+    <div class="row3"><label class="f">Zimmer<input class="field" id="mRooms" inputmode="decimal"></label><label class="f">Miete brutto<input class="field" id="mRent" inputmode="numeric"></label><label class="f">m²<input class="field" id="mM2" inputmode="numeric"></label></div>
+    <label class="f">Notiz (optional)<textarea class="field" id="mNote" rows="2" placeholder="z.B. Tipp von Nachbarin, Besichtigung Sa 10 Uhr">${esc(pre.note || "")}</textarea></label>
+    <button type="button" class="btn primary" id="mSave">Hinzufügen</button></div>`;
+  S.manText = pre.text || "";
+  const thumbs = () => { $("mThumbs").innerHTML = S.manFiles.map((f) => f.type.startsWith("image/") ? `<img src="${URL.createObjectURL(f)}" alt="">` : `<span class="tag">PDF</span>`).join(""); };
+  const readShots = async () => {
+    if (!S.manFiles.some((f) => f.type.startsWith("image/"))) return;
+    const st = $("mKi"); st.hidden = false; st.textContent = "Claude liest die Screenshots … (ca. 10–20 Sek.)";
+    try {
+      const r = await manualReadShots(S.manFiles);
+      const put = (id, v) => { const el = $(id); if (el && v != null && v !== "" && !el.value.trim()) el.value = v; };
+      put("mStreet", r.strasse); put("mPlz", r.plz); put("mCity", r.ort); put("mRooms", r.zimmer); put("mRent", r.miete_brutto); put("mM2", r.flaeche_m2);
+      if (r.text) S.manText = [S.manText, r.text].filter(Boolean).join("\n");
+      st.textContent = "✦ Von Claude ausgefüllt – bitte kurz prüfen." + (r.netto ? " Achtung: nur Nettomiete sichtbar." : "");
+    } catch (e) { st.textContent = "Screenshots nicht gelesen: " + e.message + " Bitte von Hand ausfüllen."; }
+  };
+  thumbs(); readShots();
+  $("mFiles").onchange = (e) => { S.manFiles.push(...e.target.files); thumbs(); readShots(); };
+  $("mSave").onclick = () => saveManual();
+}
+async function saveManual() {
+  const raw = $("mUrl").value.trim(), url = firstLink(raw) || (/^www\./i.test(raw) ? "https://" + raw : "");
+  if (!url) { toast("Bitte einen Link einfügen (https://…).", "err"); $("mUrl").focus(); return; }
+  const btn = $("mSave"); btn.disabled = true; btn.textContent = "Speichere …";
+  try {
+    const mk = await manualKey(url), k = mk.key;
+    const known = hitByKey(k) || hitByUrl(url, mk.url);
+    const note = $("mNote").value.trim();
+    if (known) {
+      // schon in der Liste (oder wird gerade geholt): nur Screenshots/Notiz dazu
+      if (S.manFiles.length || note) await uploadOwn(keyOf(known), S.manFiles, note);
+      if (verdict(keyOf(known)) === "out") setOut(keyOf(known), false);
+      S.manFiles = [];
+      toast(known.manual?.pending ? "Diese Wohnung wird schon geholt." : "Diese Wohnung ist schon in der Liste.", "ok"); openDetail(keyOf(known)); return;
+    }
+    const item = { id: "m" + Date.now().toString(36), url: mk.url, key: k, portal: mk.portal, by: S.person, at: new Date().toISOString(),
+      street: $("mStreet").value.trim() || null, plz: $("mPlz").value.trim() || null, city: $("mCity").value.trim() || null,
+      rooms: numIn($("mRooms").value), rent: numIn($("mRent").value), m2: numIn($("mM2").value), note: note || null, text: S.manText || null };
+    toast("Speichere …", "", 0);
+    await saveManualItem(item);
+    S.hits = S.hits.filter((h) => !(h.manual?.pending && keyOf(h) === k)); mergeManual();
+    S.seen.add(k); saveSeen();
+    if (S.manFiles.length || note) await uploadOwn(k, S.manFiles, note);
+    S.manFiles = []; renderHits();
+    toast("Hinzugefügt. Wollihood holt die Details, in ca. 2 Min. ist sie fertig.", "ok", 6000);
+    openDetail(k);
+    setTimeout(load, 150000);
+  } catch (e) {
+    toast("Nicht gespeichert: " + e.message, "err", 8000);
+    btn.disabled = false; btn.textContent = "Hinzufügen";
+  }
+}
+$("addLinkBtn").addEventListener("click", () => openManual());
 // Geteiltes aus anderen Apps entgegennehmen
 async function handleShare(id) {
   let meta;
@@ -1291,6 +1457,18 @@ async function handleShare(id) {
   const blob = `${meta.title} ${meta.text} ${meta.url}`;
   const ids = blob.match(/\d{6,12}/g) || [];
   const guess = S.hits.find((h) => (h.sources || [{ url: h.url }]).some((s) => blob.includes(s.url)) || (h.keys || []).some((k) => ids.some((n) => k.endsWith(":" + n))));
+  const link = firstLink(`${meta.url} ${meta.text} ${meta.title}`);
+  const loadFiles = async () => {
+    const c = await caches.open("wollihood-share"), out = [];
+    for (const f of meta.files) { const r = await c.match(f.path); if (r) out.push(new File([await r.blob()], decodeURIComponent(r.headers.get("X-Name") || f.name || "datei"), { type: f.type || "image/jpeg" })); }
+    return out;
+  };
+  const asNew = async () => {
+    const files = await loadFiles();
+    const c = await caches.open("wollihood-share"); for (const key of await c.keys()) if (key.url.includes(`/__share/${id}/`)) await c.delete(key);
+    openManual({ url: link, files, text: [meta.title, meta.text].filter(Boolean).join(" ").trim() });
+  };
+  if (!guess && link) { asNew(); return; }       // geteilter Link einer Wohnung, die Wollihood nicht kennt
   const rank = (h) => (h === guess ? 0 : verdict(keyOf(h)) === "out" ? 2 : 1);
   const list = [...S.hits].sort((a, b) => rank(a) - rank(b));
   S.detailKey = null;
@@ -1300,7 +1478,9 @@ async function handleShare(id) {
       <p class="hint">${meta.files.length} Datei${meta.files.length === 1 ? "" : "en"}${meta.text || meta.url ? " und Text" : ""} geteilt.${guess ? " Passende Wohnung ist vorausgewählt." : ""}</p>
       <input class="field" id="shareFilter" placeholder="Strasse oder Quartier suchen">
       <div class="sharelist">${list.map((h) => `<label class="check"><input type="radio" name="shareTo" value="${esc(keyOf(h))}" ${h === guess ? "checked" : ""}><span class="cl">${esc(h.street || h.title || "Inserat")}<small>${esc([h.plz, QUARTER[h.plz] || h.city].filter(Boolean).join(" "))} · ${esc(rooms(h.rooms))} · ${esc(chf(h.rent))}${verdict(keyOf(h)) === "out" ? " · aussortiert" : ""}</small></span></label>`).join("") || '<p class="hint">Keine Treffer in der Liste.</p>'}</div>
-      <button type="button" class="btn primary" id="shareSave">Speichern</button></div>`;
+      <button type="button" class="btn primary" id="shareSave">Speichern</button>
+      <button type="button" class="btn" id="shareNew">Neue Wohnung anlegen</button></div>`;
+  $("shareNew").onclick = asNew;
   $("shareFilter").oninput = (ev) => { const q = ev.target.value.toLowerCase(); $("dBody").querySelectorAll(".sharelist label").forEach((l) => (l.hidden = q && !l.textContent.toLowerCase().includes(q))); };
   $("shareSave").onclick = async () => {
     const k = ($("dBody").querySelector("input[name=shareTo]:checked") || {}).value;
@@ -1469,7 +1649,7 @@ function renderHits() {
         <div class="srcs">Gefunden auf: ${sourcesHtml(x)}${agencyOf(x) ? ` · Verwaltung: <b>${esc(agencyOf(x))}</b>` : ""}</div>
         ${verdict(k) === "out" ? `<div class="notes">${itemOf(k).out ? "Aussortiert von " + esc(PEOPLE[itemOf(k).out.by] || "") : "Aussortiert: beide Daumen runter"}${outTime(k) ? " · " + dmy(outTime(k)) : ""}</div>` : ""}
         ${x.notes && x.notes.length ? `<div class="notes">${esc(x.notes.join(" · "))}</div>` : ""}
-        ${x.swap || featKeys(x.features).length ? `<div class="tags">${x.swap ? '<span class="tag swap">Tausch</span>' : ""}${featKeys(x.features).map((k) => `<span class="tag">${esc(featShort(k))}</span>`).join("")}</div>` : ""}
+        ${x.manual || x.swap || featKeys(x.features).length ? `<div class="tags">${manualTag(x)}${x.swap ? '<span class="tag swap">Tausch</span>' : ""}${featKeys(x.features).map((k) => `<span class="tag">${esc(featShort(k))}</span>`).join("")}</div>` : ""}
         ${x.swap && x.swap_wants ? `<div class="wants"><b>Sucht:</b> ${esc(x.swap_wants)}</div>` : ""}
         ${socialBlock(x)}
         ${stLine(k)}
@@ -2052,9 +2232,10 @@ async function load() {
     if (e.status === 401 || e.status === 404) { showSetup(e.message); return; }
     toast(e.message, "err", 8000); return;
   }
-  const [hits, health, events, marks, social, people, arch, ags] = await Promise.allSettled([
+  const [hits, health, events, marks, social, people, arch, ags, man] = await Promise.allSettled([
     readJson("state/recent.json"), readJson("state/health.json"), readJson("state/events.json"), readJson("marks.json"),
-    readJson("social.json"), readJson("people.json"), readJson("archiv/index.json"), readJson("agencies.json")]);
+    readJson("social.json"), readJson("people.json"), readJson("archiv/index.json"), readJson("agencies.json"), readJson("manual.json")]);
+  if (man.status === "fulfilled") S.manual = man.value.data.items || [];
   if (arch.status === "fulfilled") S.archive = arch.value.data || {};
   if (ags.status === "fulfilled") { S.agencies = ags.value.data.agencies || {}; S.agenciesSha = ags.value.sha; }
   if (social.status === "fulfilled") { S.social = social.value.data.items || {}; S.socialSha = social.value.sha; }
@@ -2062,6 +2243,7 @@ async function load() {
   renderMyPush(); syncDevicePerson(); migrateMarks();
   if (hits.status === "fulfilled") { S.hits = hits.value.data; store.set("wh_cache_hits", JSON.stringify(S.hits)); }
   if (health.status === "fulfilled") S.health = health.value.data;
+  mergeManual();
   if (events.status === "fulfilled") S.events = events.value.data;
   if (marks.status === "fulfilled") { S.marks = marks.value.data; S.marksSha = marks.value.sha; }
   else if (marks.reason?.status === 404) { S.marks = JSON.parse(store.get("wh_marks") || "{}"); S.marksSha = null; }
@@ -2217,7 +2399,7 @@ let installEvt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("installBtn").hidden = false; $("installHint").hidden = true; });
 $("installBtn").addEventListener("click", async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("installBtn").hidden = true; });
 if (window.matchMedia("(display-mode: standalone)").matches) { $("installHint").textContent = "Läuft als App."; }
-const APP_VERSION = "59 · 29.10.2026";
+const APP_VERSION = "60 · 31.10.2026";
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").then((reg) => { reg.update().catch(() => {}); }).catch(() => {});
   let reloaded = false;
