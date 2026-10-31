@@ -378,6 +378,10 @@ textarea.bewtext { min-height: 62vh; font: 16px/1.55 Georgia, "Times New Roman",
 textarea.bewnote { min-height: 220px; font: 15px/1.5 Georgia, "Times New Roman", serif }
 #bClaude .addrow { margin-top: 10px }
 .tip { border-left: 4px solid var(--warn); background: var(--sunk); padding: 8px 10px; margin-top: 6px; font-size: 14px; line-height: 1.4 }
+.tip[data-stelle], .idea[data-stelle] { cursor: pointer } .tipgo { font-weight: 800; color: var(--muted) }
+.ideas { margin-top: 10px } .ideas summary { cursor: pointer; font: 800 12px var(--body); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); padding: 6px 0 }
+.ideas .idea { font-size: 14px; line-height: 1.4; padding: 6px 0; border-top: 1px solid var(--line) }
+.hint.erkl { margin-top: 8px; font-size: 13px }
 .linkbtn { background: none; border: 0; color: var(--accent); font: 800 13px var(--body); padding: 0; cursor: pointer; text-decoration: underline }
 .diff { white-space: pre-wrap; font-size: 14px; line-height: 1.5; border: 1px solid var(--hair); padding: 8px 10px; overflow-wrap: anywhere }
 .diff ins { background: color-mix(in srgb, var(--ok) 28%, transparent); text-decoration: none }
@@ -2399,7 +2403,7 @@ let installEvt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("installBtn").hidden = false; $("installHint").hidden = true; });
 $("installBtn").addEventListener("click", async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("installBtn").hidden = true; });
 if (window.matchMedia("(display-mode: standalone)").matches) { $("installHint").textContent = "Läuft als App."; }
-const APP_VERSION = "62 · 31.10.2026";
+const APP_VERSION = "63 · 31.10.2026";
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").then((reg) => { reg.update().catch(() => {}); }).catch(() => {});
   let reloaded = false;
@@ -2615,7 +2619,11 @@ Regeln:
 - Alter aus den Geburtsdaten und dem heutigen Datum berechnen. Befristete oder endende Jobs nicht als dauerhaft darstellen (Datum beachten).
 - Bei Genossenschaften das gemeinschaftliche Wohnen betonen, bei privaten Verwaltungen eher Verlässlichkeit und Stabilität.
 - Die Anrede steht NICHT im Anschreiben-Text (sie wird separat gewählt). Absätze im Anschreiben durch eine Leerzeile trennen; der Schluss ist «Über eine positive Rückmeldung …», dann «Freundliche Grüsse» und in der nächsten Zeile «Leonie, Pascal und Lio».
-- Hinweise (Stolpersteine): höchstens 6, kurz und konkret. Prüfe Widersprüche zwischen Anschreiben, Bemerkung, Stammdaten und Inserat, falsche oder veraltete Fakten, riskante oder missverständliche Sätze, Floskeln, Länge (das Anschreiben muss auf eine Seite passen: höchstens etwa 230 Wörter). «stelle» ist ein wörtliches, kurzes Zitat aus dem betroffenen Text (oder leer). Keine Hinweise auf offene [Platzhalter], die sind bekannt.
+- Hinweise: je genau ein kurzer Satz, mit «art»:
+  · «klaeren»: höchstens 3, nur echte Stolpersteine, bei denen Leonie und Pascal etwas tun oder entscheiden müssen.
+  · «idee»: höchstens 3 Vorschläge, die sie nutzen können oder nicht (anderes Detail aus dem Inserat, Frage für die Besichtigung).
+  · «erklaerung»: höchstens 2, was du bewusst weggelassen oder geändert hast und warum.
+  Nichts doppelt, keine Hinweise ohne Nutzen. Prüfe Widersprüche zwischen Anschreiben, Bemerkung, Stammdaten und Inserat, falsche oder veraltete Fakten, riskante oder missverständliche Sätze, Floskeln, Länge (das Anschreiben muss auf eine Seite passen: höchstens etwa 230 Wörter). «stelle» ist ein wörtliches, kurzes Zitat aus dem betroffenen Text (oder leer). Keine Hinweise auf offene [Platzhalter], die sind bekannt.
 - Die gelernten Regeln stammen aus Änderungen, die Leonie und Pascal von Hand gemacht haben. Sie haben Vorrang vor allgemeinen Stilregeln.
 - Nach-Check Textstil (Pascals Wunsch, immer bevor du antwortest): Lies jeden Satz, den du geschrieben oder geändert hast, so, als würden Leonie oder Pascal ihn laut sagen. Würden sie das so sagen? Typisch künstlich/KI: das Inserat nacherzählen («spricht uns an, dass …»), allgemeine Wertesätze («schätzen eine lebendige Nachbarschaft», «legen Wert auf …»), Dreierketten und Adjektivhäufungen, zu glatte, symmetrische Sätze, «besonders», «sehr gerne», «gegenseitig», Doppelpunkt-Effekte, Gedankenstriche als Stilmittel, Sätze, die für jede Familie und jede Wohnung passen würden. Solche Sätze ersetzt du durch einen einfachen, konkreten Satz oder streichst sie. Im Zweifel kürzer. Bei «Rechtschreibung prüfen» und «Stolpersteine» änderst du den Text nicht, sondern nennst künstlich wirkende Stellen als Hinweis.
 - Antworte ausschliesslich mit dem Werkzeug «bewerbung».`;
@@ -2623,7 +2631,7 @@ const BEW_TOOL = { name: "bewerbung", description: "Ergebnis: beide Texte (volls
   input_schema: { type: "object", required: ["anschreiben", "bemerkung", "hinweise"], properties: {
     anschreiben: { type: "string", description: "Vollständiger Anschreiben-Text ohne Anrede, Absätze durch Leerzeile getrennt" },
     bemerkung: { type: "string", description: "Vollständige Bemerkung fürs Online-Formular (mit eigener Grusszeile am Anfang und Schluss)" },
-    hinweise: { type: "array", items: { type: "object", required: ["text"], properties: { stelle: { type: "string" }, text: { type: "string" } } } },
+    hinweise: { type: "array", items: { type: "object", required: ["text", "art"], properties: { art: { type: "string", enum: ["klaeren", "idee", "erklaerung"] }, stelle: { type: "string" }, text: { type: "string", description: "ein kurzer Satz" } } } },
     aenderungen: { type: "array", description: "Nur bei Rechtschreibprüfung: was korrigiert wurde", items: { type: "object", properties: { vorher: { type: "string" }, nachher: { type: "string" } } } } } } };
 const BEW_AUFTRAG = {
   entwurf: `Erstelle beide Texte für diese Wohnung.
@@ -2730,10 +2738,16 @@ async function bewKi(mode) {
   } catch (e) { $("bState").textContent = "Fehler: " + e.message; }
   finally { BEW.busy = false; document.querySelectorAll("#bClaude [data-ki]").forEach((b) => (b.disabled = false)); }
 }
+// Hinweise nach Art: «Zu klären» sichtbar, Ideen eingeklappt, Erklärungen als Zeile bei den Änderungen
+const tipArt = (t) => (["klaeren", "idee", "erklaerung"].includes(t.art) ? t.art : "klaeren");
+const tipRow = (t, cls) => `<div class="${cls}"${t.stelle ? ` data-stelle="${esc(t.stelle)}" role="button" tabindex="0"` : ""}>${esc(t.text)}${t.stelle ? ' <span class="tipgo" aria-hidden="true">›</span>' : ""}</div>`;
+const bewErkl = () => (BEW.doc.hinweise || []).filter((t) => tipArt(t) === "erklaerung").slice(0, 2);
 function bewTips() {
-  const h = BEW.doc.hinweise || [];
-  $("bTips").innerHTML = h.length ? `<div class="ftitle sm">Hinweise von Claude</div>` + h.map((t) =>
-    `<div class="tip">${esc(t.text)}${t.stelle ? ` <button type="button" class="linkbtn" data-stelle="${esc(t.stelle)}">Stelle zeigen</button>` : ""}</div>`).join("") : "";
+  const h = BEW.doc.hinweise || [], k = h.filter((t) => tipArt(t) === "klaeren").slice(0, 3), id = h.filter((t) => tipArt(t) === "idee").slice(0, 3);
+  const er = BEW.prev ? [] : bewErkl();      // ohne Änderungen: Erklärungen hier, sonst bei «Was Claude geändert hat»
+  $("bTips").innerHTML = (k.length ? `<div class="ftitle sm">Zu klären</div>${k.map((t) => tipRow(t, "tip")).join("")}` : "")
+    + (id.length ? `<details class="ideas"><summary>${id.length} ${id.length === 1 ? "Idee" : "Ideen"} von Claude</summary>${id.map((t) => tipRow(t, "idea")).join("")}</details>` : "")
+    + (er.length ? `<p class="hint erkl">${er.map((t) => esc(t.text)).join(" ")}</p>` : "");
 }
 function bewShow(q) {
   for (const id of ["bText", "bNote"]) {
@@ -2763,6 +2777,7 @@ function bewDiff(before, aend) {
   $("bDiff").innerHTML = `<div class="ftitle sm">Was Claude geändert hat</div>
     ${part("Anschreiben", before.text, BEW.doc.text)}${part("Bemerkung", before.bemerkung || "", BEW.doc.bemerkung)}
     ${(aend || []).length ? `<p class="hint">${aend.map((x) => `${esc(x.vorher)} → ${esc(x.nachher)}`).join(" · ")}</p>` : ""}
+    ${bewErkl().length ? `<p class="hint erkl">${bewErkl().map((t) => esc(t.text)).join(" ")}</p>` : ""}
     <div class="brow"><button type="button" class="btn" id="bUndo">Rückgängig</button></div>`;
 }
 function bewUndo() {
