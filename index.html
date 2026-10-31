@@ -2822,7 +2822,7 @@ let installEvt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("installBtn").hidden = false; $("installHint").hidden = true; });
 $("installBtn").addEventListener("click", async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("installBtn").hidden = true; });
 if (window.matchMedia("(display-mode: standalone)").matches) { $("installHint").textContent = "Läuft als App."; }
-const APP_VERSION = "68 · 31.10.2026";
+const APP_VERSION = "69 · 31.10.2026";
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").then((reg) => { reg.update().catch(() => {}); }).catch(() => {});
   let reloaded = false;
@@ -3219,9 +3219,9 @@ const KMT_TA = { kontakt: "kText", text: "bText", bemerkung: "bNote" };
 const KMT_NAME = { kontakt: "Nachricht", text: "Anschreiben", bemerkung: "Bemerkung" };
 function kmtBlock(feld) {
   return `<div class="kmt" data-kfeld="${feld}">
-    <div class="kmtbar"><button type="button" class="btn sm" data-kmtnew="${feld}">Kommentieren</button><span class="hint">Stelle im Text markieren, dann antippen – ohne Markierung gilt er für den ganzen Text.</span></div>
+    <div class="kmtbar"><button type="button" class="btn sm" data-kmtnew="${feld}">Ändern lassen</button><span class="hint">Stelle im Text markieren, dann antippen – ohne Markierung gilt es für den ganzen Text.</span></div>
     <div class="kmtform" hidden></div><div class="kmtlist"></div>
-    <button type="button" class="btn ki" data-kmtgo="${feld}" hidden>✦ Überarbeiten</button></div>`;
+    <button type="button" class="btn ki" data-kmtgo="${feld}" hidden>✦ Umsetzen</button></div>`;
 }
 async function kmtLoad(k) {
   const aid = await aidOf(k);
@@ -3232,10 +3232,10 @@ async function kmtLoad(k) {
 function kmtRender() {
   document.querySelectorAll(".kmt[data-kfeld]").forEach((box) => {
     const feld = box.dataset.kfeld, list = KMT.items.filter((c) => c.feld === feld);
-    box.querySelector(".kmtlist").innerHTML = list.map((c) => `<div class="kmtitem">${c.stelle ? `<q>${esc(c.stelle.length > 90 ? c.stelle.slice(0, 90) + " …" : c.stelle)}</q>` : '<q class="all">ganzer Text</q>'}
-      <span>${esc(c.text)}</span><small>${esc(PEOPLE[c.by] || c.by || "")}</small><button type="button" class="kmtdel" data-kmtdel="${esc(c.id)}" aria-label="Kommentar löschen">✕</button></div>`).join("");
+    box.querySelector(".kmtlist").innerHTML = (list.length ? '<div class="ftitle sm">Änderungswünsche</div>' : "") + list.map((c) => `<div class="kmtitem">${c.stelle ? `<q>${esc(c.stelle.length > 90 ? c.stelle.slice(0, 90) + " …" : c.stelle)}</q>` : '<q class="all">ganzer Text</q>'}
+      <span>${esc(c.text)}</span><small>${esc(PEOPLE[c.by] || c.by || "")}</small><button type="button" class="kmtdel" data-kmtdel="${esc(c.id)}" aria-label="Änderungswunsch löschen">✕</button></div>`).join("");
     const go = box.querySelector("[data-kmtgo]");
-    go.hidden = !list.length; go.textContent = `✦ Überarbeiten (${list.length} Kommentar${list.length === 1 ? "" : "e"})`;
+    go.hidden = !list.length; go.textContent = `✦ Umsetzen (${list.length})`;
   });
 }
 async function kmtSave(fn) {
@@ -3244,9 +3244,9 @@ async function kmtSave(fn) {
       let cur = { data: { items: [] }, sha: null };
       try { cur = await readJson(`archiv/${KMT.aid}/bewerbung/kommentare.json`); } catch (e) { if (e.status !== 404) throw e; }
       const items = fn(cur.data.items || []);
-      KMT.sha = await writeJson(`archiv/${KMT.aid}/bewerbung/kommentare.json`, { items }, cur.sha, `Kommentar zum Text (${PEOPLE[S.person] || ""})`);
+      KMT.sha = await writeJson(`archiv/${KMT.aid}/bewerbung/kommentare.json`, { items }, cur.sha, `Änderungswunsch zum Text (${PEOPLE[S.person] || ""})`);
       KMT.items = items; kmtRender(); return true;
-    } catch (e) { if (!(e.status === 409 || e.status === 422) || i === 2) { toast("Kommentar nicht gespeichert: " + e.message, "err"); return false; } }
+    } catch (e) { if (!(e.status === 409 || e.status === 422) || i === 2) { toast("Änderungswunsch nicht gespeichert: " + e.message, "err"); return false; } }
   }
 }
 function kmtInstr(feld) {
