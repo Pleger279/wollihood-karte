@@ -2399,7 +2399,7 @@ let installEvt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("installBtn").hidden = false; $("installHint").hidden = true; });
 $("installBtn").addEventListener("click", async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("installBtn").hidden = true; });
 if (window.matchMedia("(display-mode: standalone)").matches) { $("installHint").textContent = "Läuft als App."; }
-const APP_VERSION = "61 · 31.10.2026";
+const APP_VERSION = "62 · 31.10.2026";
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").then((reg) => { reg.update().catch(() => {}); }).catch(() => {});
   let reloaded = false;
@@ -2617,6 +2617,7 @@ Regeln:
 - Die Anrede steht NICHT im Anschreiben-Text (sie wird separat gewählt). Absätze im Anschreiben durch eine Leerzeile trennen; der Schluss ist «Über eine positive Rückmeldung …», dann «Freundliche Grüsse» und in der nächsten Zeile «Leonie, Pascal und Lio».
 - Hinweise (Stolpersteine): höchstens 6, kurz und konkret. Prüfe Widersprüche zwischen Anschreiben, Bemerkung, Stammdaten und Inserat, falsche oder veraltete Fakten, riskante oder missverständliche Sätze, Floskeln, Länge (das Anschreiben muss auf eine Seite passen: höchstens etwa 230 Wörter). «stelle» ist ein wörtliches, kurzes Zitat aus dem betroffenen Text (oder leer). Keine Hinweise auf offene [Platzhalter], die sind bekannt.
 - Die gelernten Regeln stammen aus Änderungen, die Leonie und Pascal von Hand gemacht haben. Sie haben Vorrang vor allgemeinen Stilregeln.
+- Nach-Check Textstil (Pascals Wunsch, immer bevor du antwortest): Lies jeden Satz, den du geschrieben oder geändert hast, so, als würden Leonie oder Pascal ihn laut sagen. Würden sie das so sagen? Typisch künstlich/KI: das Inserat nacherzählen («spricht uns an, dass …»), allgemeine Wertesätze («schätzen eine lebendige Nachbarschaft», «legen Wert auf …»), Dreierketten und Adjektivhäufungen, zu glatte, symmetrische Sätze, «besonders», «sehr gerne», «gegenseitig», Doppelpunkt-Effekte, Gedankenstriche als Stilmittel, Sätze, die für jede Familie und jede Wohnung passen würden. Solche Sätze ersetzt du durch einen einfachen, konkreten Satz oder streichst sie. Im Zweifel kürzer. Bei «Rechtschreibung prüfen» und «Stolpersteine» änderst du den Text nicht, sondern nennst künstlich wirkende Stellen als Hinweis.
 - Antworte ausschliesslich mit dem Werkzeug «bewerbung».`;
 const BEW_TOOL = { name: "bewerbung", description: "Ergebnis: beide Texte (vollständig) und Hinweise.",
   input_schema: { type: "object", required: ["anschreiben", "bemerkung", "hinweise"], properties: {
