@@ -592,6 +592,7 @@ label.f small, div.f small { color: var(--muted); font: 500 12.5px var(--body) }
 .sdone { margin: 0; font-size: 13.5px; color: var(--ok); display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap }
 .sdone .linkbtn { font-size: 12.5px; color: var(--muted) }
 #kText { min-height: 170px }
+.btn.ki { background: var(--accent-soft); color: var(--accent); border-color: transparent }
 .steps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px }
 .steps span { display: grid; gap: 6px; font: 500 11.5px var(--body); color: var(--muted) }
 .steps span::before { content: ""; height: 4px; border-radius: 2px; background: var(--line) }
@@ -1230,9 +1231,9 @@ function standPanel(k) {
   let body = "";
   if (tab === "kontakt") body = `<p class="hint">Kurze Nachricht fürs Kontaktfeld im Inserat – vor der Besichtigung.</p>
       <textarea class="field" id="kText" rows="7" spellcheck="true" lang="de-CH" placeholder="Lade …"></textarea>
+      <button type="button" class="btn ki" id="kKi">✦ Neu schreiben lassen</button>
       <p class="hint" id="kState"></p><div id="kTips"></div>
       <button type="button" class="btn primary" id="kCopy">Kopieren &amp; Inserat öffnen</button>
-      <button type="button" class="linkbtn" id="kKi" style="justify-self:start">✦ Neu schreiben lassen</button>
       ${steps.kontakt ? doneLine("kontakt", "Angefragt") : `<button type="button" class="btn" data-step="kontakt">Als angefragt markieren</button>`}`;
   if (tab === "besichtigung") {
     const b = steps.besichtigung || {};
@@ -2800,7 +2801,7 @@ let installEvt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("installBtn").hidden = false; $("installHint").hidden = true; });
 $("installBtn").addEventListener("click", async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("installBtn").hidden = true; });
 if (window.matchMedia("(display-mode: standalone)").matches) { $("installHint").textContent = "Läuft als App."; }
-const APP_VERSION = "66 · 31.10.2026";
+const APP_VERSION = "67 · 31.10.2026";
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").then((reg) => { reg.update().catch(() => {}); }).catch(() => {});
   let reloaded = false;
