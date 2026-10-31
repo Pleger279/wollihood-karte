@@ -584,6 +584,14 @@ label.f small, div.f small { color: var(--muted); font: 500 12.5px var(--body) }
 .dhead { display: grid; gap: 2px; padding: 2px 2px 0 }
 .dhead h1 { margin: 0; font: 700 22px/1.2 var(--body); letter-spacing: -.01em; overflow-wrap: anywhere }
 .dhead .sub { font-size: 13.5px; color: var(--muted) }
+.stabs { display: grid; grid-template-columns: minmax(0, .95fr) minmax(0, 1.4fr) minmax(0, 1.25fr) minmax(0, 1fr); gap: 2px; background: var(--seg); border-radius: 12px; padding: 3px }
+.stabs button { border: 0; background: transparent; border-radius: 9px; padding: 9px 0; font: 500 12.5px var(--body); color: var(--muted); cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+.stabs button.done { color: var(--ok) } .stabs button.no { color: var(--bad) }
+.stabs button[aria-selected="true"] { background: var(--surface); color: var(--fg); font-weight: 600; box-shadow: var(--shadow) }
+.sbody { display: grid; gap: 10px }
+.sdone { margin: 0; font-size: 13.5px; color: var(--ok); display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap }
+.sdone .linkbtn { font-size: 12.5px; color: var(--muted) }
+#kText { min-height: 170px }
 .steps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px }
 .steps span { display: grid; gap: 6px; font: 500 11.5px var(--body); color: var(--muted) }
 .steps span::before { content: ""; height: 4px; border-radius: 2px; background: var(--line) }
@@ -1179,26 +1187,148 @@ function stLine(k) {
   if (!st || !st.value) return "";
   return `<button type="button" class="stline" data-detail><span>Stand: <b>${esc(statusLabel(st))}</b>${st.by ? ` · ${esc(PEOPLE[st.by] || st.by)}, ${esc(ago(st.at))}` : ""}</span><span aria-hidden="true">›</span></button>`;
 }
+// ---------- Schritte: Kontakt · Besichtigung · Bewerbung · Antwort (frei umschaltbar, v66) ----------
+// social[k].steps = { kontakt:{by,at}, besichtigung:{when,done,by,at}, bewerbung:{by,at}, antwort:{value,by,at} }
+// social[k].status bleibt der «letzte Stand» (für Favoriten, Push «Stand geändert» und ältere Geräte).
+const STEPS = [["kontakt", "Kontakt"], ["besichtigung", "Besichtigung"], ["bewerbung", "Bewerbung"], ["antwort", "Antwort"]];
+function stepsOf(k) {
+  const it = itemOf(k);
+  if (it.steps) return it.steps;
+  const st = it.status || {}, by = st.by, at = st.at;        // alte Einträge: aus dem Stand ableiten
+  return st.value === "angefragt" ? { kontakt: { by, at } } : st.value === "besichtigung" ? { besichtigung: { when: st.when || null, by, at } }
+    : st.value === "beworben" ? { bewerbung: { by, at } } : st.value === "zusage" || st.value === "absage" ? { antwort: { value: st.value, by, at } } : {};
+}
+const besDone = (b) => !!b && (b.done || (b.when && new Date(b.when) < new Date()));
+const stepDone = (steps, n) => n === "besichtigung" ? besDone(steps.besichtigung) : !!steps[n];
+function statusFrom(steps) {
+  if (steps.antwort?.value) return { value: steps.antwort.value };
+  if (steps.bewerbung) return { value: "beworben" };
+  if (steps.besichtigung && (steps.besichtigung.when || steps.besichtigung.done)) return { value: "besichtigung", when: steps.besichtigung.when || null };
+  if (steps.kontakt) return { value: "angefragt" };
+  return null;
+}
+function setStep(k, name, data) {
+  if (needPerson()) return;
+  const me = S.person, label = (S.hits.find((h) => keyOf(h) === k) || {}).street || "Inserat", now = new Date().toISOString();
+  socialOp(`Schritt ${name} ${data ? "gesetzt" : "zurückgesetzt"} von ${PEOPLE[me]} (${label})`, (items) => {
+    const it = items[k] || (items[k] = { votes: {}, comments: [] });
+    const steps = JSON.parse(JSON.stringify(it.steps || stepsOf(k)));
+    if (data) steps[name] = { ...(steps[name] || {}), ...data, by: me, at: now }; else delete steps[name];
+    it.steps = steps;
+    const ns = statusFrom(steps);
+    if (!ns) delete it.status;
+    else if (it.status?.value !== ns.value || (it.status?.when || null) !== (ns.when || null)) it.status = { ...ns, when: ns.when || null, by: me, at: now };
+    it.updated = now;
+  });
+  setTimeout(() => refreshStand(k), 30);
+}
+function defaultTab(k) { const st = stepsOf(k); return (STEPS.find(([n]) => !stepDone(st, n)) || STEPS[3])[0]; }
 function standPanel(k) {
-  const it = itemOf(k), st = it.status || {}, favBy = it.fav?.by;
-  const why = verdict(k) === "both" ? "Ihr seid euch einig" : favBy ? `Favorit von ${PEOPLE[favBy] || favBy}` : "";
-  const when = st.when ? new Date(new Date(st.when).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16) : "";
-  const idx = { "": 0, angefragt: 1, besichtigung: 2, beworben: 3, zusage: 3, absage: 3 }[st.value || ""] ?? 0;
-  const last = st.value === "zusage" ? "Zusage" : st.value === "absage" ? "Absage" : "Beworben";
-  const steps = ["Entdeckt", "Angefragt", "Besichtigt", last].map((l, i) =>
-    `<span class="${i < idx ? "ok" : i === idx ? (st.value === "absage" ? "on no" : st.value === "zusage" ? "on ok" : "on") : ""}">${l}</span>`).join("");
-  const label = !st.value || st.value === "angefragt" ? "Kontakt aufnehmen" : st.value === "besichtigung" ? "Bewerbung schreiben" : "Bewerbung ansehen";
+  const steps = stepsOf(k), tab = S.dTab || defaultTab(k);
   const x = S.hits.find((h) => keyOf(h) === k) || {};
+  const doneLine = (n, txt) => { const s = steps[n]; return `<p class="sdone">✓ ${esc(txt)}${s?.by ? ` · ${esc(PEOPLE[s.by] || s.by)}, ${esc(ago(s.at))}` : ""} <button type="button" class="linkbtn" data-unstep="${n}">rückgängig</button></p>`; };
+  let body = "";
+  if (tab === "kontakt") body = `<p class="hint">Kurze Nachricht fürs Kontaktfeld im Inserat – vor der Besichtigung.</p>
+      <textarea class="field" id="kText" rows="7" spellcheck="true" lang="de-CH" placeholder="Lade …"></textarea>
+      <p class="hint" id="kState"></p><div id="kTips"></div>
+      <button type="button" class="btn primary" id="kCopy">Kopieren &amp; Inserat öffnen</button>
+      <button type="button" class="linkbtn" id="kKi" style="justify-self:start">✦ Neu schreiben lassen</button>
+      ${steps.kontakt ? doneLine("kontakt", "Angefragt") : `<button type="button" class="btn" data-step="kontakt">Als angefragt markieren</button>`}`;
+  if (tab === "besichtigung") {
+    const b = steps.besichtigung || {};
+    const when = b.when ? new Date(new Date(b.when).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16) : "";
+    body = `<label class="f"><small>Termin</small><input class="field" type="datetime-local" data-swhen value="${when}"></label>
+      ${besDone(b) ? doneLine("besichtigung", b.when ? "Besichtigt am " + new Date(b.when).toLocaleDateString("de-CH") : "Besichtigt")
+        : `<button type="button" class="btn" data-step="besichtigung">Als besichtigt markieren</button>`}`;
+  }
+  if (tab === "bewerbung") body = `<p class="hint" id="dBewInfo">Anschreiben, Bemerkung fürs Formular, PDF und Dossier.</p><div id="dBewPdf"></div>
+      <button type="button" class="btn primary" data-bew>Bewerbung bearbeiten</button>
+      ${steps.bewerbung ? doneLine("bewerbung", "Beworben") : `<button type="button" class="btn" data-step="bewerbung">Als beworben markieren</button>`}`;
+  if (tab === "antwort") { const v = steps.antwort?.value;
+    body = `<div class="seg"><button type="button" class="opt" data-answer="zusage" aria-pressed="${v === "zusage"}">Zusage</button><button type="button" class="opt" data-answer="absage" aria-pressed="${v === "absage"}">Absage</button></div>
+      ${v ? doneLine("antwort", v === "zusage" ? "Zusage" : "Absage") : '<p class="hint">Antwort der Verwaltung, sobald sie da ist.</p>'}`; }
   return `<div class="panel" id="dStand">
-    <div class="steps" aria-label="Unser Stand">${steps}</div>
-    <div class="standrow">
-      <select class="field" data-status aria-label="Stand">${STATUS.map(([v, l]) => `<option value="${v}"${(st.value || "") === v ? " selected" : ""}>${l}</option>`).join("")}</select>
-      ${st.value === "besichtigung" ? `<label class="f"><small>Termin</small><input class="field" type="datetime-local" data-when value="${when}"></label>` : ""}
-    </div>
-    <div id="dBew"><button type="button" class="btn primary" data-bew style="width:100%">${label}</button>
-      <p class="hint" id="dBewInfo" style="margin-top:6px">${[why, st.by ? `Stand von ${esc(PEOPLE[st.by] || st.by)}, ${esc(ago(st.at))}` : ""].filter(Boolean).map(esc).join(" · ")}</p><div id="dBewPdf"></div></div>
+    <div class="stabs" role="tablist" aria-label="Schritte">${STEPS.map(([n, l]) => `<button type="button" role="tab" data-stab="${n}" aria-selected="${n === tab}" class="${stepDone(steps, n) ? "done" : ""}${n === "antwort" && steps.antwort?.value === "absage" ? " no" : ""}">${stepDone(steps, n) ? "✓" : ""}${l}</button>`).join("")}</div>
+    <div class="sbody">${body}</div>
     ${firstUrl(x) ? `<a class="linkbtn" style="justify-self:center" href="${esc(firstUrl(x))}" target="_blank" rel="noopener">Inserat auf ${esc(x.sources?.[0]?.portal || x.portal || "der Plattform")} öffnen ↗</a>` : ""}
   </div>`;
+}
+function refreshStand(k) {
+  const el = $("dStand"); if (!el || S.detailKey !== k) return;
+  el.outerHTML = standPanel(k); afterStand(k);
+}
+function afterStand(k) {
+  const tab = S.dTab || defaultTab(k);
+  if (tab === "bewerbung") bewProbe(k);
+  if (tab === "kontakt") kontaktLoad(k);
+}
+// Kontakt-Nachricht: archiv/<id>/bewerbung/kontakt.json, Claude schreibt beim ersten Öffnen
+const KON = { k: null, sha: null, data: null, busy: false, auto: new Set() };
+async function kontaktLoad(k) {
+  const ta = $("kText"); if (!ta) return;
+  const aid = await aidOf(k);
+  if (KON.k !== k) { KON.k = k; KON.sha = null; KON.data = null;
+    try { const r = await readJson(`archiv/${aid}/bewerbung/kontakt.json`); KON.data = r.data; KON.sha = r.sha; } catch { } }
+  if (S.detailKey !== k || !$("kText")) return;
+  $("kText").value = KON.data?.text || ""; $("kText").placeholder = "Eure Nachricht …";
+  if (KON.data?.text) $("kState").textContent = `Gespeichert${KON.data.by ? " von " + (PEOPLE[KON.data.by] || KON.data.by) : ""}, ${ago(KON.data.updated)}.`;
+  else if (!KON.auto.has(k)) { KON.auto.add(k); kontaktKi(k); }
+}
+async function kontaktSave(k, text, quiet) {
+  if (needPerson()) return;
+  const aid = await aidOf(k);
+  const data = { ...(KON.data || {}), text, by: S.person, updated: new Date().toISOString() };
+  try { KON.sha = await writeJson(`archiv/${aid}/bewerbung/kontakt.json`, data, KON.sha, `Kontakt-Nachricht (${PEOPLE[S.person]})`); KON.data = data;
+    if (!quiet) toast("Nachricht gespeichert.", "ok"); if ($("kState")) $("kState").textContent = "Gespeichert.";
+  } catch (e) { toast("Nicht gespeichert: " + e.message, "err"); }
+}
+const KON_TOOL = { name: "nachricht", description: "Die erste Nachricht ans Kontaktfeld des Inserats und kurze Hinweise.",
+  input_schema: { type: "object", required: ["nachricht"], properties: { nachricht: { type: "string", description: "Vollständige Nachricht mit Anrede «Guten Tag» und Grussformel" },
+    hinweise: { type: "array", items: { type: "object", required: ["text"], properties: { art: { type: "string", enum: ["klaeren", "idee", "erklaerung"] }, text: { type: "string" } } } } } } };
+async function kontaktKi(k) {
+  if (KON.busy) return;
+  const st = $("kState");
+  try {
+    const c = await bewCtx();
+    if (!c.key) { if (st) st.textContent = "Kein Claude-Schlüssel (Optionen → «Claude für Bewerbungen»). Schreibt die Nachricht selbst."; return; }
+    KON.busy = true; if (st) st.textContent = "Claude schreibt die Nachricht … (ca. 15–30 Sek.)"; $("kKi") && ($("kKi").disabled = true);
+    BEW.k = k; BEW.x = S.hits.find((h) => keyOf(h) === k) || {}; BEW.d = S.detailData || null;
+    const user = `Heute ist ${new Date().toLocaleDateString("de-CH", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}.
+
+<stammdaten>
+${JSON.stringify(c.stamm, null, 1)}
+</stammdaten>
+
+<stil_und_fruehere_texte>
+${c.stil}
+</stil_und_fruehere_texte>
+
+<gelernte_regeln>
+${(c.regeln || []).map((r) => "- " + r.regel).join("\n") || "(noch keine)"}
+</gelernte_regeln>
+
+<inserat>
+${bewInserat()}
+</inserat>
+
+<aktuell>
+${$("kText")?.value || "(noch leer)"}
+</aktuell>
+
+<auftrag>
+Schreibe die erste Nachricht fürs Kontaktfeld im Inserat: Erstkontakt vor der Besichtigung (Regeln oben). Kurz, natürlich, mit «Guten Tag» und Grussformel «Freundliche Grüsse» plus «Leonie Meier und Pascal Stadelmann». Nur die Nachricht, kein Anschreiben. Hinweise höchstens 2, nur «klaeren».
+</auftrag>`;
+    const sys = BEW_SYSTEM.replace("Werkzeug «bewerbung»", "Werkzeug «nachricht»");
+    const res = await claudeTool(sys, user, KON_TOOL, "nachricht");
+    const text = String(res.nachricht || "").replace(/\r/g, "").trim();
+    if (S.detailKey === k && $("kText") && text) {
+      $("kText").value = text;
+      $("kTips").innerHTML = (res.hinweise || []).filter((h) => h && h.text && (h.art || "klaeren") === "klaeren").slice(0, 2).map((h) => `<div class="tip">${esc(h.text)}</div>`).join("");
+      if (st) st.textContent = "✦ Von Claude geschrieben – anpassen und dann kopieren.";
+      kontaktSave(k, text, true);
+    }
+  } catch (e) { if (st) st.textContent = "Claude: " + e.message; }
+  finally { KON.busy = false; $("kKi") && ($("kKi").disabled = false); }
 }
 // «Bewertung & Notizen»: Daumen, Stern, Kommentare, Notiz und eigene Dateien an einem Ort
 function usPanel(k) {
@@ -1359,7 +1489,7 @@ document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("deta
 async function openDetail(k) {
   const x = S.hits.find((h) => keyOf(h) === k) || {};
   const a = archEntry(x);
-  S.detailKey = k;
+  S.detailKey = k; S.dTab = null;
   $("dTitle").textContent = "Wohnung";
   $("detail").hidden = false; document.body.style.overflow = "hidden";
   $("dBody").innerHTML = '<p class="hint">Lade …</p>';
@@ -1432,7 +1562,8 @@ function renderDetail(x, a, d) {
   const dd = $("dDesc"); if (dd) setTimeout(() => { if (dd.scrollHeight <= dd.clientHeight + 4) $("dDescMore")?.remove(); }, 30);
   // Bilder aus dem privaten Repo nachladen
   $("dBody").querySelectorAll("img[data-src]").forEach((img) => repoFile(img.dataset.src).then((u) => (img.src = u)).catch(() => img.closest("figure")?.remove()));
-  bewProbe(S.detailKey);
+  S.detailData = d;
+  afterStand(S.detailKey);
 }
 // ---------- Eigene Dateien, Notiz, «Teilen → Wollihood» ----------
 async function aidOf(k) {
@@ -1503,10 +1634,8 @@ $("dBody").addEventListener("change", (e) => {
     socialOp(`${PEOPLE[S.person]} Notiz`, (items) => { const it = items[k] || (items[k] = { votes: {}, comments: [] }); it.note = val; it.updated = new Date().toISOString(); });
     toast("Notiz gespeichert.", "ok"); return;
   }
-  let hit = false;
-  if (e.target.matches("[data-status]")) { setStatus(k, e.target.value, null); hit = true; }
-  if (e.target.matches("[data-when]") && e.target.value) { setStatus(k, "besichtigung", new Date(e.target.value).toISOString()); hit = true; }
-  if (hit) setTimeout(() => { const el = $("dStand"); if (el) { el.outerHTML = standPanel(k); bewProbe(k); } }, 60);
+  if (e.target.matches("[data-swhen]")) { setStep(k, "besichtigung", { when: e.target.value ? new Date(e.target.value).toISOString() : null }); return; }
+  if (e.target.id === "kText") { const t = e.target.value.trim(); if (t !== (KON.data?.text || "").trim()) kontaktSave(k, t, true); return; }
 });
 $("dBody").addEventListener("change", async (e) => {
   if (e.target.id !== "ownFiles" || !e.target.files.length) return;
@@ -1725,6 +1854,23 @@ async function handleShare(id) {
 }
 $("dBody").addEventListener("click", async (e) => {
   const k0 = S.detailKey;
+  const stb = e.target.closest("[data-stab]"); if (stb && k0) { S.dTab = stb.dataset.stab; refreshStand(k0); return; }
+  const sp = e.target.closest("[data-step]"); if (sp && k0) { setStep(k0, sp.dataset.step, sp.dataset.step === "besichtigung" ? { done: true } : {}); return; }
+  const us = e.target.closest("[data-unstep]"); if (us && k0) { setStep(k0, us.dataset.unstep, null); return; }
+  const an = e.target.closest("[data-answer]"); if (an && k0) { setStep(k0, "antwort", { value: an.dataset.answer }); return; }
+  if (e.target.id === "kKi" && k0) { kontaktKi(k0); return; }
+  if (e.target.id === "kCopy" && k0) {
+    const t = $("kText").value.trim(), x = S.hits.find((h) => keyOf(h) === k0) || {};
+    if (!t) { toast("Noch keine Nachricht.", "err"); return; }
+    const offen = t.match(/\[[^\]]*\]/g);
+    if (offen && !confirm(`In der Nachricht steht noch: ${offen.join(", ")}\n\nTrotzdem kopieren?`)) return;
+    try { await navigator.clipboard.writeText(t); } catch { $("kText").select(); }
+    if (t !== (KON.data?.text || "").trim()) kontaktSave(k0, t, true);
+    if (firstUrl(x)) window.open(firstUrl(x), "_blank", "noopener");
+    if (!stepsOf(k0).kontakt) setTimeout(() => toastAction("Nachricht kopiert. Geschickt?", "Als angefragt markieren", () => setStep(k0, "kontakt", {}), 15000), 600);
+    else toast("Nachricht kopiert.", "ok");
+    return;
+  }
   const dv = e.target.closest("[data-dvote]"); if (dv && k0) { setVote(k0, dv.dataset.dvote); refreshUs(); return; }
   if (e.target.closest("[data-dfav]") && k0) { toggleFav(k0); setTimeout(refreshUs, 30); return; }
   if (e.target.id === "dCmtSend" && k0) { const ta = $("dCmt"); if (ta.value.trim()) { addComment(k0, ta.value); refreshUs(); } return; }
@@ -1835,15 +1981,13 @@ const inFav = (k) => verdict(k) !== "out" && (isFav(k) || !!itemOf(k).status?.va
 const ST_ORDER = ["besichtigung", "beworben", "angefragt", "zusage", "", "absage"];
 const ST_GROUP = { besichtigung: "Besichtigung", beworben: "Beworben", angefragt: "Angefragt", zusage: "Zusage", "": "Noch nichts unternommen", absage: "Absage" };
 function nextStep(k) {
-  const st = itemOf(k).status || {};
-  const d = st.when ? new Date(st.when) : null;
-  if (st.value === "besichtigung") return d && d > new Date()
-    ? { t: `Besichtigung ${d.toLocaleDateString("de-CH", { weekday: "short", day: "numeric", month: "numeric" })} ${d.toLocaleTimeString("de-CH", { hour: "2-digit", minute: "2-digit" })}`, wait: true }
-    : { t: "Bewerbung schicken ›" };
-  if (st.value === "angefragt") return { t: `Angefragt ${ago(st.at)} · warten auf Antwort`, wait: true };
-  if (st.value === "beworben") return { t: `Beworben ${ago(st.at)} · warten auf Antwort`, wait: true };
-  if (st.value === "zusage") return { t: "Zusage!" };
-  if (st.value === "absage") return { t: "Absage", wait: true };
+  const st = stepsOf(k), b = st.besichtigung;
+  if (st.antwort?.value) return st.antwort.value === "zusage" ? { t: "Zusage!" } : { t: "Absage", wait: true };
+  if (st.bewerbung) return { t: `Beworben ${ago(st.bewerbung.at)} · warten auf Antwort`, wait: true };
+  if (b?.when && new Date(b.when) > new Date()) { const d = new Date(b.when);
+    return { t: `Besichtigung ${d.toLocaleDateString("de-CH", { weekday: "short", day: "numeric", month: "numeric" })} ${d.toLocaleTimeString("de-CH", { hour: "2-digit", minute: "2-digit" })}`, wait: true }; }
+  if (besDone(b)) return { t: "Bewerbung schicken ›" };
+  if (st.kontakt) return { t: `Angefragt ${ago(st.kontakt.at)} · warten auf Antwort`, wait: true };
   return { t: "Kontakt aufnehmen ›" };
 }
 const houseIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>';
@@ -2656,7 +2800,7 @@ let installEvt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("installBtn").hidden = false; $("installHint").hidden = true; });
 $("installBtn").addEventListener("click", async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("installBtn").hidden = true; });
 if (window.matchMedia("(display-mode: standalone)").matches) { $("installHint").textContent = "Läuft als App."; }
-const APP_VERSION = "65 · 31.10.2026";
+const APP_VERSION = "66 · 31.10.2026";
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").then((reg) => { reg.update().catch(() => {}); }).catch(() => {});
   let reloaded = false;
