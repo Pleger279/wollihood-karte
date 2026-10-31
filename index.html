@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Wollihood</title>
 <meta name="robots" content="noindex">
-<meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#0A0A0A" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#F5F5F3" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#111214" media="(prefers-color-scheme: dark)">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Wollihood">
@@ -14,7 +14,7 @@
 <link rel="icon" href="icons/icon-192.png?v=2">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=2">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Archivo:wght@400;600;700;800&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Archivo:wght@400;600;700;800&family=Inter:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@geoman-io/leaflet-geoman-free@2.17.0/dist/leaflet-geoman.css">
 <style>
@@ -427,12 +427,185 @@ textarea.bewnote { min-height: 220px; font: 15px/1.5 Georgia, "Times New Roman",
 .lrule input { margin-top: 3px; width: 18px; height: 18px; flex: none }
 .lrule small, .lrow small { display: block; color: var(--muted); font-size: 12.5px; margin-top: 2px }
 .lrow { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; padding: 8px 0; border-top: 1px solid var(--hair); font-size: 14px; line-height: 1.4 }
+
+/* ===== Leichtes Design (v64, 31.10.2026) – überschreibt den Plakat-Stil oben =====
+   Heller Grund, weisse Karten mit runden Ecken statt schwarzer Rahmen, normale Schrift statt Versalien,
+   Farbe nur mit Bedeutung (Blau = Hauptaktion/Auswahl, Orange = zu klären, Grün = gut). */
+:root {
+  --bg: #F5F5F3; --surface: #FFFFFF; --sunk: #F0F0EE; --fg: #17181A; --muted: #5E6268; --line: #E1E1DE; --hair: #EDEDEA;
+  --accent: #0068AA; --accent-soft: #EAF3F9; --accent-ink: #FFFFFF; --bar: #F5F5F3; --bar-ink: #17181A;
+  --ok: #1E7A46; --ok-soft: #E3F1E8; --bad: #C4302B; --warn: #A85A08; --warn-soft: #FFF4E5; --seg: #E8E8E5;
+  --star: #F2B705; --star-ink: #17181A; --shadow: 0 1px 2px rgba(0,0,0,.06), 0 1px 1px rgba(0,0,0,.03);
+  --body: "Inter", system-ui, -apple-system, "Segoe UI", Arial, sans-serif; --display: "Archivo", "Inter", Arial, sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #111214; --surface: #1B1C1F; --sunk: #24262A; --fg: #EDEDED; --muted: #A3A6AB; --line: #34363A; --hair: #2A2C30;
+  --accent: #4AA3E0; --accent-soft: #14283A; --accent-ink: #FFFFFF; --bar: #111214; --bar-ink: #EDEDED;
+  --ok: #4CC98A; --ok-soft: #12291D; --bad: #FF6B66; --warn: #F0A848; --warn-soft: #2E2210; --seg: #24262A; --shadow: none } }
+:root[data-theme="dark"] {
+  --bg: #111214; --surface: #1B1C1F; --sunk: #24262A; --fg: #EDEDED; --muted: #A3A6AB; --line: #34363A; --hair: #2A2C30;
+  --accent: #4AA3E0; --accent-soft: #14283A; --accent-ink: #FFFFFF; --bar: #111214; --bar-ink: #EDEDED;
+  --ok: #4CC98A; --ok-soft: #12291D; --bad: #FF6B66; --warn: #F0A848; --warn-soft: #2E2210; --seg: #24262A; --shadow: none }
+body { font: 15px/1.45 var(--body) }
+.cap { font: 500 12px/1.2 var(--body); text-transform: none; letter-spacing: 0 }
+h2 { font: 600 16px/1.25 var(--body); letter-spacing: 0; text-transform: none }
+.ftitle { font: 600 16px/1.25 var(--body); letter-spacing: 0; text-transform: none }
+.ftitle.sm { font: 600 12.5px var(--body); letter-spacing: 0; text-transform: none; color: var(--muted) }
+.appbar { border-bottom: 0; align-items: center; padding-bottom: 6px }
+.appbar h1 { font: 800 22px/1.1 var(--display); letter-spacing: -.01em; text-transform: none }
+.appbar h1 .w2 { display: inline }
+.appbar .sub { font: 400 12px/1.2 var(--body); text-transform: none; letter-spacing: 0; color: var(--muted); margin-top: 3px }
+.appbar .sub .dot { background: var(--ok) }
+.iconbtn { border: 0; border-radius: 22px; background: var(--surface); box-shadow: var(--shadow) }
+.sheethead .iconbtn { box-shadow: none; background: var(--sunk) }
+main { padding-top: 6px }
+.view { gap: 12px; grid-template-columns: minmax(0, 1fr) }
+.sumlabel { text-transform: none; letter-spacing: 0; font: 600 12px var(--body) }
+.panel { border: 0; border-radius: 14px; box-shadow: var(--shadow); gap: 12px }
+.btn { border: 1px solid var(--line); border-radius: 12px; font: 600 14px var(--body); text-transform: none; letter-spacing: 0; min-height: 44px }
+.btn.primary { border-color: var(--accent) }
+.field { border: 1px solid var(--line); border-radius: 10px; background: var(--surface); font-size: 15px }
+textarea.field { font-size: 15px }
+label.f, div.f { font-weight: 600 }
+label.f small, div.f small { font: 500 12px var(--body); text-transform: none; letter-spacing: 0 }
+.chips { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 2px; border: 0; margin: 0; padding: 3px; background: var(--seg); border-radius: 12px; overflow: visible }
+.chip { border: 0 !important; border-radius: 9px; background: transparent; padding: 9px 2px; font: 500 13px var(--body); text-transform: none; letter-spacing: 0; color: var(--muted); text-align: center; min-width: 0; overflow: hidden; text-overflow: ellipsis }
+.chip[aria-pressed="true"] { background: var(--surface); color: var(--fg); font-weight: 600; box-shadow: var(--shadow) }
+.sortrow { margin-top: -2px; justify-content: space-between }
+.sortrow .hint { font: 500 12px var(--body); text-transform: none; letter-spacing: 0 }
+.sortbtn { font: 500 12.5px var(--body); text-transform: none; letter-spacing: 0; padding: 6px 8px; border-bottom: 2px solid transparent }
+.sortbtn[aria-pressed="true"] { border-bottom-color: var(--accent); font-weight: 600 }
+.tag { border: 0; border-radius: 10px; background: var(--sunk); font: 500 11.5px var(--body); text-transform: none; letter-spacing: 0; padding: 2px 8px; margin: 0; color: var(--muted) }
+.tag.hand { background: var(--accent-soft); color: var(--accent) }
+.tag.swap { background: var(--accent); color: #fff }
+.toast { border: 1px solid var(--line); border-radius: 12px; font: 600 13px var(--body); box-shadow: var(--shadow) }
+.toast .tbtn { border: 1px solid currentColor; border-radius: 8px; font: 600 12px var(--body); text-transform: none; letter-spacing: 0 }
+.empty { border-top: 0; padding: 26px 4px }
+.empty b { font: 600 17px var(--body); text-transform: none; letter-spacing: 0 }
+.switch input { border: 1px solid var(--line); border-radius: 14px; background: var(--sunk) }
+.switch input::after { border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.25) }
+.seg, .tabs2 { border: 0 !important; background: var(--seg); border-radius: 12px; padding: 3px; gap: 2px !important }
+.opt, .tabs2 .opt { border: 0 !important; border-radius: 9px; background: transparent; font: 500 13.5px var(--body); text-transform: none; letter-spacing: 0; min-height: 40px }
+.opt[aria-pressed="true"] { background: var(--surface); color: var(--fg); font-weight: 600; box-shadow: var(--shadow) }
+.rooms, .checks, .recips, .sharelist { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--surface) }
+.rooms button { font: 500 15px var(--body); border-color: var(--hair) }
+.rooms button.end { background: var(--accent) }
+.check { border-color: var(--hair); font-weight: 500 }
+.check input { border: 1.5px solid var(--line); border-radius: 6px }
+.summary { background: var(--accent-soft); color: var(--fg); border-radius: 14px; font: 600 14px/1.35 var(--body) }
+.summary .sw-sub { color: var(--muted) }
+details.adv summary { font: 600 16px var(--body); text-transform: none; letter-spacing: 0 }
+details.adv summary::after { font: 400 22px/1 var(--body); color: var(--muted) }
+details.adv-inner summary { font: 600 13.5px var(--body); text-transform: none; letter-spacing: 0 }
+.stats { border: 0; border-radius: 14px; background: var(--surface); box-shadow: var(--shadow) }
+.stat { border-color: var(--hair) }
+.stat b { font: 700 24px/1 var(--body); letter-spacing: -.01em }
+.stat span { font: 500 12px var(--body); text-transform: none; letter-spacing: 0 }
+.src .s { border-radius: 50% }
+#map { border: 0; border-radius: 14px }
+.leaflet-touch .leaflet-bar { border: 1px solid var(--line); border-radius: 10px !important; overflow: hidden }
+.savebar .btn { box-shadow: 0 4px 14px rgba(0,0,0,.18) }
+.mv button, .fnbtns button { border: 1px solid var(--line); border-radius: 6px }
+.fprev, .fnudge { border: 1px solid var(--line); border-radius: 10px; overflow: hidden }
+.learn { border: 1px solid var(--accent); border-radius: 12px }
+.tip { border-left: 0; background: var(--warn-soft); border-radius: 12px; padding: 10px 12px }
+.ideas summary { font: 600 13px var(--body); text-transform: none; letter-spacing: 0 }
+.ideas .idea { border-top-color: var(--hair) }
+.diff { border-radius: 10px }
+.linkbtn { font: 600 13.5px var(--body); text-decoration: none }
+/* Tableiste */
+.tabbar { background: var(--surface); color: var(--muted); border-top: 1px solid var(--line) }
+.tab { border-right: 0; font: 500 11px var(--body); text-transform: none; letter-spacing: 0 }
+.tab[aria-selected="true"] { color: var(--accent); box-shadow: none; font-weight: 600 }
+.tab .count { border-radius: 9px; font: 600 11px var(--body); top: 5px }
+/* Fenster (Details, Bewerbung) */
+.sheet { background: var(--bg) }
+.sheetbody { grid-auto-rows: max-content }
+.dcform textarea.field { min-height: 44px; height: 44px; resize: none }
+#ownNote { min-height: 64px }
+.sheethead { border-bottom: 1px solid var(--line); background: var(--bar) }
+.sheethead b { font: 700 17px/1.2 var(--body); text-transform: none }
+.onl { border: 0; border-radius: 10px; font: 500 13px var(--body); text-transform: none; letter-spacing: 0; background: var(--sunk); color: var(--muted); padding: 8px 12px }
+.onl.online { background: var(--ok-soft); color: var(--ok) } .onl.offline { background: #FDECEA; color: var(--bad) } .onl.reserviert { background: var(--warn-soft); color: var(--warn) }
+.gal { border: 0; border-radius: 14px; box-shadow: var(--shadow) }
+.gal figcaption { border-radius: 8px; font: 600 11.5px var(--body); background: rgba(0,0,0,.6); color: #fff }
+.dfacts { border: 0; border-radius: 14px; background: var(--surface); box-shadow: var(--shadow); overflow: hidden }
+.dfacts div { border-color: var(--hair) }
+.dfacts b { font: 600 15px var(--body) }
+.chips2 span { border: 0; border-radius: 12px; background: var(--sunk); font: 500 12px var(--body); text-transform: none; letter-spacing: 0; padding: 4px 10px }
+.ownfiles img { border: 0; border-radius: 8px }
+.contact a, .doclist a, .srcs a { font-weight: 600 }
+.desc { font-size: 14.5px }
+.desc.clamp { display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden }
+/* Trefferkarte (kompakt) */
+.card { border: 0; border-radius: 14px; box-shadow: var(--shadow); overflow: hidden; display: block }
+.card .chead { display: flex; gap: 12px; padding: 10px; cursor: pointer; align-items: stretch; text-align: left }
+.card .thumb { width: 96px; min-height: 96px; flex: none; border-radius: 10px; overflow: hidden; background: var(--accent-soft); color: var(--accent); position: relative; display: grid; place-items: center }
+.card .thumb img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover }
+.card .thumb .ph { display: grid; justify-items: center; gap: 2px; font: 500 11px var(--body); text-align: center; padding: 4px }
+.card .thumb .ph svg { width: 22px; height: 22px }
+.card .thumb .nb { position: absolute; left: 6px; top: 6px; background: var(--accent); color: #fff; font: 600 10.5px var(--body); padding: 2px 6px; border-radius: 6px }
+.card .cinfo { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px }
+.card .l1 { display: flex; justify-content: space-between; align-items: baseline; gap: 8px }
+.card .l1 b { font: 700 17px var(--body); white-space: nowrap }
+.card .l1 b.na { font-weight: 600; color: var(--muted); font-size: 15px }
+.card .l2 { font-size: 13px; color: var(--fg); opacity: .85 }
+.card .l3, .card .l4 { font-size: 13px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+.card .l4 { color: var(--fg); opacity: .85 }
+.card .l4 .ai { color: var(--accent) } .card .l4 .warn { color: var(--warn); font-weight: 700 }
+.card .next { font: 600 13px var(--body); color: var(--accent); margin-top: 2px }
+.card .next.wait { color: var(--muted); font-weight: 500 }
+.spill { font: 600 11px var(--body); padding: 2px 7px; border-radius: 8px; white-space: nowrap; background: var(--sunk); color: var(--muted) }
+.spill.st { background: var(--accent-soft); color: var(--accent) } .spill.st-zusage { background: var(--ok-soft); color: var(--ok) } .spill.st-absage { background: #FDECEA; color: var(--bad) }
+.spill.fav { background: #FFF6D6; color: #7A5A00 } .spill.split { background: var(--warn-soft); color: var(--warn) }
+.card .cfoot { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: auto; padding-top: 6px }
+.vmini { width: 38px; height: 30px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); color: var(--muted); display: grid; place-items: center; cursor: pointer; padding: 0 }
+.vmini svg { width: 16px; height: 16px }
+.vmini[aria-pressed="true"].up { background: var(--ok-soft); border-color: var(--ok); color: var(--ok) }
+.vmini[aria-pressed="true"].down { background: var(--sunk); border-color: var(--fg); color: var(--fg) }
+.ochip { font: 500 12px var(--body); color: var(--muted); padding: 3px 8px; border-radius: 9px; background: var(--sunk); display: inline-flex; gap: 4px; align-items: center; white-space: nowrap }
+.ochip svg { width: 12px; height: 12px }
+.ochip.up { background: var(--ok-soft); color: var(--ok); font-weight: 600 } .ochip.down { background: var(--sunk); color: var(--fg) }
+.cchip { font: 500 12px var(--body); color: var(--muted); display: inline-flex; align-items: center; gap: 4px; margin-left: auto }
+.cchip svg { width: 14px; height: 14px }
+.card .outline { margin-top: auto; padding-top: 6px; font-size: 12.5px; color: var(--muted); display: flex; gap: 10px; align-items: center; flex-wrap: wrap }
+.grp { margin: 10px 2px -2px; font: 600 13px var(--body); color: var(--muted); display: flex; align-items: center; gap: 8px }
+.grp i { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); display: inline-block }
+.grp.st-besichtigung i, .grp.st-beworben i { background: var(--accent) } .grp.st-angefragt i { background: var(--warn) } .grp.st-zusage i { background: var(--ok) } .grp.st-absage i { background: var(--bad) }
+@media (max-width: 360px) { .card .thumb { width: 80px } }
+/* Details: Seite der Wohnung */
+.dhead { display: grid; gap: 2px; padding: 2px 2px 0 }
+.dhead h1 { margin: 0; font: 700 22px/1.2 var(--body); letter-spacing: -.01em; overflow-wrap: anywhere }
+.dhead .sub { font-size: 13.5px; color: var(--muted) }
+.steps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px }
+.steps span { display: grid; gap: 6px; font: 500 11.5px var(--body); color: var(--muted) }
+.steps span::before { content: ""; height: 4px; border-radius: 2px; background: var(--line) }
+.steps span.on { color: var(--fg); font-weight: 600 } .steps span.on::before { background: var(--accent) }
+.steps span.ok::before { background: var(--ok) } .steps span.no::before { background: var(--bad) }
+.aibox { background: var(--accent-soft); border-radius: 14px; padding: 12px 14px; display: grid; gap: 4px; font-size: 14.5px; line-height: 1.45 }
+.aibox small { font: 600 12px var(--body); color: var(--accent) }
+.aibox .hk { color: var(--warn); font-size: 13.5px }
+.usrow { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 40px }
+.usrow .vbs { display: flex; gap: 8px }
+.usrow .vmini { width: 46px; height: 36px }
+.dthread .cmt { grid-template-columns: 64px minmax(0, 1fr); padding: 8px 0; border-bottom: 1px solid var(--hair) }
+.dthread .cmt .who { font: 600 12px var(--body); text-transform: none; letter-spacing: 0 }
+.dcform { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px }
+.dcform .btn { flex: none; padding-inline: 14px }
+.quiet { justify-self: center; border: 0; background: none; color: var(--bad); font: 500 14px var(--body); padding: 10px; cursor: pointer }
+.quiet.back { color: var(--accent) }
+.detail-mini { border-radius: 14px; overflow: hidden; box-shadow: var(--shadow) }
+.detail-mini .mini { border-top: 0; height: 160px }
+.mini .lbl { font: 600 11.5px var(--body); text-transform: none; letter-spacing: 0; border-radius: 0 8px 0 0 }
 </style>
 </head>
 <body>
 
 <header class="appbar">
   <h1>Wolli<span class="w2">hood</span><span class="sub" id="subline">Wohnungssuche Wollishofen</span></h1>
+  <button class="iconbtn" id="addLinkBtn" type="button" aria-label="Wohnung per Link hinzufügen">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+  </button>
   <button class="iconbtn" id="refreshBtn" type="button" aria-label="Neu laden">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg>
   </button>
@@ -461,17 +634,12 @@ textarea.bewnote { min-height: 220px; font: 15px/1.5 Georgia, "Times New Roman",
     <div class="chips" role="group" aria-label="Filter">
       <button class="chip" type="button" data-filter="new" aria-pressed="true">Neu</button>
       <button class="chip" type="button" data-filter="fav" aria-pressed="false">Favoriten</button>
-      <button class="chip" type="button" data-filter="split" aria-pressed="false">Uneinig</button>
-      <button class="chip" type="button" data-filter="open" aria-pressed="false">Offen für mich</button>
       <button class="chip" type="button" data-filter="all" aria-pressed="false">Alle</button>
       <button class="chip" type="button" data-filter="out" aria-pressed="false">Aussortiert</button>
     </div>
     <div class="sortrow" role="group" aria-label="Sortierung">
-      <span class="hint" aria-hidden="true">Sort.</span>
-      <button class="sortbtn" type="button" data-sort="new">Neueste</button>
-      <button class="sortbtn" type="button" data-sort="price">Günstigste</button>
-      <button class="sortbtn" type="button" data-sort="size">Grösste</button>
-      <button class="sortbtn addlink" type="button" id="addLinkBtn">＋ Per Link</button>
+      <span class="hint" id="listCount"></span>
+      <span><button class="sortbtn" type="button" data-sort="new">Neueste</button><button class="sortbtn" type="button" data-sort="price">Günstigste</button><button class="sortbtn" type="button" data-sort="size">Grösste</button></span>
     </div>
     <div class="panel whoami" id="whoPanel" hidden>
       <div class="ftitle">Wer nutzt dieses Handy?</div>
@@ -802,11 +970,12 @@ function initMini(el) {
   minis.set(el, m);
 }
 function mountMinis() {
-  minis.forEach((m) => m.remove()); minis.clear();
-  document.querySelectorAll(".mini[data-lat]").forEach((el) => (miniObserver ? miniObserver.observe(el) : initMini(el)));
+  minis.forEach((m, el) => { if (!el.isConnected || !el.closest("#dBody")) { m.remove(); minis.delete(el); } });
+  document.querySelectorAll("#hitList .mini[data-lat]").forEach((el) => (miniObserver ? miniObserver.observe(el) : initMini(el)));
 }
 function showOnMap(k) {
   const x = S.hits.find((h) => keyOf(h) === k); if (!x || x.lat == null) return;
+  if (!$("detail").hidden) closeDetail();
   S.seen.add(k); saveSeen();
   S.focus = [x.lat, x.lon];
   setSearchMode("show"); showTab("search");
@@ -863,9 +1032,7 @@ function filtered() {
     if (S.filter === "out") return v === "out";
     if (v === "out") return false;
     if (S.filter === "new") return isNew(x);
-    if (S.filter === "fav") return isFav(k);
-    if (S.filter === "split") return v === "split";
-    if (S.filter === "open") return !!S.person && !myVote(k);
+    if (S.filter === "fav") return inFav(k);
     return true;
   });
 }
@@ -1009,14 +1176,48 @@ function standPanel(k) {
   const it = itemOf(k), st = it.status || {}, favBy = it.fav?.by;
   const why = verdict(k) === "both" ? "Ihr seid euch einig" : favBy ? `Favorit von ${PEOPLE[favBy] || favBy}` : "";
   const when = st.when ? new Date(new Date(st.when).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16) : "";
-  return `<div class="panel" id="dStand"><h2>Unser Stand</h2>
-    ${why ? `<p class="hint">${esc(why)}</p>` : ""}
+  const idx = { "": 0, angefragt: 1, besichtigung: 2, beworben: 3, zusage: 3, absage: 3 }[st.value || ""] ?? 0;
+  const last = st.value === "zusage" ? "Zusage" : st.value === "absage" ? "Absage" : "Beworben";
+  const steps = ["Entdeckt", "Angefragt", "Besichtigt", last].map((l, i) =>
+    `<span class="${i < idx ? "ok" : i === idx ? (st.value === "absage" ? "on no" : st.value === "zusage" ? "on ok" : "on") : ""}">${l}</span>`).join("");
+  const label = !st.value || st.value === "angefragt" ? "Kontakt aufnehmen" : st.value === "besichtigung" ? "Bewerbung schreiben" : "Bewerbung ansehen";
+  const x = S.hits.find((h) => keyOf(h) === k) || {};
+  return `<div class="panel" id="dStand">
+    <div class="steps" aria-label="Unser Stand">${steps}</div>
     <div class="standrow">
       <select class="field" data-status aria-label="Stand">${STATUS.map(([v, l]) => `<option value="${v}"${(st.value || "") === v ? " selected" : ""}>${l}</option>`).join("")}</select>
       ${st.value === "besichtigung" ? `<label class="f"><small>Termin</small><input class="field" type="datetime-local" data-when value="${when}"></label>` : ""}
     </div>
-    ${st.by ? `<p class="hint">Gesetzt von ${esc(PEOPLE[st.by] || st.by)}, ${esc(ago(st.at))}</p>` : ""}
+    <div id="dBew"><button type="button" class="btn primary" data-bew style="width:100%">${label}</button>
+      <p class="hint" id="dBewInfo" style="margin-top:6px">${[why, st.by ? `Stand von ${esc(PEOPLE[st.by] || st.by)}, ${esc(ago(st.at))}` : ""].filter(Boolean).map(esc).join(" · ")}</p><div id="dBewPdf"></div></div>
+    ${firstUrl(x) ? `<a class="linkbtn" style="justify-self:center" href="${esc(firstUrl(x))}" target="_blank" rel="noopener">Inserat auf ${esc(x.sources?.[0]?.portal || x.portal || "der Plattform")} öffnen ↗</a>` : ""}
   </div>`;
+}
+// «Unter uns»: Daumen, Stern, Kommentare, Notiz und eigene Dateien an einem Ort
+function usPanel(k) {
+  const it = itemOf(k), mine = myVote(k), other = S.person ? otherOf(S.person) : null, ov = other ? (it.votes || {})[other] : null;
+  const files = it.files || [];
+  return `<div class="panel" id="dUs"><h2>Unter uns</h2>
+    <div class="usrow"><span>Du</span><span class="vbs">
+      <button type="button" class="vmini up" data-dvote="up" aria-pressed="${mine === "up"}" aria-label="Daumen hoch">${thumb("up")}</button>
+      <button type="button" class="vmini down" data-dvote="down" aria-pressed="${mine === "down"}" aria-label="Daumen runter">${thumb("down")}</button>
+      <button type="button" class="vmini" data-dfav aria-pressed="${isFav(k)}" aria-label="Favorit" style="${isFav(k) ? "color:var(--star);border-color:var(--star)" : ""}">${isFav(k) ? icon.star : icon.starO}</button></span></div>
+    ${other ? `<div class="usrow"><span>${esc(PEOPLE[other])}</span><span class="ochip ${ov || ""}">${ov === "up" ? "dafür " + thumb("up") : ov === "down" ? "dagegen " + thumb("down") : "noch offen"}</span></div>` : ""}
+    <div class="dthread">${(it.comments || []).map((c) => `<div class="cmt ${c.by === S.person ? "mine" : ""}">
+        <div class="who">${esc(PEOPLE[c.by] || c.by)}<span>${esc(ago(c.at))}</span></div>
+        <p>${esc(c.text)}</p>${c.by === S.person ? `<button type="button" class="del" data-ddel="${esc(c.id)}">löschen</button>` : ""}</div>`).join("")}</div>
+    <div class="dcform"><textarea class="field" rows="1" id="dCmt" placeholder="Kommentar${other ? " an " + esc(PEOPLE[other]) : ""} …"></textarea><button type="button" class="btn primary" id="dCmtSend">Senden</button></div>
+    <label class="f"><small>Notiz (Kontakt, Termine …) – wird beim Verlassen des Felds gespeichert</small>
+      <textarea class="field" id="ownNote" rows="2" placeholder="z.B. Frau Muster, 044 …, Besichtigung Do 18 Uhr">${esc(it.note || "")}</textarea></label>
+    ${files.length ? `<div class="ownfiles">${files.map((f) => f.type === "application/pdf" ? `<a href="#" data-doc="${esc(f.path)}">📄 ${esc(f.name || "Dokument")}</a>`
+      : `<img data-src="${esc(f.path)}" data-full="${esc(f.path)}" alt="${esc(f.name || "")}">`).join("")}</div>` : ""}
+    <label class="linkbtn" for="ownFiles" style="cursor:pointer">+ Screenshot oder Dokument</label>
+    <input type="file" id="ownFiles" accept="image/*,application/pdf" multiple hidden></div>`;
+}
+function refreshUs() {
+  const el = $("dUs"); if (!el || !S.detailKey) return;
+  el.outerHTML = usPanel(S.detailKey);
+  $("dUs").querySelectorAll("img[data-src]").forEach((img) => repoFile(img.dataset.src).then((u) => (img.src = u)).catch(() => img.remove()));
 }
 const QUARTER = { "8001": "Altstadt", "8004": "Aussersihl", "8005": "Industriequartier", "8006": "Oberstrass", "8008": "Riesbach",
   "8032": "Hottingen", "8037": "Wipkingen", "8047": "Albisrieden", "8048": "Altstetten", "8050": "Oerlikon", "8051": "Schwamendingen",
@@ -1152,7 +1353,7 @@ async function openDetail(k) {
   const x = S.hits.find((h) => keyOf(h) === k) || {};
   const a = archEntry(x);
   S.detailKey = k;
-  $("dTitle").textContent = x.street || x.title || "Details";
+  $("dTitle").textContent = "Wohnung";
   $("detail").hidden = false; document.body.style.overflow = "hidden";
   $("dBody").innerHTML = '<p class="hint">Lade …</p>';
   let d = null;
@@ -1187,7 +1388,7 @@ function renderDetail(x, a, d) {
   if (book.note) lines.push(`<div class="hint">${esc(book.note)}</div>`);
   (c.phones || []).forEach((p) => lines.push(`<div>☎ <a href="tel:${esc(p.replace(/\s/g, ""))}">${esc(p)}</a> <span class="hint">(aus dem Inserat)</span></div>`));
   (c.emails || []).forEach((m) => lines.push(`<div>✉ <a href="mailto:${esc(m)}">${esc(m)}</a> <span class="hint">(aus dem Inserat)</span></div>`));
-  if (d?.apply_url && a?.online !== "offline") lines.push(`<a class="btn primary" href="${esc(d.apply_url)}" target="_blank" rel="noopener">Online bewerben</a>`);
+  if (d?.apply_url && a?.online !== "offline") lines.push(`<a class="btn" href="${esc(d.apply_url)}" target="_blank" rel="noopener">Bewerbungs- / Kontaktformular öffnen ↗</a>`);
   const bookForm = ag ? `<details class="adv-inner"><summary>${book.phone || book.email || book.website ? "Kontakt der Verwaltung bearbeiten" : "Telefon / E-Mail der Verwaltung ergänzen"}</summary>
       <p class="hint">Gilt für alle Wohnungen von «${esc(ag.name)}», auch künftige.</p>
       <label class="f">Telefon<input class="field" id="agPhone" type="tel" value="${esc(book.phone || "")}"></label>
@@ -1200,20 +1401,28 @@ function renderDetail(x, a, d) {
   const docs = (d?.documents || []).map((doc) => doc.file ? `<a href="#" data-doc="archiv/${esc(a.id)}/${esc(doc.file)}">📄 ${esc(doc.title || "Dokument")}</a>`
     : doc.url ? `<a href="${esc(doc.url)}" target="_blank" rel="noopener">📄 ${esc(doc.title || "Dokument")} (online)</a>` : "").join("");
   const mail = d?.mail ? `<a href="${esc(d.mail.link)}" target="_blank" rel="noopener">Original-Mail in Gmail öffnen ↗</a>` : "";
+  const quarter = QUARTER[x.plz] || x.city || "";
+  const portal = x.sources?.[0]?.portal || x.portal || "";
+  const sub = [quarter, portal ? `auf ${portal} ${ago(x.published || x.first_seen)}` : "", a?.online === "online" ? "noch online" : a?.online === "offline" ? "offline" : a?.online === "reserviert" ? "reserviert" : ""].filter(Boolean).join(" · ");
+  const ai = x.ai?.text ? `<div class="aibox"><small>✦ Claude</small><span>${esc(x.ai.text)}</span>${(x.ai.haken || []).length ? `<span class="hk">${esc(x.ai.haken.join(" · "))}</span>` : ""}</div>` : "";
+  const out = verdict(S.detailKey) === "out";
   $("dBody").innerHTML = `
-    ${onl || '<div class="onl">Noch nicht gesichert. Neue Treffer, Favoriten und Wohnungen mit Stand sichert Wollihood beim nächsten Suchlauf.</div>'}
-    ${firstUrl(x) ? `<a class="btn platlink" href="${esc(firstUrl(x))}" target="_blank" rel="noopener">Inserat auf ${esc(x.sources?.[0]?.portal || x.portal || "der Plattform")} öffnen ${icon.open}</a>` : ""}
-    ${standPanel(S.detailKey)}
-    ${bewPanel()}
-    ${ownBlock(S.detailKey)}
     ${gal}
+    <div class="dhead"><h1>${esc(placeName(x))}</h1><div class="sub">${esc(sub)}</div></div>
     ${facts}
-    ${searchPanel(x)}
+    ${standPanel(S.detailKey)}
+    ${ai}
+    ${usPanel(S.detailKey)}
+    ${desc || attrs ? `<div class="panel"><h2>Beschreibung</h2>${desc ? `<div class="desc clamp" id="dDesc">${esc(desc)}</div><button type="button" class="linkbtn" id="dDescMore" style="justify-self:start">Mehr lesen</button>` : ""}${attrs ? `<div class="chips2">${attrs}</div>` : ""}</div>` : ""}
+    ${x.lat != null ? `<div class="detail-mini">${miniMap(x)}</div>` : ""}
     <div class="panel"><h2>Kontakt</h2><div class="contact">${lines.join("") || '<p class="hint">Keine Angaben.</p>'}${bookForm}</div></div>
-    ${attrs ? `<div class="chips2">${attrs}</div>` : ""}
-    ${desc ? `<div class="panel"><h2>Beschreibung</h2><div class="desc">${esc(desc)}</div></div>` : ""}
+    ${searchPanel(x)}
     ${docs ? `<div class="panel doclist"><h2>Dokumente</h2>${docs}</div>` : ""}
-    <div class="srcs" style="padding:0">Gefunden auf: ${sourcesHtml(x)}${mail ? " · " + mail : ""}</div>`;
+    ${onl || '<div class="onl">Noch nicht gesichert. Neue Treffer, Favoriten und Wohnungen mit Stand sichert Wollihood beim nächsten Suchlauf.</div>'}
+    <div class="srcs" style="padding:0">Gefunden auf: ${sourcesHtml(x)}${mail ? " · " + mail : ""}${(x.notes || []).length ? `<br>${esc(x.notes.join(" · "))}` : ""}</div>
+    <button type="button" class="quiet${out ? " back" : ""}" data-dout="${out ? 0 : 1}">${out ? "Zurückholen" : "Aussortieren"}</button>`;
+  const dm = $("dBody").querySelector(".mini"); if (dm) setTimeout(() => initMini(dm), 60);
+  const dd = $("dDesc"); if (dd) setTimeout(() => { if (dd.scrollHeight <= dd.clientHeight + 4) $("dDescMore")?.remove(); }, 30);
   // Bilder aus dem privaten Repo nachladen
   $("dBody").querySelectorAll("img[data-src]").forEach((img) => repoFile(img.dataset.src).then((u) => (img.src = u)).catch(() => img.closest("figure")?.remove()));
   bewProbe(S.detailKey);
@@ -1280,10 +1489,17 @@ async function refreshDetail() {
 }
 $("dBody").addEventListener("change", (e) => {
   const k = S.detailKey; if (!k) return;
+  if (e.target.id === "ownNote") {
+    if (needPerson()) return;
+    const val = e.target.value.trim();
+    if (val === (itemOf(k).note || "").trim()) return;
+    socialOp(`${PEOPLE[S.person]} Notiz`, (items) => { const it = items[k] || (items[k] = { votes: {}, comments: [] }); it.note = val; it.updated = new Date().toISOString(); });
+    toast("Notiz gespeichert.", "ok"); return;
+  }
   let hit = false;
   if (e.target.matches("[data-status]")) { setStatus(k, e.target.value, null); hit = true; }
   if (e.target.matches("[data-when]") && e.target.value) { setStatus(k, "besichtigung", new Date(e.target.value).toISOString()); hit = true; }
-  if (hit) setTimeout(() => { const el = $("dStand"); if (el) el.outerHTML = standPanel(k); }, 60);
+  if (hit) setTimeout(() => { const el = $("dStand"); if (el) { el.outerHTML = standPanel(k); bewProbe(k); } }, 60);
 });
 $("dBody").addEventListener("change", async (e) => {
   if (e.target.id !== "ownFiles" || !e.target.files.length) return;
@@ -1501,6 +1717,13 @@ async function handleShare(id) {
   };
 }
 $("dBody").addEventListener("click", async (e) => {
+  const k0 = S.detailKey;
+  const dv = e.target.closest("[data-dvote]"); if (dv && k0) { setVote(k0, dv.dataset.dvote); refreshUs(); return; }
+  if (e.target.closest("[data-dfav]") && k0) { toggleFav(k0); setTimeout(refreshUs, 30); return; }
+  if (e.target.id === "dCmtSend" && k0) { const ta = $("dCmt"); if (ta.value.trim()) { addComment(k0, ta.value); refreshUs(); } return; }
+  const dl = e.target.closest("[data-ddel]"); if (dl && k0) { deleteComment(k0, dl.dataset.ddel); setTimeout(refreshUs, 30); return; }
+  const dout = e.target.closest("[data-dout]"); if (dout && k0) { setOut(k0, dout.dataset.dout === "1"); if (dout.dataset.dout === "1") closeDetail(); else refreshDetail(); return; }
+  if (e.target.id === "dDescMore") { $("dDesc").classList.toggle("clamp"); e.target.textContent = $("dDesc").classList.contains("clamp") ? "Mehr lesen" : "Weniger"; return; }
   if (e.target.id === "ownNoteSave") {
     if (needPerson()) return;
     const k = S.detailKey, val = $("ownNote").value.trim();
@@ -1598,71 +1821,94 @@ function setPerson(p) {
 }
 document.addEventListener("click", (e) => { const b = e.target.closest("[data-who]"); if (b) setPerson(b.dataset.who); });
 
+// Name einer Wohnung ohne Strasse: «4-Zimmer-Wohnung, Wollishofen» statt rohem Inseratetitel
+const placeName = (x) => x.street || [x.rooms != null ? `${x.rooms}-Zimmer-Wohnung` : "Wohnung", [x.plz, QUARTER[x.plz] || x.city].filter(Boolean).join(" ")].filter(Boolean).join(", ");
+// Favoriten: alles mit Stern, zwei Daumen hoch oder einem Stand (läuft schon)
+const inFav = (k) => verdict(k) !== "out" && (isFav(k) || !!itemOf(k).status?.value);
+const ST_ORDER = ["besichtigung", "beworben", "angefragt", "zusage", "", "absage"];
+const ST_GROUP = { besichtigung: "Besichtigung", beworben: "Beworben", angefragt: "Angefragt", zusage: "Zusage", "": "Noch nichts unternommen", absage: "Absage" };
+function nextStep(k) {
+  const st = itemOf(k).status || {};
+  const d = st.when ? new Date(st.when) : null;
+  if (st.value === "besichtigung") return d && d > new Date()
+    ? { t: `Besichtigung ${d.toLocaleDateString("de-CH", { weekday: "short", day: "numeric", month: "numeric" })} ${d.toLocaleTimeString("de-CH", { hour: "2-digit", minute: "2-digit" })}`, wait: true }
+    : { t: "Bewerbung schicken ›" };
+  if (st.value === "angefragt") return { t: `Angefragt ${ago(st.at)} · warten auf Antwort`, wait: true };
+  if (st.value === "beworben") return { t: `Beworben ${ago(st.at)} · warten auf Antwort`, wait: true };
+  if (st.value === "zusage") return { t: "Zusage!" };
+  if (st.value === "absage") return { t: "Absage", wait: true };
+  return { t: "Kontakt aufnehmen ›" };
+}
+const houseIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>';
+function hitCard(x, withNext) {
+  const k = keyOf(x), it = itemOf(k), st = it.status, mine = myVote(k), v = verdict(k);
+  const other = S.person ? otherOf(S.person) : null, ov = other ? (it.votes || {})[other] : null;
+  const quarter = QUARTER[x.plz] || x.city || "";
+  const l2 = [x.rooms != null ? `${x.rooms} Zi` : "Zimmer ?", x.m2 ? `${x.m2} m²` : "", quarter].filter(Boolean).join(" · ");
+  const photo = x.image ? `<img src="${esc(x.image)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : "";
+  const haken = (x.ai?.haken || []).length && x.ai?.passt === false;
+  const pill = st && st.value ? `<span class="spill st st-${esc(st.value)}">${esc(statusLabel(st))}</span>`
+    : isFav(k) ? '<span class="spill fav">★ Favorit</span>' : v === "split" ? '<span class="spill split">Uneinig</span>' : "";
+  const n = (it.comments || []).length;
+  const ns = withNext ? nextStep(k) : null;
+  const foot = v === "out"
+    ? `<div class="outline"><span>${it.out ? "Aussortiert von " + esc(PEOPLE[it.out.by] || "") : "Beide Daumen runter"}${outTime(k) ? " · " + dmy(outTime(k)) : ""}</span><button type="button" class="linkbtn" data-out="0">Zurückholen</button></div>`
+    : `<div class="cfoot">
+        <button type="button" class="vmini up" data-vote="up" aria-pressed="${mine === "up"}" aria-label="Daumen hoch">${thumb("up")}</button>
+        <button type="button" class="vmini down" data-vote="down" aria-pressed="${mine === "down"}" aria-label="Daumen runter">${thumb("down")}</button>
+        ${other ? `<span class="ochip ${ov || ""}">${esc(PEOPLE[other])} ${ov ? thumb(ov) : "·"}</span>` : ""}
+        ${manualTag(x)}${x.swap ? '<span class="tag swap">Tausch</span>' : ""}
+        ${n ? `<span class="cchip" data-detail>${bubble}${n}</span>` : ""}
+      </div>`;
+  return `<article class="card" data-key="${esc(k)}">
+    <div class="chead" data-detail role="button" tabindex="0" aria-label="Details: ${esc(placeName(x))}">
+      <div class="thumb">${photo}<span class="ph">${houseIcon}kein Foto</span>${isNew(x) ? '<span class="nb">Neu</span>' : ""}</div>
+      <div class="cinfo">
+        <div class="l1"><b class="${x.rent ? "" : "na"}">${x.rent ? "CHF " + esc(fmtN(x.rent)) : "Preis offen"}</b>${pill}</div>
+        <div class="l2">${esc(l2)}</div>
+        <div class="l3">${esc(placeName(x))} · ${esc(ago(x.published || x.first_seen))}</div>
+        ${x.ai && x.ai.text ? `<div class="l4">${haken ? '<span class="warn">!</span>' : '<span class="ai">✦</span>'} ${esc(x.ai.text)}</div>` : ""}
+        ${ns ? `<div class="next${ns.wait ? " wait" : ""}">${esc(ns.t)}</div>` : ""}
+        ${foot}
+      </div>
+    </div>
+  </article>`;
+}
 function renderHits() {
+  if (!["new", "fav", "all", "out"].includes(S.filter)) S.filter = "all";
   const pool = S.hits.filter(inSavedArea);
   const live = pool.filter((x) => verdict(keyOf(x)) !== "out");
-  const cnt = {
-    new: live.filter(isNew).length, fav: live.filter((x) => isFav(keyOf(x))).length, split: live.filter((x) => verdict(keyOf(x)) === "split").length,
-    open: S.person ? live.filter((x) => !myVote(keyOf(x))).length : 0, all: 0, out: pool.length - live.length,
-  };
-  const names = { new: "Neu", fav: "Favoriten", split: "Uneinig", open: "Offen für mich", all: "Alle", out: "Aussortiert" };
+  const cnt = { new: live.filter(isNew).length, fav: live.filter((x) => inFav(keyOf(x))).length, all: 0, out: pool.length - live.length };
+  const names = { new: "Neu", fav: "Favoriten", all: "Alle", out: "Aussortiert" };
   const newN = cnt.new;
   document.querySelectorAll("[data-filter]").forEach((b) => {
     const f = b.dataset.filter;
     b.setAttribute("aria-pressed", String(f === S.filter));
-    b.textContent = names[f] + (cnt[f] ? " · " + cnt[f] : "");
+    b.textContent = names[f] + (cnt[f] && f !== "out" ? " · " + cnt[f] : "");
   });
   $("whoPanel").hidden = !!S.person;
   $("newCount").hidden = !newN; $("newCount").textContent = newN;
   $("allSeenBtn").hidden = !(S.filter === "new" && newN > 1);
   const list = filtered();
+  $("listCount").textContent = list.length ? `${list.length} ${S.filter === "new" ? (list.length === 1 ? "neue Wohnung" : "neue Wohnungen") : list.length === 1 ? "Wohnung" : "Wohnungen"}` : "";
   if (!list.length) {
     const msg = {
       new: ["Nichts Neues", "Sobald eine passende Wohnung auftaucht, erscheint sie hier und du bekommst eine Push-Meldung."],
-      fav: ["Noch keine Favoriten", "Hier landen Wohnungen, bei denen ihr beide Daumen hoch gegeben habt oder die jemand mit dem Stern markiert hat."],
+      fav: ["Noch keine Favoriten", "Hier landen Wohnungen mit Stern, mit zwei Daumen hoch oder mit einem Stand (angefragt, Besichtigung …)."],
       all: ["Noch keine Treffer", "Die Suche läuft alle 30 Minuten. Treffer der letzten Wochen erscheinen hier."],
-      split: ["Keine offenen Diskussionen", "Hier landen Wohnungen, bei denen einer dafür und einer dagegen ist."],
-      open: [S.person ? "Alles bewertet" : "Wer bist du?", S.person ? "Du hast alle Treffer bewertet." : "Wähle oben, wer dieses Handy nutzt."],
       out: ["Nichts aussortiert", "Haben beide Daumen runter gegeben, landet die Wohnung hier."],
     }[S.filter];
     $("hitList").innerHTML = `<div class="empty"><b>${msg[0]}</b>${msg[1]}</div>`;
     return;
   }
-  $("hitList").innerHTML = list.map((x) => {
-    const k = keyOf(x), fav = isFav(k), st = itemOf(k).status;
-    const place = [x.street, [x.plz, x.city].filter(Boolean).join(" ")].filter(Boolean).join(", ") || x.title || "";
-    const photo = x.image
-      ? `<img src="${esc(x.image)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentNode.classList.add('noimg');this.remove()">`
-      : "";
-    const quarter = QUARTER[x.plz] || x.city || "";
-    const placeTag = [x.plz, quarter].filter(Boolean).join(" · ");
-    const badge = st && st.value ? `<span class="badge stat st-${esc(st.value)}">${esc(statusLabel(st))}</span>`
-      : fav ? '<span class="badge fav">Favorit</span>' : verdict(k) === "split" ? '<span class="badge split">Uneinig</span>' : "";
-    return `<article class="card" data-key="${esc(k)}">
-      <div class="photo ${x.image ? "" : "noimg"}" role="button" tabindex="0" aria-label="Details öffnen" data-detail>${photo}
-        <span class="ph"><span class="k">${esc(x.plz || "")}${x.plz ? " · " : ""}kein Foto</span><span class="q">${esc(quarter || x.portal || "Wohnung")}</span><span class="r">${x.rooms != null ? esc(String(x.rooms)) + " Zimmer" : "Zimmerzahl fehlt"}</span></span>
-        ${placeTag ? `<span class="place">${esc(placeTag)}</span>` : ""}${isNew(x) ? '<span class="badge new">Neu</span>' : ""}${badge}</div>
-      <div class="facts" data-detail>
-        <div class="pr"><div class="cap">Miete ${x.rent_note === "netto" ? "netto" : "brutto"}</div><b class="${x.rent ? "" : "na"}">${x.rent ? esc(fmtN(x.rent)) : "auf Anfrage"}</b></div>
-        <div class="rm"><div><div class="cap">Zimmer</div><b>${x.rooms ?? "–"}</b></div><div><div class="cap">Fläche</div><b>${x.m2 ? esc(x.m2) + " m²" : "–"}</b></div></div>
-      </div>
-      <div class="body">
-        <div class="addr" data-detail>${esc(x.street || x.title || place)}</div>
-        <div class="meta">${pubLabel(x)}${x.pushed ? " · Push gesendet" : x.push_skipped ? " · kein Push (" + esc(x.push_skipped) + ")" : ""}</div>
-        ${x.ai && x.ai.text ? `<div class="ailine"><span aria-hidden="true">✦</span> ${esc(x.ai.text)}</div>` : ""}
-        <div class="srcs">Gefunden auf: ${sourcesHtml(x)}${agencyOf(x) ? ` · Verwaltung: <b>${esc(agencyOf(x))}</b>` : ""}</div>
-        ${verdict(k) === "out" ? `<div class="notes">${itemOf(k).out ? "Aussortiert von " + esc(PEOPLE[itemOf(k).out.by] || "") : "Aussortiert: beide Daumen runter"}${outTime(k) ? " · " + dmy(outTime(k)) : ""}</div>` : ""}
-        ${x.notes && x.notes.length ? `<div class="notes">${esc(x.notes.join(" · "))}</div>` : ""}
-        ${x.manual || x.swap || featKeys(x.features).length ? `<div class="tags">${manualTag(x)}${x.swap ? '<span class="tag swap">Tausch</span>' : ""}${featKeys(x.features).map((k) => `<span class="tag">${esc(featShort(k))}</span>`).join("")}</div>` : ""}
-        ${x.swap && x.swap_wants ? `<div class="wants"><b>Sucht:</b> ${esc(x.swap_wants)}</div>` : ""}
-        ${socialBlock(x)}
-        ${stLine(k)}
-        ${miniMap(x)}
-      </div>
-      <div class="actions three"><button type="button" class="btn primary detbtn" data-detail aria-label="Details und Archiv">${icon.doc}<span>Details</span></button><a class="btn" href="${esc(firstUrl(x))}" target="_blank" rel="noopener" data-open aria-label="Inserat auf ${esc(x.sources?.[0]?.portal || x.portal || "der Plattform")} öffnen">Inserat ${icon.open}</a>${outBtn(k)}</div>
-    </article>`;
-  }).join("");
-  mountMinis();
+  if (S.filter === "fav") {
+    const groups = new Map(ST_ORDER.map((g) => [g, []]));
+    list.forEach((x) => { const g = itemOf(keyOf(x)).status?.value || ""; (groups.get(g) || groups.get("")).push(x); });
+    $("hitList").innerHTML = [...groups].filter(([, xs]) => xs.length)
+      .map(([g, xs]) => `<h3 class="grp st-${g || "none"}"><i></i>${ST_GROUP[g]} · ${xs.length}</h3>${xs.map((x) => hitCard(x, true)).join("")}`).join("");
+  } else {
+    $("hitList").innerHTML = list.map((x) => hitCard(x, false)).join("");
+  }
 }
 let marksQueue = Promise.resolve();
 function setMark(k, val) {
@@ -1687,7 +1933,7 @@ $("hitList").addEventListener("change", (e) => {
   if (e.target.matches("[data-when]") && e.target.value) setStatus(k, "besichtigung", new Date(e.target.value).toISOString());
 });
 $("hitList").addEventListener("keydown", (e) => {
-  if ((e.key === "Enter" || e.key === " ") && e.target.matches(".photo[data-detail]")) { e.preventDefault(); e.target.click(); return; }
+  if ((e.key === "Enter" || e.key === " ") && e.target.matches(".chead[data-detail]")) { e.preventDefault(); e.target.click(); return; }
   if (e.key === "Enter" && !e.shiftKey && e.target.matches("[data-cinput]")) {
     e.preventDefault(); const card = e.target.closest(".card"); addComment(card.dataset.key, e.target.value); e.target.value = "";
   }
@@ -2403,7 +2649,7 @@ let installEvt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("installBtn").hidden = false; $("installHint").hidden = true; });
 $("installBtn").addEventListener("click", async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("installBtn").hidden = true; });
 if (window.matchMedia("(display-mode: standalone)").matches) { $("installHint").textContent = "Läuft als App."; }
-const APP_VERSION = "63 · 31.10.2026";
+const APP_VERSION = "64 · 31.10.2026";
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").then((reg) => { reg.update().catch(() => {}); }).catch(() => {});
   let reloaded = false;
@@ -2433,8 +2679,8 @@ async function bewProbe(k) {
     const r = await readJson(`archiv/${aid}/bewerbung/anschreiben.json`);
     if (S.detailKey !== k || !$("dBew")) return;
     const doc = r.data;
-    $("dBew").querySelector("[data-bew]").textContent = "Bewerbung bearbeiten";
-    $("dBewInfo").textContent = `Zuletzt bearbeitet${doc.by ? " von " + (PEOPLE[doc.by] || doc.by) : ""}, ${ago(doc.updated)}.`;
+    const info = $("dBewInfo"), was = info.textContent;
+    info.textContent = [`Text gespeichert${doc.by ? " von " + (PEOPLE[doc.by] || doc.by) : ""}, ${ago(doc.updated)}`, was].filter(Boolean).join(" · ");
     if (doc.pdf) $("dBewPdf").innerHTML = `<a href="#" class="doclink" data-doc="${esc(doc.pdf)}">📄 Anschreiben (PDF, ${esc(ago(doc.pdf_at))})</a>`;
   } catch { /* noch keine Bewerbung */ }
 }
