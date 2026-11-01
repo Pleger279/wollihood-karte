@@ -564,6 +564,7 @@ label.f small, div.f small { color: var(--muted); font: 500 12.5px var(--body) }
 .card .thumb img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover }
 .card .thumb .ph { display: grid; justify-items: center; gap: 2px; font: 500 11px var(--body); text-align: center; padding: 4px }
 .card .thumb .ph svg { width: 22px; height: 22px }
+.card .thumb .aerlbl { position: absolute; right: 4px; bottom: 4px; background: rgba(0,0,0,.55); color: #fff; font: 600 9.5px var(--body); padding: 1px 5px; border-radius: 5px }
 .card .thumb .nb { position: absolute; left: 6px; top: 6px; background: var(--accent); color: #fff; font: 600 10.5px var(--body); padding: 2px 6px; border-radius: 6px }
 .card .cinfo { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px }
 .card .l1 { display: flex; justify-content: space-between; align-items: baseline; gap: 8px }
@@ -1575,7 +1576,9 @@ function renderDetail(x, a, d) {
     : `<div class="onl">Gesichert ${esc(ago(a.archived_at))} · Online-Status bei diesem Portal nicht prüfbar</div>`;
   const imgs = (d?.images || []);
   const gal = imgs.length ? `<div class="gal">${imgs.map((im, i) => `<figure><img data-src="archiv/${esc(a.id)}/${esc(im.file)}" alt="${esc(im.caption || "")}"><figcaption>${i + 1}/${imgs.length}</figcaption></figure>`).join("")}</div>`
-    : x.image ? `<div class="gal"><figure><img src="${esc(x.image)}" alt="" referrerpolicy="no-referrer"></figure></div>` : "";
+    : x.image ? `<div class="gal"><figure><img src="${esc(x.image)}" alt="" referrerpolicy="no-referrer"></figure></div>`
+    : ownPhoto(S.detailKey) ? `<div class="gal"><figure><img data-src="${esc(ownPhoto(S.detailKey))}" data-full="${esc(ownPhoto(S.detailKey))}" alt=""><figcaption>Eigener Screenshot</figcaption></figure></div>`
+    : aerialUrl(x) ? `<div class="gal"><figure><img src="${esc(aerialUrl(x))}" alt="Luftbild"><figcaption>Luftbild · © swisstopo · kein Inseratefoto</figcaption></figure></div>` : "";
   const f = d?.facts || {};
   const fact = (l, v) => (v != null && v !== "" ? `<div><span class="cap">${l}</span><b>${esc(v)}</b></div>` : "");
   const facts = `<div class="dfacts">${fact("Miete brutto", (f.rent_gross || x.rent) ? "CHF " + fmtN(f.rent_gross || x.rent) : null)}${fact("Netto + NK", f.rent_net ? `${fmtN(f.rent_net)} + ${fmtN(f.rent_charges || 0)}` : null)}
@@ -2047,6 +2050,13 @@ document.addEventListener("click", (e) => { const b = e.target.closest("[data-wh
 
 // Name einer Wohnung ohne Strasse: «4-Zimmer-Wohnung, Wollishofen» statt rohem Inseratetitel
 const placeName = (x) => x.street || [x.rooms != null ? `${x.rooms}-Zimmer-Wohnung` : "Wohnung", [x.plz, QUARTER[x.plz] || x.city].filter(Boolean).join(" ")].filter(Boolean).join(", ");
+// Ersatzbilder: eigener Screenshot aus «Bewertung & Notizen», sonst Luftbild von swisstopo (frei nutzbar, © swisstopo)
+const ownPhoto = (k) => (itemOf(k).files || []).find((f) => f.type !== "application/pdf")?.path || null;
+function aerialUrl(x) {
+  if (x.lat == null || x.lon == null) return null;
+  const d = 0.0008, dl = d * 1.48;          // ca. 90 × 120 m, Haus in der Mitte
+  return `https://wms.geo.admin.ch/?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=ch.swisstopo.swissimage&STYLES=&CRS=EPSG:4326&BBOX=${(+x.lat - d).toFixed(5)},${(+x.lon - dl).toFixed(5)},${(+x.lat + d).toFixed(5)},${(+x.lon + dl).toFixed(5)}&WIDTH=480&HEIGHT=360&FORMAT=image/jpeg`;
+}
 // Favoriten: alles mit Stern, zwei Daumen hoch oder einem Stand (läuft schon)
 const inFav = (k) => verdict(k) !== "out" && (isFav(k) || !!itemOf(k).status?.value);
 const ST_ORDER = ["besichtigung", "beworben", "angefragt", "zusage", "", "absage"];
@@ -2067,7 +2077,11 @@ function hitCard(x, withNext) {
   const other = S.person ? otherOf(S.person) : null, ov = other ? (it.votes || {})[other] : null;
   const quarter = QUARTER[x.plz] || x.city || "";
   const l2 = [x.rooms != null ? `${x.rooms} Zi` : "Zimmer ?", x.m2 ? `${x.m2} m²` : "", quarter].filter(Boolean).join(" · ");
-  const photo = x.image ? `<img src="${esc(x.image)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : "";
+  const own = ownPhoto(k), aer = aerialUrl(x);
+  // Foto: Inserat → eigener Screenshot → Luftbild (swisstopo); fällt das Inseratefoto aus, springt das Luftbild ein
+  const photo = x.image ? `<img src="${esc(x.image)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="${aer ? `this.onerror=null;this.src='${esc(aer)}'` : "this.remove()"}">`
+    : own ? `<img data-src="${esc(own)}" alt="" loading="lazy">`
+    : aer ? `<img src="${esc(aer)}" alt="Luftbild" loading="lazy" onerror="this.remove()"><span class="aerlbl">Luftbild</span>` : "";
   const haken = (x.ai?.haken || []).length && x.ai?.passt === false;
   const pill = st && st.value ? `<span class="spill st st-${esc(st.value)}">${esc(statusLabel(st))}</span>`
     : isFav(k) ? '<span class="spill fav">★ Favorit</span>' : v === "split" ? '<span class="spill split">Uneinig</span>' : "";
@@ -2131,6 +2145,7 @@ function renderHits() {
   } else {
     $("hitList").innerHTML = list.map((x) => hitCard(x, false)).join("");
   }
+  $("hitList").querySelectorAll(".thumb img[data-src]").forEach((img) => repoFile(img.dataset.src).then((u) => (img.src = u)).catch(() => img.remove()));
 }
 let marksQueue = Promise.resolve();
 function setMark(k, val) {
@@ -2693,6 +2708,7 @@ function renderStatus() {
   });
   const dl = [];
   dl.push(`<div class="src"><span class="s ${S.config?.digest?.enabled === false ? "warn" : ""}"></span><b>Tägliches Briefing</b><div class="m">${S.config?.digest?.enabled === false ? "ausgeschaltet" : digestText(h)}</div></div>`);
+  if (h?.photos) dl.push(`<div class="src"><span class="s ${h.photos.ohne ? "warn" : ""}"></span><b>Fotos</b><div class="m">${h.photos.ohne ? `${h.photos.ohne} Treffer noch ohne Inseratefoto (Wollihood sucht weiter; in der App erscheint solange Screenshot oder Luftbild)` : "alle Treffer haben ein Foto"}${h.photos.gefunden ? ` · ${h.photos.gefunden} im letzten Lauf gefunden` : ""}</div></div>`);
   if (h?.push) dl.push(`<div class="src"><span class="s ${h.push.ok ? "" : "bad"}"></span><b>Push-Mitteilungen</b><div class="m">${h.push.ok ? "funktionieren · zuletzt geprüft " + esc(ago(h.push.at)) : esc(h.push.msg)}</div></div>`);
   $("delivery").innerHTML = dl.join("");
   $("sources").innerHTML = rows.join("") || '<p class="hint">Noch kein Lauf.</p>';
@@ -2887,7 +2903,7 @@ let installEvt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("installBtn").hidden = false; $("installHint").hidden = true; });
 $("installBtn").addEventListener("click", async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("installBtn").hidden = true; });
 if (window.matchMedia("(display-mode: standalone)").matches) { $("installHint").textContent = "Läuft als App."; }
-const APP_VERSION = "75 · 01.11.2026";
+const APP_VERSION = "76 · 01.11.2026";
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").then((reg) => { reg.update().catch(() => {}); }).catch(() => {});
   let reloaded = false;
