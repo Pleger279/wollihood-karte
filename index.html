@@ -1175,6 +1175,24 @@ async function migrateMarks() {
     todo.forEach((k) => { const it = items[k] || (items[k] = { votes: {}, comments: [] }); it.fav = it.fav || { by: S.person || "pascal", at: new Date().toISOString() }; });
   });
 }
+// Doppelte Wohnung zusammengeführt (Suchskript merge_twins): Bewertung/Notizen der zweiten Fundstelle zum Hauptschlüssel holen
+function foldTwins(items) {
+  let n = 0;
+  for (const x of S.hits || []) {
+    const k = keyOf(x), rest = (x.keys || []).slice(1).filter((k2) => items[k2] && k2 !== k);
+    for (const k2 of rest) {
+      const a = items[k] || (items[k] = { votes: {}, comments: [] }), b = items[k2];
+      if (b.folded_into === k) continue;
+      for (const [p, v] of Object.entries(b.votes || {})) if (!(a.votes || (a.votes = {}))[p]) { a.votes[p] = v; }
+      for (const f of ["fav", "out", "status", "steps"]) if (!a[f] && b[f]) a[f] = b[f];
+      if ((b.note || "").trim()) a.note = (a.note || "").trim() ? `${a.note}\n\n${b.note}` : b.note;
+      const have = new Set((a.comments || []).map((c) => c.at + c.text));
+      a.comments = [...(a.comments || []), ...(b.comments || []).filter((c) => !have.has(c.at + c.text))].sort((u, v) => (u.at < v.at ? -1 : 1));
+      b.folded_into = k; n++;
+    }
+  }
+  return n;
+}
 let socialQueue = Promise.resolve();
 function socialOp(label, apply) {
   // sofort lokal anwenden, dann mit dem neusten Stand im Repo zusammenführen
@@ -2758,6 +2776,7 @@ async function load() {
   if (hits.status === "fulfilled") { S.hits = hits.value.data; store.set("wh_cache_hits", JSON.stringify(S.hits)); }
   if (health.status === "fulfilled") S.health = health.value.data;
   mergeManual();
+  if (social.status === "fulfilled" && foldTwins(JSON.parse(JSON.stringify(S.social)))) socialOp("Doppel zusammengeführt", foldTwins);
   if (events.status === "fulfilled") S.events = events.value.data;
   if (marks.status === "fulfilled") { S.marks = marks.value.data; S.marksSha = marks.value.sha; }
   else if (marks.reason?.status === 404) { S.marks = JSON.parse(store.get("wh_marks") || "{}"); S.marksSha = null; }
@@ -2918,7 +2937,7 @@ let installEvt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("installBtn").hidden = false; $("installHint").hidden = true; });
 $("installBtn").addEventListener("click", async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("installBtn").hidden = true; });
 if (window.matchMedia("(display-mode: standalone)").matches) { $("installHint").textContent = "Läuft als App."; }
-const APP_VERSION = "77 · 01.11.2026";
+const APP_VERSION = "78 · 01.11.2026";
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").then((reg) => { reg.update().catch(() => {}); }).catch(() => {});
   let reloaded = false;
