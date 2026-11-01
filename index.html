@@ -1300,7 +1300,7 @@ function standPanel(k) {
   return `<div class="panel" id="dStand">
     <div class="stabs" role="tablist" aria-label="Schritte">${STEPS.map(([n, l]) => `<button type="button" role="tab" data-stab="${n}" aria-selected="${n === tab}" class="${stepDone(steps, n) ? "done" : ""}${n === "antwort" && steps.antwort?.value === "absage" ? " no" : ""}">${stepDone(steps, n) ? "✓" : ""}${l}</button>`).join("")}</div>
     <div class="sbody">${body}</div>
-    ${firstUrl(x) ? `<a class="linkbtn" style="justify-self:center" href="${esc(firstUrl(x))}" target="_blank" rel="noopener">Inserat auf ${esc(x.sources?.[0]?.portal || x.portal || "der Plattform")} öffnen ↗</a>` : ""}
+    ${firstUrl(x) ? `<a class="linkbtn" style="justify-self:center" href="${esc(goodUrl(x))}" target="_blank" rel="noopener">${TRACK_RX.test(firstUrl(x)) ? `Inserat auf ${esc(x.sources?.[0]?.portal || x.portal || "der Plattform")} suchen ↗` : `Inserat auf ${esc(x.sources?.[0]?.portal || x.portal || "der Plattform")} öffnen ↗`}</a>` : ""}
   </div>`;
 }
 function refreshStand(k) {
@@ -1974,6 +1974,13 @@ $("dBody").addEventListener("click", async (e) => {
 const firstUrl = (x) => (x.sources && x.sources[0] && x.sources[0].url) || x.url;
 // Tracking-Links aus Abo-Mails (z.B. Comparis), die Wollihood nicht auflösen kann
 const TRACK_RX = /links\.comparis\.ch|\/s\/c\/|list-manage\.com|mailchi\.mp|\/\/(click|clicks|track|trk|email)\.|sendgrid\.net/i;
+// Tracking-Links von Comparis führen auf die Startseite (lassen sich nicht auflösen, enthalten keine Inserate-Nummer).
+// Stattdessen gezielt suchen: Google auf comparis.ch mit Strasse, sonst PLZ + Zimmer + Preis.
+function searchUrl(x) {
+  const q = x.street ? `"${x.street}" ${x.plz || ""}` : [x.plz, x.rooms != null ? `${x.rooms} Zimmer` : "", x.rent ? `CHF ${fmtN(x.rent)}` : ""].filter(Boolean).join(" ");
+  return "https://www.google.com/search?q=" + encodeURIComponent(`${q} site:comparis.ch`);
+}
+const goodUrl = (x) => { const u = firstUrl(x); return u && TRACK_RX.test(u) ? searchUrl(x) : u; };
 function unresolved(x) {
   const all = [x.url, ...(x.sources || []).map((s) => s.url), ...(x.also_urls || [])].filter(Boolean);
   return all.length > 0 && all.every((u) => TRACK_RX.test(u));
@@ -1991,14 +1998,14 @@ function searchPanel(x) {
   }
   if (!links.length) return "";
   return `<div class="panel"><h2>Inserat suchen</h2>
-    <p class="hint">Der Link aus der Abo-Mail lässt sich nicht direkt öffnen (Weiterleitung des Portals). Hier findest du das Inserat${street ? ` mit «${esc(street)}»` : ""} trotzdem:</p>
+    <p class="hint">Der Link aus der Comparis-Mail führt nur auf die Startseite. Hier findest du das Inserat${street ? ` mit «${esc(street)}»` : ""}:</p>
     <div class="srchbtns">${links.map(([n, u]) => `<a class="btn" href="${esc(u)}" target="_blank" rel="noopener">${esc(n)}</a>`).join("")}</div></div>`;
 }
 // Fundstellen: zuerst gefunden zuerst, jede antippbar
 function sourcesHtml(x) {
   const list = (x.sources && x.sources.length ? x.sources : [{ portal: x.portal, url: x.url, at: x.first_seen }])
     .concat((x.also_urls || []).filter((u) => !(x.sources || []).some((s) => s.url === u)).map((u) => ({ portal: "weiterer Link", url: u, at: null })));
-  return list.map((s) => `<a href="${esc(s.url)}" target="_blank" rel="noopener" data-open>${esc(s.portal || "Link")}</a>${s.at ? " " + esc(new Date(s.at).toLocaleDateString("de-CH", { day: "2-digit", month: "2-digit" })) : ""}`).join(" · ");
+  return list.map((s) => `<a href="${esc(TRACK_RX.test(s.url || "") ? searchUrl(x) : s.url)}" target="_blank" rel="noopener" data-open>${esc(s.portal || "Link")}</a>${s.at ? " " + esc(new Date(s.at).toLocaleDateString("de-CH", { day: "2-digit", month: "2-digit" })) : ""}`).join(" · ");
 }
 function outBtn(k) {
   const o = itemOf(k).out;
@@ -2286,7 +2293,7 @@ function renderMarkers() {
     // Farbe mit Bedeutung: grau = aussortiert / ausserhalb Push, grün = läuft schon, gelb = Favorit, blau = offen
     const c = out || outPush ? "#9a9a9a" : st ? css("--ok") : isFav(k) ? css("--star") : accent();
     S.markers[k] = L.circleMarker([x.lat, x.lon], { radius: out ? 6 : 8, color: "#fff", weight: 2, fillColor: c, fillOpacity: out ? 0.6 : 0.95, pmIgnore: true })
-      .bindPopup(`${x.image ? `<img src="${esc(x.image)}" alt="" style="width:200px;height:112px;object-fit:cover;border-radius:6px;display:block;margin-bottom:6px" referrerpolicy="no-referrer">` : ""}<b>${esc(chf(x.rent))} · ${esc(rooms(x.rooms))}${x.m2 ? " · " + esc(x.m2) + " m²" : ""}</b><br>${esc(x.street || "")}<br><a href="#" data-k="${esc(keyOf(x))}" onclick="openDetail(this.dataset.k);return false">Details</a> · <a href="${esc(x.url)}" target="_blank" rel="noopener">Inserat ↗</a>`, { maxWidth: 220 })
+      .bindPopup(`${x.image ? `<img src="${esc(x.image)}" alt="" style="width:200px;height:112px;object-fit:cover;border-radius:6px;display:block;margin-bottom:6px" referrerpolicy="no-referrer">` : ""}<b>${esc(chf(x.rent))} · ${esc(rooms(x.rooms))}${x.m2 ? " · " + esc(x.m2) + " m²" : ""}</b><br>${esc(x.street || "")}<br><a href="#" data-k="${esc(keyOf(x))}" onclick="openDetail(this.dataset.k);return false">Details</a> · <a href="${esc(goodUrl(x))}" target="_blank" rel="noopener">Inserat ↗</a>`, { maxWidth: 220 })
       .addTo(S.hitLayer);
   });
   const t = $("outToggle");
@@ -2880,7 +2887,7 @@ let installEvt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("installBtn").hidden = false; $("installHint").hidden = true; });
 $("installBtn").addEventListener("click", async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("installBtn").hidden = true; });
 if (window.matchMedia("(display-mode: standalone)").matches) { $("installHint").textContent = "Läuft als App."; }
-const APP_VERSION = "74 · 31.10.2026";
+const APP_VERSION = "75 · 01.11.2026";
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").then((reg) => { reg.update().catch(() => {}); }).catch(() => {});
   let reloaded = false;
