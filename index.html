@@ -1301,7 +1301,7 @@ function standPanel(k) {
   return `<div class="panel" id="dStand">
     <div class="stabs" role="tablist" aria-label="Schritte">${STEPS.map(([n, l]) => `<button type="button" role="tab" data-stab="${n}" aria-selected="${n === tab}" class="${stepDone(steps, n) ? "done" : ""}${n === "antwort" && steps.antwort?.value === "absage" ? " no" : ""}">${stepDone(steps, n) ? "✓" : ""}${l}</button>`).join("")}</div>
     <div class="sbody">${body}</div>
-    ${firstUrl(x) ? `<a class="linkbtn" style="justify-self:center" href="${esc(goodUrl(x))}" target="_blank" rel="noopener">${TRACK_RX.test(firstUrl(x)) ? `Inserat auf ${esc(x.sources?.[0]?.portal || x.portal || "der Plattform")} suchen ↗` : `Inserat auf ${esc(x.sources?.[0]?.portal || x.portal || "der Plattform")} öffnen ↗`}</a>` : ""}
+    ${firstUrl(x) ? `<a class="linkbtn" style="justify-self:center" href="${esc(goodUrl(x))}" target="_blank" rel="noopener">${goodSource(x) ? `Inserat auf ${esc(goodSource(x).portal || portalOf(goodSource(x).url))} öffnen ↗` : `Auf Comparis suchen ↗`}</a>` : ""}
   </div>`;
 }
 function refreshStand(k) {
@@ -1978,12 +1978,27 @@ const firstUrl = (x) => (x.sources && x.sources[0] && x.sources[0].url) || x.url
 // Tracking-Links aus Abo-Mails (z.B. Comparis), die Wollihood nicht auflösen kann
 const TRACK_RX = /links\.comparis\.ch|\/s\/c\/|list-manage\.com|mailchi\.mp|\/\/(click|clicks|track|trk|email)\.|sendgrid\.net/i;
 // Tracking-Links von Comparis führen auf die Startseite (lassen sich nicht auflösen, enthalten keine Inserate-Nummer).
-// Stattdessen gezielt suchen: Google auf comparis.ch mit Strasse, sonst PLZ + Zimmer + Preis.
+// 1. gleiche Wohnung auf anderer Plattform (Suchskript links.py ersetzt den Link, App nimmt jede gute Fundstelle)
+// 2. sonst gefilterte Comparis-Liste: PLZ, genaue Zimmerzahl, Miete ±50 → meist genau diese Wohnung
+function comparisList(x) {
+  const r = { DealType: 10, SiteId: 0, RootPropertyTypes: [], PropertyTypes: [] };
+  if (x.plz) r.LocationSearchString = String(x.plz);
+  if (x.rooms != null) { r.RoomsFrom = x.rooms; r.RoomsTo = x.rooms; }
+  if (x.rent) { r.PriceFrom = Math.max(0, Math.round(x.rent) - 50); r.PriceTo = Math.round(x.rent) + 50; }
+  return "https://www.comparis.ch/immobilien/result/list?requestobject=" + encodeURIComponent(JSON.stringify(r));
+}
 function searchUrl(x) {
-  const q = x.street ? `"${x.street}" ${x.plz || ""}` : [x.plz, x.rooms != null ? `${x.rooms} Zimmer` : "", x.rent ? `CHF ${fmtN(x.rent)}` : ""].filter(Boolean).join(" ");
+  if (x.plz || x.rooms != null || x.rent) return comparisList(x);
+  const q = x.street ? `"${x.street}"` : "Wohnung mieten";
   return "https://www.google.com/search?q=" + encodeURIComponent(`${q} site:comparis.ch`);
 }
-const goodUrl = (x) => { const u = firstUrl(x); return u && TRACK_RX.test(u) ? searchUrl(x) : u; };
+const portalOf = (u) => { const h = (u.match(/\/\/(?:www\.)?([^/]+)/) || [])[1] || ""; return ({ "flatfox.ch": "Flatfox", "homegate.ch": "Homegate", "immoscout24.ch": "ImmoScout24", "newhome.ch": "Newhome", "comparis.ch": "Comparis" })[h] || "der Plattform"; };
+// erste Fundstelle mit echtem Link (Portal dazu), sonst null
+function goodSource(x) {
+  const list = [...(x.sources || []), { portal: x.portal, url: x.url }, ...(x.also_urls || []).map((u) => ({ portal: null, url: u }))];
+  return list.find((s) => s.url && !TRACK_RX.test(s.url)) || null;
+}
+const goodUrl = (x) => { const g = goodSource(x); return g ? g.url : firstUrl(x) ? searchUrl(x) : null; };
 function unresolved(x) {
   const all = [x.url, ...(x.sources || []).map((s) => s.url), ...(x.also_urls || [])].filter(Boolean);
   return all.length > 0 && all.every((u) => TRACK_RX.test(u));
@@ -1993,15 +2008,15 @@ function searchPanel(x) {
   const plz = x.plz || "", street = x.street || "";
   const g = (q) => "https://www.google.com/search?q=" + encodeURIComponent(q);
   const links = [];
+  if (plz || x.rooms != null || x.rent) links.push(["Comparis-Liste", comparisList(x)]);
   if (street) links.push(["Google", g(`"${street}" ${plz} Wohnung mieten`)]);
-  if (street) links.push(["Comparis", g(`"${street}" site:comparis.ch`)]);
   if (/^80\d\d$/.test(plz)) {
     links.push(["Homegate", `https://www.homegate.ch/rent/apartment/zip-${plz}/matching-list`]);
     links.push(["ImmoScout24", `https://www.immoscout24.ch/en/flat/rent/postcode-${plz}-zuerich`]);
   }
   if (!links.length) return "";
   return `<div class="panel"><h2>Inserat suchen</h2>
-    <p class="hint">Der Link aus der Comparis-Mail führt nur auf die Startseite. Hier findest du das Inserat${street ? ` mit «${esc(street)}»` : ""}:</p>
+    <p class="hint">Der Link aus der Comparis-Mail führt nur auf die Startseite. Die Comparis-Liste ist auf PLZ, Zimmer und Miete gefiltert – meist steht dort nur diese Wohnung.</p>
     <div class="srchbtns">${links.map(([n, u]) => `<a class="btn" href="${esc(u)}" target="_blank" rel="noopener">${esc(n)}</a>`).join("")}</div></div>`;
 }
 // Fundstellen: zuerst gefunden zuerst, jede antippbar
@@ -2903,7 +2918,7 @@ let installEvt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("installBtn").hidden = false; $("installHint").hidden = true; });
 $("installBtn").addEventListener("click", async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("installBtn").hidden = true; });
 if (window.matchMedia("(display-mode: standalone)").matches) { $("installHint").textContent = "Läuft als App."; }
-const APP_VERSION = "76 · 01.11.2026";
+const APP_VERSION = "77 · 01.11.2026";
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").then((reg) => { reg.update().catch(() => {}); }).catch(() => {});
   let reloaded = false;
