@@ -656,6 +656,16 @@ label.f small, div.f small { color: var(--muted); font: 500 12.5px var(--body) }
 .detail-mini { border-radius: 14px; overflow: hidden; box-shadow: var(--shadow) }
 .detail-mini .mini { border-top: 0; height: 160px }
 .mini .lbl { font: 600 12px var(--body); text-transform: none; letter-spacing: 0; border-radius: 8px; left: 8px; bottom: 8px; background: var(--surface); color: var(--accent); box-shadow: var(--shadow) }
+.shotbox{display:grid;gap:10px;padding:12px;border-radius:12px;background:var(--soft, rgba(0,117,191,.06))}
+.shotbox h3{margin:0;font-size:15px}.shotbox h4{margin:4px 0 0;font-size:13px;font-weight:600}
+.shotfotos{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.shotfoto{position:relative;display:block;aspect-ratio:4/3;border-radius:8px;overflow:hidden;cursor:pointer}
+.shotfoto img{width:100%;height:100%;object-fit:cover;display:block}
+.shotfoto input{position:absolute;top:6px;left:6px;width:18px;height:18px;margin:0}
+.shotfoto:has(input:not(:checked)) img{opacity:.3;filter:grayscale(1)}
+.shotline{margin:0}
+.shotgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.shotgrid .f small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
 </style>
 </head>
 <body>
@@ -1436,6 +1446,7 @@ function usPanel(k) {
     <div class="kbar"><button type="button" class="btn sm" id="ownNoteSave" disabled>Gespeichert</button></div>
     ${files.length ? `<div class="ownfiles">${files.map((f) => f.type === "application/pdf" ? `<a href="#" data-doc="${esc(f.path)}">📄 ${esc(f.name || "Dokument")}</a>`
       : `<img data-src="${esc(f.path)}" data-full="${esc(f.path)}" alt="${esc(f.name || "")}">`).join("")}</div>` : ""}
+    ${shotsBox(k)}
     <label class="linkbtn" for="ownFiles" style="cursor:pointer">+ Screenshot oder Dokument</label>
     <input type="file" id="ownFiles" accept="image/*,application/pdf" multiple hidden></div>`;
 }
@@ -1593,15 +1604,17 @@ function renderDetail(x, a, d) {
     : a.online === "online" ? `<div class="onl online">Noch online · gesichert ${esc(ago(a.archived_at))}</div>`
     : `<div class="onl">Gesichert ${esc(ago(a.archived_at))} · Online-Status bei diesem Portal nicht prüfbar</div>`;
   const imgs = (d?.images || []);
-  const gal = imgs.length ? `<div class="gal">${imgs.map((im, i) => `<figure><img data-src="archiv/${esc(a.id)}/${esc(im.file)}" alt="${esc(im.caption || "")}"><figcaption>${i + 1}/${imgs.length}</figcaption></figure>`).join("")}</div>`
+  const sfs = shotFotos(S.detailKey);
+  const gal = sfs.length ? `<div class="gal">${sfs.map((pth, i) => `<figure><img data-src="${esc(pth)}" data-full="${esc(pth)}" alt=""><figcaption>${i + 1}/${sfs.length} · aus Screenshot</figcaption></figure>`).join("")}${imgs.map((im) => `<figure><img data-src="archiv/${esc(a.id)}/${esc(im.file)}" alt=""><figcaption>Inserat</figcaption></figure>`).join("")}</div>`
+    : imgs.length ? `<div class="gal">${imgs.map((im, i) => `<figure><img data-src="archiv/${esc(a.id)}/${esc(im.file)}" alt="${esc(im.caption || "")}"><figcaption>${i + 1}/${imgs.length}</figcaption></figure>`).join("")}</div>`
     : x.image ? `<div class="gal"><figure><img src="${esc(x.image)}" alt="" referrerpolicy="no-referrer"></figure></div>`
     : ownPhoto(S.detailKey) ? `<div class="gal"><figure><img data-src="${esc(ownPhoto(S.detailKey))}" data-full="${esc(ownPhoto(S.detailKey))}" alt=""><figcaption>Eigener Screenshot</figcaption></figure></div>`
     : aerialUrl(x) ? `<div class="gal"><figure><img src="${esc(aerialUrl(x))}" alt="Luftbild"><figcaption>Luftbild · © swisstopo · kein Inseratefoto</figcaption></figure></div>` : "";
   const f = d?.facts || {};
   const fact = (l, v) => (v != null && v !== "" ? `<div><span class="cap">${l}</span><b>${esc(v)}</b></div>` : "");
   const facts = `<div class="dfacts">${fact("Miete brutto", (f.rent_gross || x.rent) ? "CHF " + fmtN(f.rent_gross || x.rent) : null)}${fact("Netto + NK", f.rent_net ? `${fmtN(f.rent_net)} + ${fmtN(f.rent_charges || 0)}` : null)}
-    ${fact("Zimmer", x.rooms ?? f.number_of_rooms)}${fact("Fläche", (x.m2 || f.livingspace) ? (x.m2 || f.livingspace) + " m²" : null)}${fact("Etage", f.floor != null ? (f.floor === 0 ? "EG" : f.floor + ". OG") : null)}
-    ${fact("Baujahr", f.year_built)}${fact("Renoviert", f.year_renovated)}${fact("Bezug", f.moving_date ? new Date(f.moving_date).toLocaleDateString("de-CH") : f.moving_date_type === "imm" ? "sofort" : (x.moving_date ? new Date(x.moving_date).toLocaleDateString("de-CH") : null))}</div>`;
+    ${fact("Zimmer", x.rooms ?? f.number_of_rooms)}${fact("Fläche", (x.m2 || f.livingspace) ? (x.m2 || f.livingspace) + " m²" : null)}${fact("Etage", f.floor != null ? (f.floor === 0 ? "EG" : f.floor + ". OG") : x.floor_text || null)}
+    ${fact("Baujahr", f.year_built)}${fact("Renoviert", f.year_renovated)}${fact("Bezug", f.moving_date ? new Date(f.moving_date).toLocaleDateString("de-CH") : f.moving_date_type === "imm" ? "sofort" : (x.moving_date ? new Date(x.moving_date).toLocaleDateString("de-CH") : x.moving_date_text || null))}${fact("Befristung", x.limited_text)}</div>`;
   // Kontakt
   const ag = d?.agency || (x.agency ? { name: x.agency } : null);
   const book = ag ? (S.agencies[agencyKey(ag.name)] || {}) : {};
@@ -1615,6 +1628,10 @@ function renderDetail(x, a, d) {
   if (book.email) lines.push(`<div>✉ <a href="mailto:${esc(book.email)}">${esc(book.email)}</a></div>`);
   if (book.website) lines.push(`<div>↗ <a href="${esc(/^https?:/.test(book.website) ? book.website : "https://" + book.website)}" target="_blank" rel="noopener">${esc(book.website)}</a></div>`);
   if (book.note) lines.push(`<div class="hint">${esc(book.note)}</div>`);
+  const ksh = shotOk(S.detailKey)?.kontakt || x.contact_shots || {};
+  if (ksh.name) lines.push(`<div>${esc(ksh.name)} <span class="hint">(aus Screenshot)</span></div>`);
+  if (ksh.telefon && !book.phone) lines.push(`<div>☎ <a href="tel:${esc(String(ksh.telefon).replace(/\s/g, ""))}">${esc(ksh.telefon)}</a> <span class="hint">(aus Screenshot)</span></div>`);
+  if (ksh.mail && !book.email) lines.push(`<div>✉ <a href="mailto:${esc(ksh.mail)}">${esc(ksh.mail)}</a> <span class="hint">(aus Screenshot)</span></div>`);
   (c.phones || []).forEach((p) => lines.push(`<div>☎ <a href="tel:${esc(p.replace(/\s/g, ""))}">${esc(p)}</a> <span class="hint">(aus dem Inserat)</span></div>`));
   (c.emails || []).forEach((m) => lines.push(`<div>✉ <a href="mailto:${esc(m)}">${esc(m)}</a> <span class="hint">(aus dem Inserat)</span></div>`));
   if (d?.apply_url && a?.online !== "offline") lines.push(`<a class="btn" href="${esc(d.apply_url)}" target="_blank" rel="noopener">Bewerbungs- / Kontaktformular öffnen ↗</a>`);
@@ -1724,9 +1741,174 @@ $("dBody").addEventListener("change", (e) => {
 $("dBody").addEventListener("change", async (e) => {
   if (e.target.id !== "ownFiles" || !e.target.files.length) return;
   toast("Lade hoch …", "", 0);
-  const n = await uploadOwn(S.detailKey, e.target.files);
+  const k = S.detailKey, imgs = [...e.target.files].filter((f) => f.type.startsWith("image/"));
+  const n = await uploadOwn(k, e.target.files);
   toast(n ? `${n} Datei${n > 1 ? "en" : ""} gespeichert.` : "Nichts gespeichert.", n ? "ok" : "err");
   setTimeout(refreshDetail, 300);
+  if (n && imgs.length && await kiKey()) setTimeout(() => shotsRun(k, imgs), 400);   // Claude liest gleich mit
+});
+// ---------- Angaben aus Screenshots (v79, Pascal 2.11.) ----------
+// Claude liest die Screenshots einer Wohnung, ergänzt Angaben und Kontakt und schneidet die Fotos aus.
+// Vorschlag in social[k].shots (status «vorschlag»), «Übernehmen» → status «ok» → Suchskript (wollihood/shots.py) übernimmt.
+const SHOT_FIELDS = [["strasse", "Strasse", "text"], ["plz", "PLZ", "text"], ["ort", "Ort", "text"], ["zimmer", "Zimmer", "number"],
+  ["miete_brutto", "Miete brutto (CHF)", "number"], ["flaeche_m2", "Fläche (m²)", "number"], ["etage", "Etage", "text"],
+  ["bezug", "Bezug", "text"], ["befristung", "Befristung", "text"]];
+const SHOT_KONTAKT = [["firma", "Verwaltung"], ["name", "Kontaktperson"], ["telefon", "Telefon"], ["mail", "E-Mail"]];
+const SHOT_PREV = { strasse: "street", plz: "plz", ort: "city", zimmer: "rooms", miete_brutto: "rent", flaeche_m2: "m2", etage: "floor_text", bezug: "moving_date_text", befristung: "limited_text" };
+const SHOT_TOOL = { name: "screenshots", description: "Angaben, Kontakt und Fotos aus Screenshots eines Wohnungsinserats.",
+  input_schema: { type: "object", properties: {
+    angaben: { type: "object", properties: {
+      strasse: { type: "string", description: "Strasse und Hausnummer" }, plz: { type: "string" }, ort: { type: "string" },
+      zimmer: { type: "number" }, miete_brutto: { type: "number", description: "Monatsmiete inkl. Nebenkosten in CHF; steht nur netto + NK, die Summe" },
+      miete_netto: { type: "number" }, nebenkosten: { type: "number" }, flaeche_m2: { type: "number" },
+      etage: { type: "string", description: "z.B. «2. OG», «EG»" }, bezug: { type: "string", description: "z.B. «per 1.12.2026», «sofort», «nach Vereinbarung»" },
+      befristung: { type: "string", description: "nur wenn befristet, z.B. «bis 31.3.2028»" },
+      text: { type: "string", description: "das Wichtigste aus dem Inseratetext in 1–3 Sätzen, sachlich, max. 400 Zeichen" } } },
+    kontakt: { type: "object", properties: { firma: { type: "string", description: "Verwaltung/Vermieter-Firma" }, name: { type: "string" },
+      telefon: { type: "string" }, mail: { type: "string" } } },
+    fotos: { type: "array", description: "Wohnungsfotos und Grundrisse in den Screenshots, max. 8", items: { type: "object", properties: {
+      bild: { type: "integer", description: "Nummer des Screenshots, 1 = erster" },
+      x0: { type: "integer", description: "linker Rand, 0–1000 (Anteil der Bildbreite)" }, y0: { type: "integer", description: "oberer Rand, 0–1000 (Anteil der Bildhöhe)" },
+      x1: { type: "integer" }, y1: { type: "integer" }, art: { type: "string", enum: ["foto", "grundriss"] } },
+      required: ["bild", "x0", "y0", "x1", "y1"] } } },
+    required: ["angaben"] } };
+const SHOT_PROMPT = `Das sind Screenshots eines Wohnungsinserats (Homegate, Comparis, Flatfox o.ä., meist vom Handy).
+Gib mit dem Werkzeug «screenshots» zurück, was SICHTBAR ist – nichts erfinden, nichts schätzen; Unsichtbares weglassen.
+Fotos: Rahmen jedes echten Wohnungsfotos (Räume, Haus, Aussicht, Balkon) und jedes Grundrisses, so knapp wie möglich am Bildrand,
+ohne Bedienelemente, Text, Statusleiste, Knöpfe. Koordinaten als Anteil 0–1000 der Bildbreite (x) und Bildhöhe (y) des jeweiligen Screenshots.
+Nicht nehmen: Karten, Logos, Profilbilder, Werbung, Symbolbilder/«Musterbild», Fotos, die zu mehr als einem Fünftel abgeschnitten
+oder schmaler als ein Fünftel der Bildbreite sind. Dasselbe Foto nur einmal.`;
+S.shotBusy = {};
+function shotsBox(k) {
+  const it = itemOf(k), sh = it.shots, x = hitByKey(k) || {};
+  const hasImgs = (it.files || []).some((f) => f.type !== "application/pdf");
+  if (S.shotBusy[k]) return `<div class="shotbox"><p class="hint">✦ ${esc(S.shotBusy[k])}</p></div>`;
+  if (sh && sh.status === "vorschlag") {
+    const a = sh.angaben || {}, kt = sh.kontakt || {};
+    const rows = SHOT_FIELDS.filter(([f]) => a[f] != null && a[f] !== "").map(([f, l, t]) => {
+      const prev = x[SHOT_PREV[f]];
+      const diff = prev != null && prev !== "" && String(prev) !== String(a[f]);
+      return `<label class="f"><small>${l}${diff ? ` · bisher ${esc(prev)}` : prev == null || prev === "" ? " · neu" : ""}</small><input class="field" type="${t}" step="any" data-shf="${f}" value="${esc(a[f])}"></label>`; }).join("");
+    const krows = SHOT_KONTAKT.filter(([f]) => kt[f]).map(([f, l]) => `<label class="f"><small>${l}</small><input class="field" data-shk="${f}" value="${esc(kt[f])}"></label>`).join("");
+    const fotos = (sh.fotos || []).map((f, i) => `<label class="shotfoto"><input type="checkbox" data-shfoto="${i}" checked><img data-src="${esc(f.path)}" alt=""></label>`).join("");
+    return `<div class="shotbox"><h3>✦ Aus Screenshots gelesen</h3>
+      <p class="hint">Prüfen, ändern, dann übernehmen. Wollihood verortet die Wohnung danach neu und sucht sie auf den anderen Plattformen.</p>
+      ${rows ? `<div class="shotgrid">${rows}</div>` : '<p class="hint">Keine Angaben gefunden.</p>'}${a.text ? `<label class="f"><small>Aus dem Text</small><textarea class="field" rows="3" data-shf="text">${esc(a.text)}</textarea></label>` : ""}
+      ${krows ? `<h4>Kontakt</h4><div class="shotgrid">${krows}</div>` : ""}
+      ${fotos ? `<h4>Fotos (${(sh.fotos || []).length}) – antippen zum Weglassen</h4><div class="shotfotos">${fotos}</div>` : ""}
+      <div class="kbar"><button type="button" class="btn sm" data-shot="drop">Verwerfen</button><button type="button" class="btn sm primary" data-shot="ok">Übernehmen</button></div></div>`;
+  }
+  if (sh && sh.status === "ok") return `<p class="hint shotline">✦ Aus Screenshots ergänzt · ${esc(PEOPLE[sh.by] || "")} ${esc(dmy(sh.at))}${hasImgs ? ` · <button type="button" class="linkbtn" data-shot="read">nochmals lesen</button>` : ""}</p>`;
+  if (sh && sh.error) return `<p class="hint shotline">Claude konnte die Screenshots nicht lesen: ${esc(sh.error)}${hasImgs ? ` · <button type="button" class="linkbtn" data-shot="read">nochmals</button>` : ""}</p>`;
+  return hasImgs ? `<button type="button" class="linkbtn" data-shot="read" style="justify-self:start">✦ Angaben und Fotos aus den Screenshots holen</button>` : "";
+}
+async function fileFromRepo(path) { const u = await repoFile(path); const b = await (await fetch(u)).blob(); return new File([b], path.split("/").pop(), { type: b.type || "image/jpeg" }); }
+async function cropUpload(k, file, box, n) {
+  const bmp = await createImageBitmap(file);
+  const cl = (v) => Math.max(0, Math.min(1000, Number(v) || 0));
+  let x0 = cl(box.x0) / 1000 * bmp.width, x1 = cl(box.x1) / 1000 * bmp.width, y0 = cl(box.y0) / 1000 * bmp.height, y1 = cl(box.y1) / 1000 * bmp.height;
+  const w = x1 - x0, h = y1 - y0;
+  if (w < 160 || h < 120 || w < bmp.width * 0.18) return null;            // zu klein → lieber weglassen
+  const ix = w * 0.01, iy = h * 0.01; x0 += ix; x1 -= ix; y0 += iy; y1 -= iy;  // Ränder/Schatten wegschneiden
+  const scale = Math.min(1, 1400 / Math.max(x1 - x0, y1 - y0));
+  const c = document.createElement("canvas"); c.width = Math.round((x1 - x0) * scale); c.height = Math.round((y1 - y0) * scale);
+  c.getContext("2d").drawImage(bmp, x0, y0, x1 - x0, y1 - y0, 0, 0, c.width, c.height);
+  const blob = await new Promise((r) => c.toBlob(r, "image/jpeg", 0.86));
+  const aid = await aidOf(k), path = `archiv/${aid}/eigene/foto_${Date.now().toString(36)}_${n}.jpg`;
+  await gh(path, { method: "PUT", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message: "Foto aus Screenshot", content: await blobB64(blob), branch: "main" }) });
+  fileCache.set(path, Promise.resolve(URL.createObjectURL(blob)));
+  return { path, art: box.art || "foto", w: c.width, h: c.height };
+}
+async function shotsRun(k, files) {
+  if (needPerson() || S.shotBusy[k]) return;
+  const key = await kiKey();
+  if (!key) { toast("Kein Claude-Schlüssel (Mehr → «Claude für Bewerbungen»).", "err"); return; }
+  const set = (t) => { S.shotBusy[k] = t; if (S.detailKey === k) refreshUs(); };
+  try {
+    set("Claude liest die Screenshots …");
+    if (!files) files = await Promise.all((itemOf(k).files || []).filter((f) => f.type !== "application/pdf").slice(-6).map((f) => fileFromRepo(f.path)));
+    files = [...files].filter((f) => (f.type || "").startsWith("image/")).slice(0, 6);
+    const content = [];
+    for (const f of files) content.push({ type: "image", source: { type: "base64", media_type: "image/jpeg", data: await blobB64(await shrinkImage(f)) } });
+    const x = hitByKey(k) || {};
+    content.push({ type: "text", text: SHOT_PROMPT + `\n\nBisher bekannt: ${JSON.stringify({ strasse: x.street, plz: x.plz, zimmer: x.rooms, miete: x.rent, m2: x.m2 })}` });
+    const r = await fetch("https://api.anthropic.com/v1/messages", { method: "POST",
+      headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
+      body: JSON.stringify({ model: S.config?.ai?.model || "claude-opus-5-5", max_tokens: 3000, tools: [SHOT_TOOL], tool_choice: { type: "auto" },
+        messages: [{ role: "user", content }] }) });
+    let j = {}; try { j = await r.json(); } catch { }
+    if (!r.ok) throw new Error(r.status === 401 ? "Der Claude-Schlüssel ist ungültig." : j?.error?.message || `Fehler ${r.status}`);
+    const res = (j.content || []).find((b) => b.type === "tool_use")?.input;
+    if (!res) throw new Error("Claude hat nicht im erwarteten Format geantwortet.");
+    const fotos = [];
+    const boxes = (res.fotos || []).slice(0, 8);
+    for (const [i, b] of boxes.entries()) {
+      const f = files[(b.bild || 1) - 1]; if (!f) continue;
+      set(`Schneide Fotos aus … ${i + 1}/${boxes.length}`);
+      try { const c = await cropUpload(k, f, b, i); if (c) fotos.push(c); } catch (e) { console.warn("Ausschnitt", e); }
+    }
+    const angaben = {}; for (const [f, v] of Object.entries(res.angaben || {})) if (v != null && v !== "" && v !== 0) angaben[f] = v;
+    const kontakt = {}; for (const [f, v] of Object.entries(res.kontakt || {})) if (v) kontakt[f] = v;
+    delete S.shotBusy[k];
+    socialOp(`${PEOPLE[S.person]}: Screenshots gelesen (${x.street || "Inserat"})`, (items) => {
+      const it = items[k] || (items[k] = { votes: {}, comments: [] });
+      it.shots = { status: "vorschlag", angaben, kontakt, fotos, by: S.person, at: new Date().toISOString() };
+    });
+    toast("Claude hat die Screenshots gelesen – bitte prüfen.", "ok");
+  } catch (e) {
+    delete S.shotBusy[k];
+    socialOp("Screenshots: Fehler", (items) => { const it = items[k] || (items[k] = { votes: {}, comments: [] }); it.shots = { status: "fehler", error: e.message, at: new Date().toISOString() }; });
+    toast("Claude: " + e.message, "err", 7000);
+  }
+  if (S.detailKey === k) setTimeout(refreshUs, 50);
+}
+// bestätigte Angaben sofort in der Liste zeigen (das Suchskript schreibt sie beim nächsten Lauf fest)
+function shotOverlay(x) {
+  const sh = shotOk(keyOf(x)); if (!sh) return x;
+  const a = sh.angaben || {};
+  for (const [f, dst] of Object.entries(SHOT_PREV)) if (a[f] != null && a[f] !== "") x[dst] = ["zimmer", "miete_brutto", "flaeche_m2"].includes(f) ? Number(a[f]) : a[f];
+  if (sh.kontakt?.firma && !x.agency) x.agency = sh.kontakt.firma;
+  if (a.text && !(x.text || "").includes(a.text)) x.text = a.text + "\n\n" + (x.text || "");
+  return x;
+}
+async function agencyAdd(name, kt) {
+  const k = agencyKey(name); if (!k) return;
+  for (let i = 0; i < 4; i++) {
+    try {
+      let cur = { data: { agencies: {} }, sha: S.agenciesSha };
+      try { cur = await readJson("agencies.json"); } catch (er) { if (er.status !== 404) throw er; }
+      const all = cur.data.agencies || {}, e = all[k] || { name };
+      if (!e.phone && kt.telefon) e.phone = kt.telefon;
+      if (!e.email && kt.mail) e.email = kt.mail;
+      if (!e.note && kt.name) e.note = kt.name;
+      all[k] = e;
+      S.agenciesSha = await writeJson("agencies.json", { agencies: all }, cur.sha, `Adressbuch: ${name} (aus Screenshot)`);
+      S.agencies = all; return;
+    } catch (er) { if (!(er.status === 409 || er.status === 422) || i === 3) return; }
+  }
+}
+$("dBody").addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-shot]"); if (!b || !S.detailKey) return;
+  const k = S.detailKey, act = b.dataset.shot;
+  if (act === "read") { shotsRun(k); return; }
+  if (needPerson()) return;
+  if (act === "drop") {
+    socialOp(`${PEOPLE[S.person]}: Screenshot-Angaben verworfen`, (items) => { const it = items[k]; if (it?.shots) it.shots = { status: "verworfen", by: S.person, at: new Date().toISOString() }; });
+    setTimeout(refreshUs, 50); return;
+  }
+  const box = b.closest(".shotbox"), sh = itemOf(k).shots || {};
+  const angaben = { ...(sh.angaben || {}) }, kontakt = { ...(sh.kontakt || {}) };
+  box.querySelectorAll("[data-shf]").forEach((el) => { const v = el.value.trim(); if (v) angaben[el.dataset.shf] = el.type === "number" ? Number(v) : v; else delete angaben[el.dataset.shf]; });
+  box.querySelectorAll("[data-shk]").forEach((el) => { const v = el.value.trim(); if (v) kontakt[el.dataset.shk] = v; else delete kontakt[el.dataset.shk]; });
+  const keep = new Set([...box.querySelectorAll("[data-shfoto]")].filter((c) => c.checked).map((c) => Number(c.dataset.shfoto)));
+  const fotos = (sh.fotos || []).filter((_, i) => keep.has(i));
+  const ok = { status: "ok", angaben, kontakt, fotos, by: S.person, at: new Date().toISOString() };
+  socialOp(`${PEOPLE[S.person]}: Angaben aus Screenshots übernommen`, (items) => { const it = items[k] || (items[k] = { votes: {}, comments: [] }); it.shots = ok; it.updated = ok.at; });
+  if (kontakt.firma && (kontakt.telefon || kontakt.mail)) agencyAdd(kontakt.firma, kontakt);
+  const x = hitByKey(k); if (x) shotOverlay(x);
+  toast("Übernommen. Wollihood ergänzt den Rest beim nächsten Suchlauf.", "ok");
+  setTimeout(refreshDetail, 80); renderHits();
 });
 // ---------- Wohnung per Link (von Hand, ohne Suchraster) ----------
 // Schlüssel wie im Suchskript (wollihood/sources/manual.py → key_for). Beide Seiten gleich halten!
@@ -2084,7 +2266,9 @@ document.addEventListener("click", (e) => { const b = e.target.closest("[data-wh
 // Name einer Wohnung ohne Strasse: «4-Zimmer-Wohnung, Wollishofen» statt rohem Inseratetitel
 const placeName = (x) => x.street || [x.rooms != null ? `${x.rooms}-Zimmer-Wohnung` : "Wohnung", [x.plz, QUARTER[x.plz] || x.city].filter(Boolean).join(" ")].filter(Boolean).join(", ");
 // Ersatzbilder: eigener Screenshot aus «Bewertung & Notizen», sonst Luftbild von swisstopo (frei nutzbar, © swisstopo)
-const ownPhoto = (k) => (itemOf(k).files || []).find((f) => f.type !== "application/pdf")?.path || null;
+const shotOk = (k) => { const sh = itemOf(k).shots; return sh && sh.status === "ok" ? sh : null; };
+const shotFotos = (k) => (shotOk(k)?.fotos || []).map((f) => f.path).filter(Boolean);
+const ownPhoto = (k) => shotFotos(k)[0] || (itemOf(k).files || []).find((f) => f.type !== "application/pdf")?.path || null;
 function aerialUrl(x) {
   if (x.lat == null || x.lon == null) return null;
   const d = 0.0008, dl = d * 1.48;          // ca. 90 × 120 m, Haus in der Mitte
@@ -2112,7 +2296,9 @@ function hitCard(x, withNext) {
   const l2 = [x.rooms != null ? `${x.rooms} Zi` : "Zimmer ?", x.m2 ? `${x.m2} m²` : "", quarter].filter(Boolean).join(" · ");
   const own = ownPhoto(k), aer = aerialUrl(x);
   // Foto: Inserat → eigener Screenshot → Luftbild (swisstopo); fällt das Inseratefoto aus, springt das Luftbild ein
-  const photo = x.image ? `<img src="${esc(x.image)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="${aer ? `this.onerror=null;this.src='${esc(aer)}'` : "this.remove()"}">`
+  const sf = shotFotos(k)[0];
+  const photo = sf ? `<img data-src="${esc(sf)}" alt="" loading="lazy">`
+    : x.image ? `<img src="${esc(x.image)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="${aer ? `this.onerror=null;this.src='${esc(aer)}'` : "this.remove()"}">`
     : own ? `<img data-src="${esc(own)}" alt="" loading="lazy">`
     : aer ? `<img src="${esc(aer)}" alt="Luftbild" loading="lazy" onerror="this.remove()"><span class="aerlbl">Luftbild</span>` : "";
   const haken = (x.ai?.haken || []).length && x.ai?.passt === false;
@@ -2776,6 +2962,7 @@ async function load() {
   if (hits.status === "fulfilled") { S.hits = hits.value.data; store.set("wh_cache_hits", JSON.stringify(S.hits)); }
   if (health.status === "fulfilled") S.health = health.value.data;
   mergeManual();
+  S.hits.forEach(shotOverlay);
   if (social.status === "fulfilled" && foldTwins(JSON.parse(JSON.stringify(S.social)))) socialOp("Doppel zusammengeführt", foldTwins);
   if (events.status === "fulfilled") S.events = events.value.data;
   if (marks.status === "fulfilled") { S.marks = marks.value.data; S.marksSha = marks.value.sha; }
@@ -2937,7 +3124,7 @@ let installEvt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("installBtn").hidden = false; $("installHint").hidden = true; });
 $("installBtn").addEventListener("click", async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("installBtn").hidden = true; });
 if (window.matchMedia("(display-mode: standalone)").matches) { $("installHint").textContent = "Läuft als App."; }
-const APP_VERSION = "78 · 01.11.2026";
+const APP_VERSION = "79 · 02.11.2026";
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").then((reg) => { reg.update().catch(() => {}); }).catch(() => {});
   let reloaded = false;
