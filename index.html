@@ -1604,8 +1604,8 @@ function renderDetail(x, a, d) {
     : a.online === "online" ? `<div class="onl online">Noch online · gesichert ${esc(ago(a.archived_at))}</div>`
     : `<div class="onl">Gesichert ${esc(ago(a.archived_at))} · Online-Status bei diesem Portal nicht prüfbar</div>`;
   const imgs = (d?.images || []);
-  const sfs = shotFotos(S.detailKey);
-  const gal = sfs.length ? `<div class="gal">${sfs.map((pth, i) => `<figure><img data-src="${esc(pth)}" data-full="${esc(pth)}" alt=""><figcaption>${i + 1}/${sfs.length} · aus Screenshot</figcaption></figure>`).join("")}${imgs.map((im) => `<figure><img data-src="archiv/${esc(a.id)}/${esc(im.file)}" alt=""><figcaption>Inserat</figcaption></figure>`).join("")}</div>`
+  const sfs = shotFotos(S.detailKey), sfm = (shotOk(S.detailKey)?.fotos || []).filter((f) => f.path);
+  const gal = sfs.length ? `<div class="gal">${sfs.map((pth, i) => `<figure><img data-src="${esc(pth)}" data-full="${esc(pth)}" alt=""><figcaption>${i + 1}/${sfs.length} · ${sfm[i]?.muster ? "Musterfoto" : sfm[i]?.art === "grundriss" ? "Grundriss" : "aus Screenshot"}</figcaption></figure>`).join("")}${imgs.map((im) => `<figure><img data-src="archiv/${esc(a.id)}/${esc(im.file)}" alt=""><figcaption>Inserat</figcaption></figure>`).join("")}</div>`
     : imgs.length ? `<div class="gal">${imgs.map((im, i) => `<figure><img data-src="archiv/${esc(a.id)}/${esc(im.file)}" alt="${esc(im.caption || "")}"><figcaption>${i + 1}/${imgs.length}</figcaption></figure>`).join("")}</div>`
     : x.image ? `<div class="gal"><figure><img src="${esc(x.image)}" alt="" referrerpolicy="no-referrer"></figure></div>`
     : ownPhoto(S.detailKey) ? `<div class="gal"><figure><img data-src="${esc(ownPhoto(S.detailKey))}" data-full="${esc(ownPhoto(S.detailKey))}" alt=""><figcaption>Eigener Screenshot</figcaption></figure></div>`
@@ -1769,15 +1769,18 @@ const SHOT_TOOL = { name: "screenshots", description: "Angaben, Kontakt und Foto
     fotos: { type: "array", description: "Wohnungsfotos und Grundrisse in den Screenshots, max. 8", items: { type: "object", properties: {
       bild: { type: "integer", description: "Nummer des Screenshots, 1 = erster" },
       x0: { type: "integer", description: "linker Rand, 0–1000 (Anteil der Bildbreite)" }, y0: { type: "integer", description: "oberer Rand, 0–1000 (Anteil der Bildhöhe)" },
-      x1: { type: "integer" }, y1: { type: "integer" }, art: { type: "string", enum: ["foto", "grundriss"] } },
+      x1: { type: "integer" }, y1: { type: "integer" }, art: { type: "string", enum: ["foto", "grundriss"] },
+      muster: { type: "boolean", description: "true, wenn das Inserat sagt, es seien Muster-/Symbolfotos (z.B. Ausbaustandard)" } },
       required: ["bild", "x0", "y0", "x1", "y1"] } } },
     required: ["angaben"] } };
 const SHOT_PROMPT = `Das sind Screenshots eines Wohnungsinserats (Homegate, Comparis, Flatfox o.ä., meist vom Handy).
 Gib mit dem Werkzeug «screenshots» zurück, was SICHTBAR ist – nichts erfinden, nichts schätzen; Unsichtbares weglassen.
 Fotos: Rahmen jedes echten Wohnungsfotos (Räume, Haus, Aussicht, Balkon) und jedes Grundrisses, so knapp wie möglich am Bildrand,
 ohne Bedienelemente, Text, Statusleiste, Knöpfe. Koordinaten als Anteil 0–1000 der Bildbreite (x) und Bildhöhe (y) des jeweiligen Screenshots.
-Nicht nehmen: Karten, Logos, Profilbilder, Werbung, Symbolbilder/«Musterbild», Fotos, die zu mehr als einem Fünftel abgeschnitten
-oder schmaler als ein Fünftel der Bildbreite sind. Dasselbe Foto nur einmal.`;
+Auch Musterfotos des Ausbaustandards nehmen (dann muster: true) – lieber ein Musterfoto als gar keines.
+Nicht nehmen: Karten, Logos, Profilbilder, Werbung, Fotos, die zu mehr als einem Fünftel abgeschnitten
+oder schmaler als ein Fünftel der Bildbreite sind. Dasselbe Foto (z.B. in einer Bildergalerie mehrfach gescreenshottet) nur einmal.
+Wenn in den Screenshots Fotos sichtbar sind, gib sie IMMER im Feld «fotos» zurück.`;
 S.shotBusy = {};
 function shotsBox(k) {
   const it = itemOf(k), sh = it.shots, x = hitByKey(k) || {};
@@ -1818,7 +1821,7 @@ async function cropUpload(k, file, box, n) {
   await gh(path, { method: "PUT", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ message: "Foto aus Screenshot", content: await blobB64(blob), branch: "main" }) });
   fileCache.set(path, Promise.resolve(URL.createObjectURL(blob)));
-  return { path, art: box.art || "foto", w: c.width, h: c.height };
+  return { path, art: box.art || "foto", muster: !!box.muster, w: c.width, h: c.height };
 }
 async function shotsRun(k, files) {
   if (needPerson() || S.shotBusy[k]) return;
@@ -1827,8 +1830,8 @@ async function shotsRun(k, files) {
   const set = (t) => { S.shotBusy[k] = t; if (S.detailKey === k) refreshUs(); };
   try {
     set("Claude liest die Screenshots …");
-    if (!files) files = await Promise.all((itemOf(k).files || []).filter((f) => f.type !== "application/pdf").slice(-6).map((f) => fileFromRepo(f.path)));
-    files = [...files].filter((f) => (f.type || "").startsWith("image/")).slice(0, 6);
+    if (!files) files = await Promise.all((itemOf(k).files || []).filter((f) => f.type !== "application/pdf").slice(-8).map((f) => fileFromRepo(f.path)));
+    files = [...files].filter((f) => (f.type || "").startsWith("image/")).slice(0, 8);
     const content = [];
     for (const f of files) content.push({ type: "image", source: { type: "base64", media_type: "image/jpeg", data: await blobB64(await shrinkImage(f)) } });
     const x = hitByKey(k) || {};
@@ -2268,7 +2271,8 @@ const placeName = (x) => x.street || [x.rooms != null ? `${x.rooms}-Zimmer-Wohnu
 // Ersatzbilder: eigener Screenshot aus «Bewertung & Notizen», sonst Luftbild von swisstopo (frei nutzbar, © swisstopo)
 const shotOk = (k) => { const sh = itemOf(k).shots; return sh && sh.status === "ok" ? sh : null; };
 const shotFotos = (k) => (shotOk(k)?.fotos || []).map((f) => f.path).filter(Boolean);
-const ownPhoto = (k) => shotFotos(k)[0] || (itemOf(k).files || []).find((f) => f.type !== "application/pdf")?.path || null;
+// Ein ganzer Screenshot (Text, Knöpfe) ist kein Wohnungsfoto: nur solange Claude ihn nicht gelesen hat, als Notlösung
+const ownPhoto = (k) => shotFotos(k)[0] || (itemOf(k).shots?.status === "ok" ? null : (itemOf(k).files || []).find((f) => f.type !== "application/pdf")?.path) || null;
 function aerialUrl(x) {
   if (x.lat == null || x.lon == null) return null;
   const d = 0.0008, dl = d * 1.48;          // ca. 90 × 120 m, Haus in der Mitte
@@ -3124,7 +3128,7 @@ let installEvt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("installBtn").hidden = false; $("installHint").hidden = true; });
 $("installBtn").addEventListener("click", async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("installBtn").hidden = true; });
 if (window.matchMedia("(display-mode: standalone)").matches) { $("installHint").textContent = "Läuft als App."; }
-const APP_VERSION = "79 · 02.11.2026";
+const APP_VERSION = "80 · 02.11.2026";
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").then((reg) => { reg.update().catch(() => {}); }).catch(() => {});
   let reloaded = false;
