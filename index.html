@@ -1477,6 +1477,23 @@ async function repoFile(path) {
   return p;
 }
 // --- Bildbetrachter: gross ansehen, wischen, zoomen -----------------------------------------
+// Dokument aus dem privaten Repo öffnen (3.11.: Bausteine kamen auf Android ohne PDF-Typ und Endung an → nicht lesbar).
+// Blob mit richtigem Typ; auf dem Handy als Datei mit Namen «….pdf» (öffnet im PDF-Viewer), am Computer in neuem Tab.
+const MIME = { pdf: "application/pdf", jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", svg: "image/svg+xml" };
+async function openDoc(path, name) {
+  const ext = (path.split(".").pop() || "").toLowerCase(), type = MIME[ext] || "application/octet-stream";
+  const mobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
+  const win = !mobile ? window.open("", "_blank") : null;      // vor dem Laden öffnen, sonst blockiert der Browser
+  try {
+    const raw = await (await fetch(await repoFile(path))).blob();
+    const url = URL.createObjectURL(new Blob([raw], { type }));
+    if (win) { win.location.href = url; return; }
+    const fn = String(name || path.split("/").pop()).replace(/[\\/:*?"<>|]+/g, " ").trim();
+    const a = document.createElement("a"); a.href = url; a.download = fn.toLowerCase().endsWith("." + ext) ? fn : `${fn}.${ext}`;
+    document.body.appendChild(a); a.click(); a.remove();
+    toast(`«${a.download}» geladen.`, "ok");
+  } catch (e) { if (win) win.close(); toast("Dokument nicht ladbar.", "err"); }
+}
 const V = { imgs: [], idx: 0, open: false };
 function openViewer(img) {
   const box = img.closest(".gal, .ownfiles");
@@ -2156,7 +2173,7 @@ $("dBody").addEventListener("click", async (e) => {
   const zimg = e.target.closest(".gal img, .ownfiles img");
   if (zimg && zimg.src) { openViewer(zimg); return; }
   const doc = e.target.closest("[data-doc]");
-  if (doc) { e.preventDefault(); try { window.open(await repoFile(doc.dataset.doc), "_blank"); } catch { toast("Dokument nicht ladbar.", "err"); } return; }
+  if (doc) { e.preventDefault(); openDoc(doc.dataset.doc, doc.textContent.replace(/^📄\s*/, "")); return; }
   const sv = e.target.closest("#agSave");
   if (sv) {
     const name = sv.dataset.ag, k = agencyKey(name);
@@ -3128,7 +3145,7 @@ let installEvt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("installBtn").hidden = false; $("installHint").hidden = true; });
 $("installBtn").addEventListener("click", async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("installBtn").hidden = true; });
 if (window.matchMedia("(display-mode: standalone)").matches) { $("installHint").textContent = "Läuft als App."; }
-const APP_VERSION = "80 · 02.11.2026";
+const APP_VERSION = "81 · 03.11.2026";
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").then((reg) => { reg.update().catch(() => {}); }).catch(() => {});
   let reloaded = false;
@@ -3341,7 +3358,7 @@ $("bBody").addEventListener("click", async (e) => {
   if (e.target.id === "bPdf") return bewPdf();
   if (e.target.id === "bUndo") { bewUndo(); return; }
   const dl = e.target.closest("[data-doc]");
-  if (dl) { e.preventDefault(); try { window.open(await repoFile(dl.dataset.doc), "_blank"); } catch { toast("Dokument nicht ladbar.", "err"); } return; }
+  if (dl) { e.preventDefault(); openDoc(dl.dataset.doc, dl.textContent.replace(/^📄\s*/, "")); return; }
   const tip = e.target.closest("[data-stelle]"); if (tip) { bewShow(tip.dataset.stelle); return; }
   const ki = e.target.closest("[data-ki]"); if (ki) bewKi(ki.dataset.ki);
 });
@@ -4124,7 +4141,7 @@ async function baustRender() {
       return `<div class="drow"><label><input type="checkbox" data-bstd="${esc(b.id)}"${b.standard ? " checked" : ""}><span>${esc(b.titel)}
         <small class="${a?.alt ? "old" : a?.bald ? "soon" : ""}">${b.datum ? esc(dmyL(b.datum)) : "ohne Datum"}${a ? (a.alt ? " · zu alt" : " · gültig bis " + esc(a.bis.toLocaleDateString("de-CH"))) : ""}</small></span></label>
         ${mvBtns("data-bmv", b.id, idx === 0, idx === vis.length - 1)}<details class="dmenu"><summary aria-label="Aktionen für ${esc(b.titel)}">⋯</summary><div class="dmenu-list">
-        <button type="button" data-bview="${esc(b.datei)}">Ansehen</button>
+        <button type="button" data-bview="${esc(b.datei)}" data-bname="${esc(b.titel)}">Ansehen</button>
         <label>Ersetzen<input type="file" accept="application/pdf,image/*" data-brep="${esc(b.id)}" hidden></label>
         <button type="button" class="bad" data-bremove="${esc(b.id)}">Löschen</button></div></details></div>`;
     }).join("") + '<p class="hint">Häkchen = standardmässig im Dossier. ↑↓ = Reihenfolge im Dossier (Anschreiben und Personalien stehen vorne; im Bewerbungs-Editor lässt sich alles verschieben).</p>';
@@ -4177,7 +4194,7 @@ $("baustList").addEventListener("click", async (e) => {
     return;
   }
   const v = e.target.closest("[data-bview]");
-  if (v) { try { window.open(await repoFile("dossier/" + v.dataset.bview), "_blank"); } catch { toast("Nicht ladbar.", "err"); } return; }
+  if (v) { openDoc("dossier/" + v.dataset.bview, v.dataset.bname || ""); return; }
   const del = e.target.closest("[data-bremove]");
   if (del && confirm("Diesen Baustein aus dem Dossier entfernen?")) {
     try { await baustWrite((L) => { const i = L.findIndex((x) => x.id === del.dataset.bremove); if (i >= 0) L.splice(i, 1); }, "Baustein entfernt"); toast("Entfernt.", "ok"); }
