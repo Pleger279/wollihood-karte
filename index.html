@@ -3059,16 +3059,25 @@ async function renderPush() {
   $("wpState").textContent = sub ? "Aktiv. Neue Treffer kommen direkt als Mitteilung auf dieses Gerät." : "Noch nicht aktiv. Nach dem Aktivieren brauchst du ntfy nicht mehr.";
   $("wpOn").hidden = !!sub; $("wpTest").hidden = !sub; $("wpOff").hidden = !sub;
 }
+// Beim Öffnen: Gerät der richtigen Person zuordnen und – falls der Push-Dienst es abgemeldet hat (8.11.: Pascals Gerät
+// fiel still aus der Liste, vier Tage kein Push) – von selbst wieder anmelden, sofern Mitteilungen erlaubt sind.
 async function syncDevicePerson() {
   try {
-    if (!S.person) return;
-    const sub = await currentSub(); if (!sub) return;
+    if (!("Notification" in window) || Notification.permission !== "granted") return;
+    let sub = await currentSub();
     const { data, sha } = await readSubs();
-    const d = data.devices.find((x) => (x.subscription || x).endpoint === sub.endpoint);
-    if (!d || d.person === S.person) return;
+    const d = sub && data.devices.find((x) => (x.subscription || x).endpoint === sub.endpoint);
+    if (!d) {
+      if (!sub) sub = await (await navigator.serviceWorker.ready).pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlB64ToBytes(VAPID_PUBLIC) });
+      await saveDevice(sub, "Push-Gerät wieder angemeldet");
+      toast("Push war abgemeldet – dieses Gerät ist wieder angemeldet.", "ok", 6000);
+      S.pushInFile = true; return;
+    }
+    S.pushInFile = true;
+    if (!S.person || d.person === S.person) return;
     d.person = S.person;
     await writeJson(SUBS_PATH, { ...data, updated: new Date().toISOString() }, sha, "Gerät zugeordnet");
-  } catch {}
+  } catch (e) { console.warn("Push-Abgleich", e); }
 }
 async function saveDevice(sub, message) {
   const { data, sha } = await readSubs();
@@ -3145,7 +3154,7 @@ let installEvt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("installBtn").hidden = false; $("installHint").hidden = true; });
 $("installBtn").addEventListener("click", async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("installBtn").hidden = true; });
 if (window.matchMedia("(display-mode: standalone)").matches) { $("installHint").textContent = "Läuft als App."; }
-const APP_VERSION = "81 · 03.11.2026";
+const APP_VERSION = "82 · 12.11.2026";
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").then((reg) => { reg.update().catch(() => {}); }).catch(() => {});
   let reloaded = false;
