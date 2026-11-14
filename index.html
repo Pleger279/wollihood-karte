@@ -664,6 +664,11 @@ label.f small, div.f small { color: var(--muted); font: 500 12.5px var(--body) }
 .shotfoto input{position:absolute;top:6px;left:6px;width:18px;height:18px;margin:0}
 .shotfoto:has(input:not(:checked)) img{opacity:.3;filter:grayscale(1)}
 .shotline{margin:0}
+.fotorow{display:grid;grid-template-columns:88px minmax(0,1fr);gap:12px;align-items:center}
+.fotoprev{width:88px;height:88px;border-radius:50%;object-fit:cover;background:var(--sunk)}
+.fotoedit{display:grid;justify-items:center}
+.fotoedit canvas{width:min(100%,300px);aspect-ratio:1;touch-action:none;border-radius:12px;background:var(--sunk);cursor:grab}
+.tip.ok{color:var(--ok)} .tip.warn{color:var(--bad)}
 /* Rückmeldung an Knöpfen (v84) */
 button, .btn, .linkbtn, label[for] { transition: transform .12s ease, opacity .12s }
 .tap { transform: scale(.95) }
@@ -3271,7 +3276,7 @@ let installEvt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("installBtn").hidden = false; $("installHint").hidden = true; });
 $("installBtn").addEventListener("click", async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("installBtn").hidden = true; });
 if (window.matchMedia("(display-mode: standalone)").matches) { $("installHint").textContent = "Läuft als App."; }
-const APP_VERSION = "84 · 14.11.2026";
+const APP_VERSION = "85 · 14.11.2026";
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").then((reg) => { reg.update().catch(() => {}); }).catch(() => {});
   let reloaded = false;
@@ -3377,6 +3382,7 @@ function renderBew() {
     </div>
     </section>
     <section data-bsec="unterlagen"${st === "unterlagen" ? "" : " hidden"}>
+    <div class="panel" id="bFoto"><h2>Foto im Anschreiben</h2><div id="bFotoBody"></div></div>
     <div class="panel" id="bDossier"><h2>Dossier</h2>
       <details class="dosdet" id="bDossierDet"><summary id="bDossierSum">Dokumente</summary>
         <p class="hint">Häkchen = kommt ins Dossier. ⬇ lädt ein Dokument einzeln herunter (für Plattformen mit Einzel-Upload).</p>
@@ -3403,7 +3409,7 @@ function renderBew() {
     </section>
     <div class="bewfoot"><span class="hint warnline" id="bDirty" hidden>Nicht gespeichert</span><button type="button" class="btn sm" id="bSave">Gespeichert</button>
       ${st !== "senden" ? `<button type="button" class="btn sm primary" data-bstep="${st === "text" ? "unterlagen" : "senden"}">Weiter: ${st === "text" ? "Unterlagen" : "Senden"} ›</button>` : ""}</div>`;
-  bewTips(); bewCount(); renderDossier(); renderStamm(); renderForm(); renderCopy(); bewMark(); dossierSum();
+  bewTips(); bewCount(); renderDossier(); renderStamm(); renderForm(); renderCopy(); bewMark(); dossierSum(); FOTO.img = null; fotoRender();
 }
 // Zusammenfassung des Dossiers: «11 Dokumente · alles gültig»
 function dossierSum() {
@@ -3954,6 +3960,149 @@ async function bewPdf() {
   finally { btn.disabled = false; btn.textContent = "PDF erstellen"; }
 }
 
+// --- Foto im Anschreiben (v85, Pascal 14.11.: «wir machen gerne ein Foto vor dem Haus») ---
+// Eigenes Foto pro Wohnung (oder als Standard für alle): Claude prüft es (Personen, Köpfe, Schärfe, Licht, Haus) und schlägt
+// den Ausschnitt vor; im Browser verschieben/zoomen; gespeichert als runder PNG-Ausschnitt `bewerbung/foto.png`
+// (+ Original foto-original.jpg), im PDF genau über das Kreisfoto der Vorlage gelegt.
+const FOTO_CX = 136.875, FOTO_CY = 850.08 - 147.375, FOTO_R = 110.875 + 1.2;
+const FOTO_TOOL = { name: "foto", description: "Prüfung eines Fotos für den runden Bildausschnitt im Bewerbungsschreiben.",
+  input_schema: { type: "object", required: ["koepfe", "ausschnitt", "tauglich"], properties: {
+    koepfe: { type: "array", description: "Rahmen um jeden Kopf (inkl. Haare) aller Personen, 0–1000 relativ zu Bildbreite (x) und -höhe (y)",
+      items: { type: "object", required: ["x0", "y0", "x1", "y1"], properties: { x0: { type: "integer" }, y0: { type: "integer" }, x1: { type: "integer" }, y1: { type: "integer" } } } },
+    ausschnitt: { type: "object", required: ["mitte_x", "mitte_y", "seite"], description: "Quadrat, in dem der Kreis liegt",
+      properties: { mitte_x: { type: "integer", description: "0–1000 der Bildbreite" }, mitte_y: { type: "integer", description: "0–1000 der Bildhöhe" },
+        seite: { type: "integer", description: "Seitenlänge als 0–1000 der kürzeren Bildseite" } } },
+    tauglich: { type: "boolean", description: "Eignet sich das Foto für eine Bewerbung?" },
+    hinweise: { type: "array", items: { type: "string" }, description: "höchstens 3 kurze, konkrete Hinweise (z.B. «Lio verdeckt halb Leonies Gesicht», «etwas dunkel»); leer, wenn alles gut" } } } };
+const FOTO_PROMPT = `Dieses Foto von Leonie, Pascal und Lio soll oben links ins Bewerbungsschreiben, als runder Ausschnitt (Kreis, ca. 8 cm).
+Prüfe es kritisch, wie eine Verwaltung es sehen würde: alle Personen gut erkennbar, Gesichter nicht verdeckt oder angeschnitten,
+scharf, genug Licht, freundlich, nichts Störendes. Ist ein Haus/eine Fassade im Hintergrund, soll man es im Kreis noch erkennen.
+Gib die Köpfe aller Personen als Rahmen zurück und schlage den Ausschnitt vor: ein Quadrat, dessen Innenkreis alle Köpfe
+vollständig mit etwas Luft enthält (auch die Schultern), Köpfe eher in der oberen Hälfte, Personen füllen etwa 60–75 % der Breite,
+sonst so viel Haus wie möglich. Nichts beschönigen, aber auch nichts erfinden.
+Hinweise auf Deutsch in Schweizer Schreibweise (ss statt ß), je ein kurzer Satz, nur was wirklich zählt.`;
+const FOTO = { img: null, w: 0, h: 0, crop: null, res: null, file: null, busy: false };
+function fotoRender() {
+  const box = $("bFotoBody"); if (!box) return;
+  if (FOTO.img) {            // Bearbeiten
+    const r = FOTO.res || {};
+    box.innerHTML = `<p class="hint">Verschieben mit dem Finger, Grösse mit dem Regler. Der Kreis ist genau, was ins Schreiben kommt.</p>
+      <div class="fotoedit"><canvas id="fCanvas" width="560" height="560"></canvas></div>
+      <label class="f"><small>Grösse</small><input type="range" id="fZoom" min="0.2" max="1" step="0.005"></label>
+      <div id="fCheck">${r.hinweise ? `${r.tauglich === false ? `<div class="tip warn">Claude: eher nicht geeignet.</div>` : ""}${(r.hinweise || []).map((h) => `<div class="tip">${esc(h)}</div>`).join("") || `<div class="tip ok">✦ Claude: Foto passt gut.</div>`}` : FOTO.busy ? `<p class="hint">✦ Claude prüft das Foto und sucht den besten Ausschnitt …</p>` : ""}</div>
+      <label class="chk"><input type="checkbox" id="fStd"> Als Standard für alle Bewerbungen</label>
+      <div class="kbar"><button type="button" class="btn sm" id="fCancel">Abbrechen</button><button type="button" class="btn sm" id="fAuto">✦ Ausschnitt von Claude</button><button type="button" class="btn primary" id="fSave">Foto übernehmen</button></div>`;
+    $("fZoom").value = FOTO.crop.s / Math.min(FOTO.w, FOTO.h);
+    fotoDraw(); fotoBind(); return;
+  }
+  const own = BEW.doc.foto?.path, std = BEW.ctx.vorlage?.foto;
+  box.innerHTML = `<div class="fotorow"><img class="fotoprev" data-src="${esc(own || std || "dossier/vorlage/foto-standard-vorschau.png")}" alt="">
+    <div><p class="hint">${own ? "Eigenes Foto für diese Wohnung." : std ? "Euer Standard-Foto." : "Standard: Familienfoto der Vorlage."}</p>
+    <div class="kbar"><label class="btn sm" for="fFile">${own ? "Anderes Foto" : "Eigenes Foto wählen"}</label><input type="file" id="fFile" accept="image/*" hidden>
+    ${own ? `<button type="button" class="btn sm" id="fEdit">Ausschnitt ändern</button><button type="button" class="linkbtn" id="fStdUse">Standard verwenden</button>` : ""}</div></div></div>`;
+  box.querySelectorAll("img[data-src]").forEach(async (im) => { try { im.src = await repoFile(im.dataset.src); } catch { } });
+}
+function fotoDraw() {
+  const c = $("fCanvas"); if (!c || !FOTO.img) return;
+  const g = c.getContext("2d"), N = c.width, { x, y, s } = FOTO.crop;
+  g.clearRect(0, 0, N, N);
+  g.drawImage(FOTO.img, x, y, s, s, 0, 0, N, N);
+  g.save(); g.fillStyle = "rgba(245,245,243,.82)"; g.beginPath(); g.rect(0, 0, N, N); g.arc(N / 2, N / 2, N / 2 - 2, 0, Math.PI * 2, true); g.fill("evenodd"); g.restore();
+  g.strokeStyle = "rgba(0,104,170,.9)"; g.lineWidth = 3; g.beginPath(); g.arc(N / 2, N / 2, N / 2 - 2, 0, Math.PI * 2); g.stroke();
+}
+function fotoClamp() {
+  const c = FOTO.crop, m = Math.min(FOTO.w, FOTO.h);
+  c.s = Math.max(m * 0.2, Math.min(m, c.s)); c.x = Math.max(0, Math.min(FOTO.w - c.s, c.x)); c.y = Math.max(0, Math.min(FOTO.h - c.s, c.y));
+}
+// Claude-Vorschlag übernehmen und absichern: Innenkreis muss alle Köpfe (mit Rand) enthalten
+function fotoFromClaude(res) {
+  const W = FOTO.w, H = FOTO.h, m = Math.min(W, H), a = res.ausschnitt || {};
+  const heads = (res.koepfe || []).map((k) => ({ x0: k.x0 * W / 1000, x1: k.x1 * W / 1000, y0: k.y0 * H / 1000, y1: k.y1 * H / 1000 }));
+  let cx = (a.mitte_x ?? 500) * W / 1000, cy = (a.mitte_y ?? 500) * H / 1000, s = (a.seite ?? 800) * m / 1000;
+  for (let i = 0; i < 40 && heads.length; i++) {
+    const r = s / 2;
+    // Köpfe sind rund: Punkte auf der Ellipse im Kopf-Rahmen müssen im Kreis liegen (mit 5 % Rand)
+    const out = heads.some((h) => [0, 1, 2, 3, 4, 5, 6, 7].some((i) => { const t = i * Math.PI / 4;
+      const px = (h.x0 + h.x1) / 2 + Math.cos(t) * (h.x1 - h.x0) / 2, py = (h.y0 + h.y1) / 2 + Math.sin(t) * (h.y1 - h.y0) / 2;
+      return Math.hypot(px - cx, py - cy) > r * 0.95; }));
+    if (!out) break;
+    const hx = (Math.min(...heads.map((h) => h.x0)) + Math.max(...heads.map((h) => h.x1))) / 2, hy = (Math.min(...heads.map((h) => h.y0)) + Math.max(...heads.map((h) => h.y1))) / 2;
+    cx += (hx - cx) * 0.25; cy += (hy - cy) * 0.25; s = Math.min(m, s * 1.04);
+  }
+  FOTO.crop = { x: cx - s / 2, y: cy - s / 2, s }; fotoClamp();
+}
+function fotoBind() {
+  const c = $("fCanvas"); let drag = null;
+  c.onpointerdown = (e) => { drag = { px: e.clientX, py: e.clientY, x: FOTO.crop.x, y: FOTO.crop.y }; c.setPointerCapture(e.pointerId); };
+  c.onpointermove = (e) => { if (!drag) return; const k = FOTO.crop.s / c.getBoundingClientRect().width;
+    FOTO.crop.x = drag.x - (e.clientX - drag.px) * k; FOTO.crop.y = drag.y - (e.clientY - drag.py) * k; fotoClamp(); fotoDraw(); };
+  c.onpointerup = c.onpointercancel = () => (drag = null);
+  $("fZoom").oninput = (e) => { const c0 = FOTO.crop, mid = [c0.x + c0.s / 2, c0.y + c0.s / 2];
+    c0.s = +e.target.value * Math.min(FOTO.w, FOTO.h); c0.x = mid[0] - c0.s / 2; c0.y = mid[1] - c0.s / 2; fotoClamp(); fotoDraw(); };
+}
+async function fotoOpen(file) {
+  const blob = await shrinkImage(file);            // gleiche Pixel für Claude und Ausschnitt
+  const bmp = await createImageBitmap(blob);
+  Object.assign(FOTO, { img: bmp, w: bmp.width, h: bmp.height, file: blob, res: null });
+  const m = Math.min(bmp.width, bmp.height); FOTO.crop = { x: (bmp.width - m * 0.8) / 2, y: (bmp.height - m * 0.8) / 2, s: m * 0.8 };
+  fotoRender(); await fotoCheck();
+}
+async function fotoCheck() {
+  if (!BEW.ctx.key) { FOTO.res = { hinweise: ["Kein Claude-Schlüssel – Ausschnitt bitte von Hand wählen."] }; fotoRender(); return; }
+  FOTO.busy = true; FOTO.res = null; fotoRender();
+  try {
+    const res = await claudeTool("Du prüfst Fotos für Wohnungsbewerbungen. Antworte nur über das Werkzeug «foto».",
+      [{ type: "image", source: { type: "base64", media_type: "image/jpeg", data: await blobB64(FOTO.file) } }, { type: "text", text: FOTO_PROMPT }], FOTO_TOOL, "ausschnitt");
+    FOTO.res = res; fotoFromClaude(res);
+    const n = (res.hinweise || []).length;
+    toast(res.tauglich === false ? "Claude: eher nicht geeignet" : n ? `Geprüft – ${n} Hinweis${n > 1 ? "e" : ""}` : "Foto passt gut", res.tauglich === false ? "err" : "ok");
+  } catch (e) { FOTO.res = { hinweise: ["Claude konnte das Foto nicht prüfen: " + e.message] }; toast("Claude: " + e.message, "err"); }
+  finally { FOTO.busy = false; fotoRender(); }
+}
+async function fotoPng() {
+  const N = 900, c = document.createElement("canvas"); c.width = c.height = N; const g = c.getContext("2d");
+  g.beginPath(); g.arc(N / 2, N / 2, N / 2, 0, Math.PI * 2); g.clip();
+  const { x, y, s } = FOTO.crop; g.drawImage(FOTO.img, x, y, s, s, 0, 0, N, N);
+  return await new Promise((r) => c.toBlob(r, "image/png"));
+}
+async function putFile(path, blob, message) {
+  let sha; try { sha = (await gh(path)).sha; } catch { }
+  await gh(path, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message, content: await blobB64(blob), branch: "main", ...(sha ? { sha } : {}) }) });
+  fileCache.delete(path);
+}
+async function fotoSave() {
+  if (needPerson()) return;
+  const png = await fotoPng(), std = $("fStd")?.checked;
+  const path = bewPath("foto.png"), orig = bewPath("foto-original.jpg");
+  await putFile(path, png, `Bewerbungsfoto: ${BEW.x.street || BEW.k}`);
+  await putFile(orig, FOTO.file, "Bewerbungsfoto (Original)");
+  BEW.doc.foto = { path, orig, crop: { ...FOTO.crop, w: FOTO.w, h: FOTO.h }, hinweise: FOTO.res?.hinweise || [], by: S.person, at: new Date().toISOString() };
+  if (std) {
+    await putFile("dossier/vorlage/foto-standard.png", png, "Standard-Bewerbungsfoto");
+    try { const r = await readJson("dossier/vorlage/anschreiben.json"); r.data.foto = "dossier/vorlage/foto-standard.png";
+      await writeJson("dossier/vorlage/anschreiben.json", r.data, r.sha, "Standard-Bewerbungsfoto"); BEW.ctx.vorlage = r.data; } catch (e) { toast("Standard nicht gespeichert: " + e.message, "err"); }
+  }
+  await bewSave(true);
+  FOTO.img = null; fotoRender();
+  toast(std ? "Foto übernommen – auch als Standard." : "Foto übernommen. Es kommt ins nächste PDF.", "ok");
+}
+$("bBody").addEventListener("change", async (e) => {
+  if (e.target.id !== "fFile" || !e.target.files[0]) return;
+  try { await fotoOpen(e.target.files[0]); } catch (er) { toast("Foto nicht lesbar: " + er.message, "err"); }
+});
+$("bBody").addEventListener("click", async (e) => {
+  const id = e.target.id;
+  if (id === "fCancel") { FOTO.img = null; fotoRender(); }
+  if (id === "fAuto" && FOTO.res?.ausschnitt) { fotoFromClaude(FOTO.res); fotoRender(); }
+  if (id === "fSave") { e.target.disabled = true; try { await fotoSave(); } catch (er) { toast("Nicht gespeichert: " + er.message, "err"); } finally { if (e.target.isConnected) e.target.disabled = false; } }
+  if (id === "fStdUse") { delete BEW.doc.foto; await bewSave(true); fotoRender(); toast("Standard-Foto wird verwendet.", "ok"); }
+  if (id === "fEdit" && BEW.doc.foto?.orig) {
+    try { const b = await (await fetch(await repoFile(BEW.doc.foto.orig))).blob(); const bmp = await createImageBitmap(b);
+      Object.assign(FOTO, { img: bmp, w: bmp.width, h: bmp.height, file: b, res: { hinweise: BEW.doc.foto.hinweise || [] } });
+      const c = BEW.doc.foto.crop || {}; FOTO.crop = { x: c.x || 0, y: c.y || 0, s: c.s || Math.min(bmp.width, bmp.height) }; fotoClamp(); fotoRender(); }
+    catch (er) { toast("Original nicht ladbar: " + er.message, "err"); }
+  }
+});
 // --- PDF-Grundlagen: Vorlage, Schriften, Unterschriften (einmal laden) ---
 async function pdfAssets() {
   if (BEW.assets) return BEW.assets;
@@ -3992,6 +4141,12 @@ async function anschreibenBytes(ask = true) {
     for (const s of l.segs) { pg.drawText(s.t, { x, y: LAY.base - l.top, size: LAY.size, font: s.mark ? F.I : F.R, color: pcol(s.mark ? LAY.mark : LAY.ink) }); x += s.w; }
   }
   kontaktBlock(pg, F);
+  const fotoPath = BEW.doc.foto?.path || BEW.ctx.vorlage?.foto;
+  if (fotoPath) {             // eigenes Kreisfoto genau über das Foto der Vorlage (Mitte 136.9/702.7, r 110.9 + Rand)
+    try { const img = await pdf.embedPng(await repoBytes(fotoPath)); const r = FOTO_R;
+      pg.drawImage(img, { x: FOTO_CX - r, y: FOTO_CY - r, width: 2 * r, height: 2 * r }); }
+    catch (e) { console.warn("Foto", e); }
+  }
   pdf.setTitle("Wohnungsbewerbung " + BEW.doc.adresse); pdf.setAuthor("Leonie Meier, Pascal Stadelmann");
   return pdf.save();
 }
