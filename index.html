@@ -664,6 +664,19 @@ label.f small, div.f small { color: var(--muted); font: 500 12.5px var(--body) }
 .shotfoto input{position:absolute;top:6px;left:6px;width:18px;height:18px;margin:0}
 .shotfoto:has(input:not(:checked)) img{opacity:.3;filter:grayscale(1)}
 .shotline{margin:0}
+/* Rückmeldung an Knöpfen (v84) */
+button, .btn, .linkbtn, label[for] { transition: transform .12s ease, opacity .12s }
+.tap { transform: scale(.95) }
+.busy, .done, .fail { position: relative; pointer-events: none }
+.busy::after, .done::after, .fail::after { content: attr(data-busy); position: absolute; inset: 0; display: flex; align-items: center;
+  justify-content: center; padding: 0 8px; border-radius: inherit; font: 600 13px/1.1 var(--body); white-space: nowrap; overflow: hidden;
+  background: var(--accent-soft); color: var(--accent); box-shadow: inset 0 0 0 1.5px var(--accent) }
+.busy::after { animation: actpulse 1.2s ease-in-out infinite }
+.done::after { background: var(--ok-soft); color: var(--ok); box-shadow: inset 0 0 0 1.5px var(--ok) }
+.fail::after { background: #FDECEB; color: var(--bad); box-shadow: inset 0 0 0 1.5px var(--bad) }
+@keyframes actpulse { 50% { opacity: .65 } }
+.flash { animation: actflash 1.6s ease-out }
+@keyframes actflash { 0% { box-shadow: 0 0 0 3px var(--accent) } 100% { box-shadow: 0 0 0 0 transparent } }
 .shotgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
 .shotgrid .f small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
 </style>
@@ -981,6 +994,82 @@ function ago(iso) {
 let toastTimer;
 // Über offenen Fenstern (Details, Bewerbung) schwebt die Meldung, sonst sitzt sie in der Speicherleiste.
 const sheetOpen = () => [...document.querySelectorAll(".sheet")].some((s) => !s.hidden);
+// ---------- Rückmeldung an Knöpfen (v84, Pascal 14.11.: «ich weiss nie, ob jetzt wirklich was passiert») ----------
+// Jeder Knopf: beim Antippen kurz eingedrückt. Startet er innert 2.5 s eine Anfrage (GitHub, Claude), zeigt er selbst
+// «läuft … 3 s» bzw. «Claude arbeitet … 12 s», ist so lange gesperrt und danach «✓ …» oder «✕ …» (aus der Meldung).
+// Läuft über einen fetch-Umschlag – neue Knöpfe bekommen das ohne eigenen Code. Knöpfe, die beim Neuzeichnen ersetzt
+// werden, findet es über id bzw. data-Attribut wieder.
+const ACT = { el: null, sel: "", at: 0, n: 0, t0: 0, tick: null, end: null, ki: false, err: null, ok: null, running: false };
+function actSel(b) {
+  if (b.id) return "#" + CSS.escape(b.id);
+  if (b.htmlFor) return `label[for="${CSS.escape(b.htmlFor)}"]`;
+  const card = b.closest("[data-key]"), pre = card && card !== b ? `[data-key="${CSS.escape(card.dataset.key)}"] ` : "";
+  for (const a of b.attributes) if (a.name.startsWith("data-") && a.name !== "data-busy") return `${pre}${b.tagName.toLowerCase()}[${a.name}="${CSS.escape(a.value)}"]`;
+  return "";
+}
+function actEl() { if (ACT.el && ACT.el.isConnected) return ACT.el; const e = ACT.sel && document.querySelector(ACT.sel); if (e) ACT.el = e; return e || null; }
+function actArm(b) {
+  if (ACT.running) return;
+  ACT.el = b; ACT.sel = actSel(b); ACT.at = Date.now(); ACT.err = null; ACT.ok = null; ACT.ki = false;
+}
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("button, .btn, .linkbtn, label[for]"); if (!b || b.disabled) return;
+  b.classList.add("tap"); setTimeout(() => b.classList.remove("tap"), 170);
+  // Tabs, Filter, Sortierung schalten nur um – keine Lauf-Anzeige (sonst würde ein Hintergrund-Laden dort erscheinen)
+  if (!b.closest(".toast, .seg, .stabs, .tabbar, [data-filter], [data-sort], [data-tab], [data-stab], [data-bstep]")) actArm(b);
+}, true);
+document.addEventListener("change", (e) => {
+  const t = e.target; if (t.type !== "file" || !t.id) return;
+  const l = document.querySelector(`label[for="${CSS.escape(t.id)}"]`); if (l) actArm(l);
+}, true);
+function actPaint() {
+  const el = actEl(); if (!el) return;
+  const s = Math.round((Date.now() - ACT.t0) / 1000), small = el.offsetWidth < 96;
+  el.classList.add("busy"); el.classList.remove("done", "fail");
+  el.setAttribute("data-busy", small ? (ACT.ki ? `✦ ${s} s` : s >= 1 ? `${s} s` : "…") : ACT.ki ? `Claude arbeitet … ${s} s` : s >= 2 ? `läuft … ${s} s` : "läuft …");
+}
+function actBegin(url) {
+  if (!ACT.running && (!ACT.el || Date.now() - ACT.at > 2500)) return false;
+  clearTimeout(ACT.end); ACT.n++;
+  if (/api\.anthropic\.com/.test(url)) ACT.ki = true;
+  if (!ACT.running) { ACT.running = true; ACT.t0 = Date.now(); actPaint(); clearInterval(ACT.tick); ACT.tick = setInterval(actPaint, 1000); }
+  else if (ACT.ki) actPaint();
+  return true;
+}
+function actShow(el, ok, text) {
+  if (!el) return;
+  el.classList.remove("busy"); el.classList.add(ok ? "done" : "fail");
+  el.setAttribute("data-busy", el.offsetWidth < 96 ? (ok ? "✓" : "✕") : (ok ? "✓ " : "✕ ") + text);
+  setTimeout(() => { el.classList.remove("done", "fail"); el.removeAttribute("data-busy"); }, ok ? 2500 : 6000);
+}
+function actFinish(tok) {
+  if (!tok) return;
+  ACT.n = Math.max(0, ACT.n - 1); if (ACT.n) return;
+  clearTimeout(ACT.end);
+  ACT.end = setTimeout(() => {                 // kurz warten: oft folgt gleich die nächste Anfrage
+    if (ACT.n) return;
+    clearInterval(ACT.tick); ACT.running = false;
+    actShow(actEl(), !ACT.err, ACT.err || ACT.ok || "fertig");
+    ACT.el = null; ACT.sel = ""; ACT.err = null; ACT.ok = null; ACT.ki = false;
+  }, 600);
+}
+const actShort = (t) => { t = String(t || "").replace(/\s+/g, " ").trim(); const m = t.match(/^[^.!?–:]{3,34}/); return (m ? m[0] : t.slice(0, 34)).trim(); };
+// Meldungen landen auch am Knopf; eine Meldung ohne Anfrage (z.B. «Bitte zuerst …») zeigt der Knopf sofort
+function actToast(text, cls) {
+  if (cls !== "err" && cls !== "ok") return;
+  if (ACT.running) { if (cls === "err") ACT.err = actShort(text); else ACT.ok = actShort(text); return; }
+  if (ACT.el && Date.now() - ACT.at < 2500) { actShow(actEl(), cls === "ok", actShort(text)); ACT.el = null; ACT.sel = ""; }
+}
+{
+  const _fetch = window.fetch.bind(window);
+  window.fetch = async (input, init) => {
+    const url = typeof input === "string" ? input : input?.url || "";
+    const tok = actBegin(url);
+    try { return await _fetch(input, init); }
+    catch (e) { if (tok && !ACT.err) ACT.err = "keine Verbindung"; throw e; }
+    finally { actFinish(tok); }
+  };
+}
 function toastAction(text, label, fn, ms = 6000) {
   const t = $("toast"); t.className = "toast act" + (sheetOpen() ? " float" : ""); t.hidden = false;
   t.innerHTML = `<span>${esc(text)}</span><button type="button" class="tbtn">${esc(label)}</button>`;
@@ -988,6 +1077,7 @@ function toastAction(text, label, fn, ms = 6000) {
   clearTimeout(toastTimer); toastTimer = setTimeout(() => (t.hidden = true), ms);
 }
 function toast(text, cls = "", ms = 4000) {
+  actToast(text, cls);
   const t = $("toast"); t.textContent = text; t.className = "toast " + cls + (sheetOpen() ? " float" : ""); t.hidden = false;
   clearTimeout(toastTimer); if (ms) toastTimer = setTimeout(() => (t.hidden = true), ms);
 }
@@ -1310,7 +1400,7 @@ function standPanel(k) {
       <textarea class="field" id="kText" rows="7" spellcheck="true" lang="de-CH" placeholder="Lade …"></textarea>
       <div class="kbar"><button type="button" class="btn sm" id="kCopy">Kopieren</button><button type="button" class="btn sm" id="kSave" disabled>Gespeichert</button><span class="hint" id="kState"></span></div>
       ${kmtBlock("kontakt")}
-      <button type="button" class="btn ki" id="kKi">✦ Neu schreiben lassen</button>
+      <div class="kbar"><button type="button" class="btn ki" id="kKi">✦ Entwurf schreiben</button><button type="button" class="btn sm" id="kCheck">Prüfen</button></div>
       <div id="kTips"></div><div id="kLearn"></div>
       ${steps.kontakt ? doneLine("kontakt", "Angefragt") : `<button type="button" class="btn" data-step="kontakt">Als angefragt markieren</button>`}`;
   if (tab === "besichtigung") {
@@ -1350,9 +1440,15 @@ async function kontaktLoad(k) {
     try { const r = await readJson(`archiv/${aid}/bewerbung/kontakt.json`); KON.data = r.data; KON.sha = r.sha; } catch { } }
   if (S.detailKey !== k || !$("kText")) return;
   kmtLoad(k);
-  $("kText").value = KON.data?.text || ""; $("kText").placeholder = "Eure Nachricht …"; saveBtnState();
+  $("kText").value = KON.data?.text || ""; $("kText").placeholder = "Eure Nachricht – selbst schreiben oder einfügen, oder «✦ Entwurf schreiben»."; saveBtnState();
+  // 14.11.: kein automatischer Entwurf mehr (eigener Text wurde sonst überschrieben) – Claude schreibt nur auf Knopfdruck
+  kontaktButtons();
   if (KON.data?.text) $("kState").textContent = `Gespeichert${KON.data.by ? " von " + (PEOPLE[KON.data.by] || KON.data.by) : ""}, ${ago(KON.data.updated)}`;
-  else if (!KON.auto.has(k)) { KON.auto.add(k); kontaktKi(k); }
+}
+function kontaktButtons() {
+  const has = !!$("kText")?.value.trim();
+  if ($("kKi")) $("kKi").textContent = has ? "✦ Neu schreiben lassen" : "✦ Entwurf schreiben";
+  if ($("kCheck")) $("kCheck").hidden = !has;
 }
 async function kontaktSave(k, text, quiet) {
   if (needPerson()) return;
@@ -1366,13 +1462,13 @@ const KON_TOOL = { name: "nachricht", description: "Die erste Nachricht ans Kont
   input_schema: { type: "object", required: ["nachricht"], properties: { nachricht: { type: "string", description: "Vollständige Nachricht mit Anrede «Guten Tag» und Grussformel" },
     hinweise: { type: "array", items: { type: "object", required: ["text"], properties: { art: { type: "string", enum: ["klaeren", "idee", "erklaerung"] }, text: { type: "string" } } } },
     regel_vorschlaege: { type: "array", description: "Nur wenn ein Kommentar allgemein für künftige Texte gilt: als kurze Schreibregel", items: { type: "object", required: ["regel"], properties: { regel: { type: "string" }, beispiel: { type: "string" } } } } } } };
-async function kontaktKi(k, instr) {
+async function kontaktKi(k, instr, mode) {
   if (KON.busy) return;
   const st = $("kState");
   try {
     const c = await bewCtx();
     if (!c.key) { if (st) st.textContent = "Kein Claude-Schlüssel (Mehr → «Claude für Bewerbungen»). Schreibt die Nachricht selbst."; return; }
-    KON.busy = true; if (st) st.textContent = instr ? "Claude überarbeitet die Nachricht … (ca. 15–30 Sek.)" : "Claude schreibt die Nachricht … (ca. 15–30 Sek.)"; $("kKi") && ($("kKi").disabled = true);
+    KON.busy = true; if (st) st.textContent = mode === "pruefen" ? "Claude prüft die Nachricht … (ca. 15–30 Sek.)" : instr ? "Claude überarbeitet die Nachricht … (ca. 15–30 Sek.)" : "Claude schreibt die Nachricht … (ca. 15–30 Sek.)"; $("kKi") && ($("kKi").disabled = true);
     BEW.k = k; BEW.x = S.hits.find((h) => keyOf(h) === k) || {}; BEW.d = S.detailData || null;
     const user = `Heute ist ${new Date().toLocaleDateString("de-CH", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}.
 
@@ -1397,7 +1493,7 @@ ${$("kText")?.value || "(noch leer)"}
 </aktuell>
 
 <auftrag>
-${instr ? `Überarbeite die Nachricht unter <aktuell> nach diesen Kommentaren von Leonie und Pascal. Ändere nur, was die Kommentare verlangen; alles andere bleibt wörtlich gleich. Ist ein Kommentar allgemein gemeint (gilt auch für künftige Texte), schlage ihn zusätzlich als kurze Schreibregel in «regel_vorschlaege» vor. Hinweise nur, wenn ein Kommentar unklar ist.
+${mode === "pruefen" ? `Prüfe die Nachricht unter <aktuell>, die Leonie und Pascal selbst geschrieben haben, nach allen Regeln oben (Erstkontakt vor der Besichtigung, Nach-Check Textstil, nichts Erfundenes, gelernte Regeln) und auf Rechtschreibung (Schweizer Schreibweise). Ändere die Nachricht NICHT: gib sie in «nachricht» wörtlich zurück. Nenne in «hinweise» höchstens 4 konkrete Punkte (art «klaeren»), je ein Satz mit Vorschlag, z.B. «‹…› klingt steif – lieber ‹…›». Ist alles gut, ein einziger Hinweis «Passt so.».` : instr ? `Überarbeite die Nachricht unter <aktuell> nach diesen Kommentaren von Leonie und Pascal. Ändere nur, was die Kommentare verlangen; alles andere bleibt wörtlich gleich. Ist ein Kommentar allgemein gemeint (gilt auch für künftige Texte), schlage ihn zusätzlich als kurze Schreibregel in «regel_vorschlaege» vor. Hinweise nur, wenn ein Kommentar unklar ist.
 <kommentare>
 ${instr}
 </kommentare>` : `Schreibe die erste Nachricht fürs Kontaktfeld im Inserat: Erstkontakt vor der Besichtigung (Regeln oben). Kurz, natürlich, mit «Guten Tag» und Grussformel «Freundliche Grüsse» plus «Leonie Meier und Pascal Stadelmann». Nur die Nachricht, kein Anschreiben. Hinweise höchstens 2, nur «klaeren».`}
@@ -1405,6 +1501,14 @@ ${instr}
     const sys = BEW_SYSTEM.replace("Werkzeug «bewerbung»", "Werkzeug «nachricht»");
     const res = await claudeTool(sys, user, KON_TOOL, "nachricht");
     const text = String(res.nachricht || "").replace(/\r/g, "").trim();
+    if (mode === "pruefen" && S.detailKey === k && $("kTips")) {
+      const tips = (res.hinweise || []).filter((h) => h && h.text).slice(0, 4);
+      $("kTips").innerHTML = tips.map((h) => `<div class="tip">${esc(h.text)}</div>`).join("") || `<div class="tip">Passt so.</div>`;
+      if (st) st.textContent = `✦ Geprüft – ${tips.length && !/^passt so/i.test(tips[0].text) ? tips.length + " Hinweis" + (tips.length > 1 ? "e" : "") : "passt so"}. Euer Text ist unverändert.`;
+      toast(tips.length && !/^passt so/i.test(tips[0].text) ? `${tips.length} Hinweis${tips.length > 1 ? "e" : ""}` : "Passt so", "ok");
+      $("kTips").scrollIntoView({ behavior: "smooth", block: "center" }); $("kTips").classList.add("flash"); setTimeout(() => $("kTips")?.classList.remove("flash"), 1700);
+      return;
+    }
     if (S.detailKey === k && $("kText") && text) {
       const before = $("kText").value;
       $("kText").value = text;
@@ -1414,9 +1518,11 @@ ${instr}
       if (instr && before !== text) $("kTips").innerHTML += `<div class="diff">${wdiff(before, text)}</div><button type="button" class="btn" id="kUndo">Rückgängig</button>`;
       const lv = (res.regel_vorschlaege || []).filter((r) => r && r.regel).slice(0, 3);
       if (lv.length) learnBox("kLearn", lv);
-      kontaktSave(k, text, true);
+      kontaktSave(k, text, true); kontaktButtons();
+      toast(instr ? "Überarbeitet" : "Entwurf geschrieben", "ok");
+      $("kText").scrollIntoView({ behavior: "smooth", block: "center" }); $("kText").classList.add("flash"); setTimeout(() => $("kText")?.classList.remove("flash"), 1700);
     }
-  } catch (e) { if (st) st.textContent = "Claude: " + e.message; }
+  } catch (e) { if (st) st.textContent = "Claude: " + e.message; toast("Claude: " + e.message, "err", 7000); }
   finally { KON.busy = false; $("kKi") && ($("kKi").disabled = false); }
 }
 // Speichern-Knöpfe: «Speichern» sobald etwas geändert ist, sonst «Gespeichert»
@@ -1426,7 +1532,7 @@ function saveBtnState() {
   const n = $("ownNoteSave"); if (n) { const d = noteDirty(); n.disabled = !d; n.textContent = d ? "Speichern" : "Gespeichert"; n.classList.toggle("primary", d); }
   const c = $("kSave"); if (c) { const d = konDirty(); c.disabled = !d; c.textContent = d ? "Speichern" : "Gespeichert"; c.classList.toggle("primary", d); }
 }
-document.addEventListener("input", (e) => { if (e.target.id === "ownNote" || e.target.id === "kText") saveBtnState(); });
+document.addEventListener("input", (e) => { if (e.target.id === "ownNote" || e.target.id === "kText") saveBtnState(); if (e.target.id === "kText") kontaktButtons(); });
 // «Bewertung & Notizen»: Daumen, Stern, Kommentare, Notiz und eigene Dateien an einem Ort
 function usPanel(k) {
   const it = itemOf(k), mine = myVote(k), other = S.person ? otherOf(S.person) : null, ov = other ? (it.votes || {})[other] : null;
@@ -2155,6 +2261,7 @@ $("dBody").addEventListener("click", async (e) => {
   const us = e.target.closest("[data-unstep]"); if (us && k0) { setStep(k0, us.dataset.unstep, null); return; }
   const an = e.target.closest("[data-answer]"); if (an && k0) { setStep(k0, "antwort", { value: an.dataset.answer }); return; }
   if (e.target.id === "kKi" && k0) { kontaktKi(k0); return; }
+  if (e.target.id === "kCheck" && k0) { kontaktKi(k0, null, "pruefen"); return; }
   if (e.target.id === "kUndo" && k0 && KON.prev != null) { $("kText").value = KON.prev; KON.prev = null; kontaktSave(k0, $("kText").value.trim(), true); kmtRestore("kontakt"); $("kTips").innerHTML = ""; $("kState").textContent = "Rückgängig gemacht."; return; }
   if (e.target.id === "kCopy" && k0) {
     const t = $("kText").value.trim(), x = S.hits.find((h) => keyOf(h) === k0) || {};
@@ -3164,7 +3271,7 @@ let installEvt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("installBtn").hidden = false; $("installHint").hidden = true; });
 $("installBtn").addEventListener("click", async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("installBtn").hidden = true; });
 if (window.matchMedia("(display-mode: standalone)").matches) { $("installHint").textContent = "Läuft als App."; }
-const APP_VERSION = "83 · 14.11.2026";
+const APP_VERSION = "84 · 14.11.2026";
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").then((reg) => { reg.update().catch(() => {}); }).catch(() => {});
   let reloaded = false;
@@ -3526,7 +3633,12 @@ async function bewKi(mode, instrIn, kfeld) {
     if (lv.length) { BEW.learn = lv; bewLearnShow(); }
     if (mode !== "hinweise") BEW.doc.ki = { text: BEW.doc.text, bemerkung: BEW.doc.bemerkung || "", at: new Date().toISOString() };
     bewMark();
-  } catch (e) { $("bState").textContent = "Fehler: " + e.message; }
+    // Ergebnis sichtbar machen (14.11.): Meldung am Knopf + hinscrollen + kurz hervorheben
+    const nt = (BEW.doc.hinweise || []).length;
+    toast(changed ? "Geändert – unten markiert" : nt ? `${nt} Hinweis${nt > 1 ? "e" : ""}` : mode === "pruefen" ? "Keine Fehler" : "Fertig", "ok");
+    const tgt = changed ? $("bDiff") : nt ? $("bTips") : null;
+    if (tgt && tgt.innerHTML.trim()) { tgt.scrollIntoView({ behavior: "smooth", block: "center" }); tgt.classList.add("flash"); setTimeout(() => tgt.classList.remove("flash"), 1700); }
+  } catch (e) { $("bState").textContent = "Fehler: " + e.message; toast("Claude: " + e.message, "err", 7000); }
   finally { BEW.busy = false; document.querySelectorAll("#bClaude [data-ki]").forEach((b) => (b.disabled = false)); }
 }
 // Hinweise nach Art: «Zu klären» sichtbar, Ideen eingeklappt, Erklärungen als Zeile bei den Änderungen
