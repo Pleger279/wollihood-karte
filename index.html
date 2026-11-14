@@ -664,6 +664,9 @@ label.f small, div.f small { color: var(--muted); font: 500 12.5px var(--body) }
 .shotfoto input{position:absolute;top:6px;left:6px;width:18px;height:18px;margin:0}
 .shotfoto:has(input:not(:checked)) img{opacity:.3;filter:grayscale(1)}
 .shotline{margin:0}
+.kostsum{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap} .kostsum b{font-size:22px}
+table.kost{width:100%;border-collapse:collapse;font-size:14px;margin-top:6px} table.kost td{padding:5px 0;border-bottom:1px solid var(--line)}
+table.kost td:nth-child(2),table.kost td:nth-child(3){text-align:right;white-space:nowrap;padding-left:10px;color:var(--ink-2)}
 .fotorow{display:grid;grid-template-columns:88px minmax(0,1fr);gap:12px;align-items:center}
 .fotoprev{width:88px;height:88px;border-radius:50%;object-fit:cover;background:var(--sunk)}
 .fotoedit{display:grid;justify-items:center}
@@ -799,6 +802,8 @@ button, .btn, .linkbtn, label[for] { transition: transform .12s ease, opacity .1
       <p class="hint">Für Entwurf, Hinweise und Rechtschreibprüfung im Bewerbungs-Editor. Der Schlüssel stammt aus console.anthropic.com (nicht vom Claude-Abo), wird im privaten Repo gespeichert und gilt für euch beide.</p>
       <label class="f" for="kiKey"><small>API-Schlüssel</small><input class="field" id="kiKey" type="password" autocomplete="off" placeholder="sk-ant-…"></label>
       <button class="btn primary" id="kiSave" type="button">Schlüssel prüfen und speichern</button>
+      <h3 class="ftitle sm">Kosten</h3>
+      <div id="kostenBox"><p class="hint">Lade …</p></div>
     </div>
     <div class="panel fold" id="baustPanel">
       <h2>Dossier-Bausteine</h2>
@@ -1070,10 +1075,68 @@ function actToast(text, cls) {
   window.fetch = async (input, init) => {
     const url = typeof input === "string" ? input : input?.url || "";
     const tok = actBegin(url);
-    try { return await _fetch(input, init); }
+    try {
+      const r = await _fetch(input, init);
+      if (/api\.anthropic\.com\/v1\/messages/.test(url) && r.ok) kostenZaehlen(init, r.clone());
+      return r;
+    }
     catch (e) { if (tok && !ACT.err) ACT.err = "keine Verbindung"; throw e; }
     finally { actFinish(tok); }
   };
+}
+// ---------- Claude-Kosten (v87, Pascal 14.11.) ----------
+// Jeder Claude-Aufruf der App: Tokens aus der Antwort × Preis → dossier/ki-kosten.json (Monate, nach Art, letzte 40).
+// Das Suchskript zählt seine Aufrufe in state/health.json → ai_kosten. Anzeige: Mehr → Claude.
+const KI_PREIS = { opus: [4, 20, 0.2, 5], sonnet: [2, 10, 0.1, 2.5], haiku: [1, 5, 0.1, 1.25], fable: [10, 50, 0.25, 12.5] };   // USD/Mio. Tokens
+const USD_CHF = 0.82;   // Kurs Nov. 2026, gerundet
+const KI_ART = { bewerbung: "Anschreiben", nachricht: "Kontakt-Nachricht", screenshots: "Screenshots", inserat: "Wohnung hinzufügen",
+  formular: "Formular", foto: "Foto prüfen", regeln: "Schreibregeln", chat: "Chat" };
+const KOSTEN = { neu: [], timer: null };
+function kiUsd(model, u) {
+  const p = Object.entries(KI_PREIS).find(([k]) => (model || "").includes(k))?.[1] || KI_PREIS.opus;
+  return ((u.input_tokens || 0) * p[0] + (u.output_tokens || 0) * p[1] + (u.cache_read_input_tokens || 0) * p[2] + (u.cache_creation_input_tokens || 0) * p[3]) / 1e6;
+}
+async function kostenZaehlen(init, resp) {
+  try {
+    const req = JSON.parse(init?.body || "{}"), j = await resp.json(), u = j.usage || {};
+    const art = KI_ART[req.tools?.[0]?.name] || req.tools?.[0]?.name || "Claude";
+    KOSTEN.neu.push({ at: new Date().toISOString(), by: S.person || null, art, model: req.model, in: u.input_tokens || 0, out: u.output_tokens || 0,
+      cache: (u.cache_read_input_tokens || 0) + (u.cache_creation_input_tokens || 0), usd: +kiUsd(req.model, u).toFixed(5) });
+    clearTimeout(KOSTEN.timer); KOSTEN.timer = setTimeout(kostenSpeichern, 4000);   // gesammelt speichern
+  } catch (e) { console.warn("Kosten", e); }
+}
+async function kostenSpeichern() {
+  if (!KOSTEN.neu.length) return;
+  const neu = KOSTEN.neu.splice(0);
+  for (let i = 0; i < 4; i++) {
+    try {
+      let cur = { data: { monate: {}, letzte: [] }, sha: null };
+      try { cur = await readJson("dossier/ki-kosten.json"); } catch (e) { if (e.status !== 404) throw e; }
+      const d = cur.data; d.monate = d.monate || {}; d.letzte = d.letzte || [];
+      for (const n of neu) {
+        const m = d.monate[n.at.slice(0, 7)] = d.monate[n.at.slice(0, 7)] || { usd: 0, n: 0, art: {} };
+        m.usd = +(m.usd + n.usd).toFixed(5); m.n++;
+        const a = m.art[n.art] = m.art[n.art] || { usd: 0, n: 0 }; a.usd = +(a.usd + n.usd).toFixed(5); a.n++;
+      }
+      d.letzte = [...neu.reverse(), ...d.letzte].slice(0, 40);
+      await writeJson("dossier/ki-kosten.json", d, cur.sha, `Claude-Kosten (+${neu.length})`);
+      S.kosten = d; if (!$("v-settings")?.hidden) renderKosten();
+      return;
+    } catch (e) { if (!(e.status === 409 || e.status === 422) || i === 3) { KOSTEN.neu.unshift(...neu); return; } }
+  }
+}
+const kiChf = (usd) => usd * USD_CHF < 1 ? `${(usd * USD_CHF * 100).toFixed(usd * USD_CHF * 100 < 10 ? 1 : 0)} Rp.` : `CHF ${(usd * USD_CHF).toFixed(2)}`;
+async function renderKosten() {
+  const box = $("kostenBox"); if (!box) return;
+  if (!S.kosten) { try { S.kosten = (await readJson("dossier/ki-kosten.json")).data; } catch { S.kosten = { monate: {}, letzte: [] }; } }
+  const mon = new Date().toISOString().slice(0, 7), m = S.kosten.monate?.[mon] || { usd: 0, n: 0, art: {} };
+  const bot = S.health?.ai_kosten?.[mon] || { usd: 0, n: 0 };
+  const arts = Object.entries(m.art || {}).sort((a, b) => b[1].usd - a[1].usd);
+  box.innerHTML = `<div class="kostsum"><b>${kiChf(m.usd + bot.usd)}</b><span class="hint">diesen Monat · ${m.n + bot.n} Aufrufe · ca., Kurs ${USD_CHF}</span></div>
+    <table class="kost"><tr><td>Suchlauf (Inserate einschätzen)</td><td>${bot.n}×</td><td>${kiChf(bot.usd)}</td></tr>
+    ${arts.map(([a, v]) => `<tr><td>${esc(a)}</td><td>${v.n}×</td><td>${kiChf(v.usd)}</td></tr>`).join("")}</table>
+    ${(S.kosten.letzte || []).length ? `<details><summary class="hint">Letzte Aufrufe</summary><table class="kost">${S.kosten.letzte.slice(0, 15).map((n) =>
+      `<tr><td>${esc(dmy(n.at))} ${esc(n.art)}${n.by ? " · " + esc(PEOPLE[n.by] || n.by) : ""}</td><td>${Math.round((n.in + n.cache) / 1000)}k/${Math.round(n.out / 1000 * 10) / 10}k</td><td>${kiChf(n.usd)}</td></tr>`).join("")}</table></details>` : ""}`;
 }
 function toastAction(text, label, fn, ms = 6000) {
   const t = $("toast"); t.className = "toast act" + (sheetOpen() ? " float" : ""); t.hidden = false;
@@ -3276,7 +3339,7 @@ let installEvt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("installBtn").hidden = false; $("installHint").hidden = true; });
 $("installBtn").addEventListener("click", async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("installBtn").hidden = true; });
 if (window.matchMedia("(display-mode: standalone)").matches) { $("installHint").textContent = "Läuft als App."; }
-const APP_VERSION = "86 · 14.11.2026";
+const APP_VERSION = "87 · 14.11.2026";
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").then((reg) => { reg.update().catch(() => {}); }).catch(() => {});
   let reloaded = false;
@@ -4898,7 +4961,7 @@ $("kiSave").addEventListener("click", async () => {
   } catch (e) { toast(e.message, "err"); }
   finally { $("kiSave").disabled = false; }
 });
-if (S.token) setTimeout(() => { kiState(); lernLoad(); baustRender(); }, 1200);
+if (S.token) setTimeout(() => { kiState(); lernLoad(); baustRender(); renderKosten(); }, 1200);
 </script>
 </body>
 </html>
