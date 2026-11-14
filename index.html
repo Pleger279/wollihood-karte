@@ -615,6 +615,30 @@ label.f small, div.f small { color: var(--muted); font: 500 12.5px var(--body) }
   background: var(--surface); border-top: 1px solid var(--line); display: flex; gap: 8px; align-items: center; justify-content: flex-end; z-index: 4 }
 .bewfoot #bDirty { margin-right: auto; font-size: 13px } .bewfoot .btn { flex: none }
 #bClaude > :empty { display: none }
+/* Bewerbung v89: Teile mit Status, Lese-Ansicht, Vorschläge */
+.bp-part { padding: 0; overflow: hidden }
+.bp-head { all: unset; box-sizing: border-box; width: 100%; display: flex; align-items: center; gap: 10px; padding: 14px 16px; cursor: pointer }
+.bp-head b { font: 600 16px var(--body) }
+.bp-st { margin-left: auto; font-size: 13px; text-align: right } .bp-st.ok { color: var(--ok) } .bp-st.warn { color: var(--warn) } .bp-st.muted { color: var(--muted) }
+.bp-chev { color: var(--muted); font-size: 20px; transition: transform .15s } .bp-part.open .bp-chev { transform: rotate(90deg) }
+.bp-body { display: none; padding: 0 16px 16px; gap: 12px } .bp-part.open .bp-body { display: grid }
+.bp-body > .panel { box-shadow: none; border: 1px solid var(--hair); margin: 0 }
+.bp-read { background: var(--sunk); border-radius: 12px; padding: 14px 16px; font-size: 15px; line-height: 1.5 }
+.bp-read p { margin: 0 0 .7em } .bp-read p:last-child { margin: 0 }
+.bp-meta { font-size: 12.5px; color: var(--muted); margin-bottom: 8px }
+.bp-ph { color: var(--accent); font-weight: 500 }
+.bp-mk { background: var(--warn-soft, #fff4e5); color: inherit; border-bottom: 2px solid var(--warn); border-radius: 2px; cursor: pointer }
+.bp-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap } .bp-bar .btn { flex: none }
+.bp-pruef { display: grid; gap: 8px } .bp-pruef:empty { display: none }
+.bp-vhead { display: flex; justify-content: space-between; align-items: center; gap: 8px }
+.bp-v { border: 1px solid var(--hair); border-radius: 12px; padding: 10px 12px; display: grid; gap: 8px }
+.bp-vtext { font-size: 14.5px; line-height: 1.45; cursor: pointer } .bp-vtext small { display: block; color: var(--muted); font-size: 12.5px; margin-top: 2px }
+.bp-vtext del { color: var(--bad) } .bp-vtext ins { text-decoration: none; background: color-mix(in srgb, var(--ok) 22%, transparent); border-radius: 3px }
+.bp-vbtn { display: flex; gap: 8px } .bp-vbtn .btn { flex: none }
+.bp-k { display: flex; justify-content: space-between; gap: 10px; align-items: baseline }
+.bp-okline { margin: 0; color: var(--ok); font-size: 14px }
+.bewfoot.bp-clean { display: none }
+
 .dosdet summary { cursor: pointer; list-style: none; font-size: 14.5px; display: flex; justify-content: space-between; gap: 8px; padding: 4px 0 }
 .dosdet summary .chg { color: var(--accent); font-weight: 600; white-space: nowrap }
 .dosdet[open] summary .chg { visibility: hidden }
@@ -1030,7 +1054,7 @@ document.addEventListener("click", (e) => {
   const b = e.target.closest("button, .btn, .linkbtn, label[for]"); if (!b || b.disabled) return;
   b.classList.add("act-tap"); setTimeout(() => b.classList.remove("act-tap"), 170);
   // Tabs, Filter, Sortierung schalten nur um – keine Lauf-Anzeige (sonst würde ein Hintergrund-Laden dort erscheinen)
-  if (!b.closest(".toast, .seg, .stabs, .tabbar, [data-filter], [data-sort], [data-tab], [data-stab], [data-bstep]")) actArm(b);
+  if (!b.closest(".toast, .seg, .stabs, .tabbar, [data-filter], [data-sort], [data-tab], [data-stab], [data-bstep], [data-bptoggle], [data-tedit-on], [data-tcancel]")) actArm(b);
 }, true);
 document.addEventListener("change", (e) => {
   const t = e.target; if (t.type !== "file" || !t.id) return;
@@ -3369,7 +3393,7 @@ let installEvt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("installBtn").hidden = false; $("installHint").hidden = true; });
 $("installBtn").addEventListener("click", async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("installBtn").hidden = true; });
 if (window.matchMedia("(display-mode: standalone)").matches) { $("installHint").textContent = "Läuft als App."; }
-const APP_VERSION = "88 · 14.11.2026";
+const APP_VERSION = "89 · 14.11.2026";
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").then((reg) => { reg.update().catch(() => {}); }).catch(() => {});
   let reloaded = false;
@@ -3432,7 +3456,7 @@ $("bClose").addEventListener("click", bewTryClose);
 
 async function openBew(k) {
   if (needPerson()) return;
-  BEW.k = k; BEW.x = S.hits.find((h) => keyOf(h) === k) || {}; BEW.aid = await aidOf(k); BEW.step = "text";
+  BEW.k = k; BEW.x = S.hits.find((h) => keyOf(h) === k) || {}; BEW.aid = await aidOf(k); BEW.open = null; BEW.edit = new Set(); BEW.pundo = null;
   const a = archEntry(BEW.x); BEW.d = null;
   if (a) { try { BEW.d = (await readJson(`archiv/${a.id}/data.json`)).data; } catch { } }
   $("bTitle").textContent = "Bewerbung · " + (BEW.x.street || "Wohnung");
@@ -3444,65 +3468,234 @@ async function openBew(k) {
   BEW.prev = null; BEW.saved = bewFields();
   renderBew(); formLoad(); kmtLoad(k);
 }
+// Bewerbung v89 (Pascal 14.11.): eine Seite mit Teilen, Texte nur lesbar bis «Bearbeiten»; danach «Speichern» oder «Prüfen».
+// «Prüfen» liefert Vorschläge (Übernehmen/Verwerfen/Alle übernehmen). Die Textfelder bleiben im DOM (versteckt), damit alles andere weiterläuft.
+const BP_PARTS = [["anschreiben", "Anschreiben"], ["foto", "Foto"], ["unterlagen", "Unterlagen"], ["begleit", "Begleit-Mail / Bemerkung"], ["senden", "Senden"]];
+const BP_FELD = { text: "Anschreiben", bemerkung: "Begleit-Mail / Bemerkung" };
+function bpPart(id, title, body) {
+  const open = BEW.open?.has(id);
+  return `<div class="panel bp-part${open ? " open" : ""}" data-bpart="${id}">
+    <button type="button" class="bp-head" data-bptoggle="${id}" aria-expanded="${open}"><b>${title}</b><span class="bp-st" id="bpSt-${id}"></span><span class="bp-chev" aria-hidden="true">›</span></button>
+    <div class="bp-body">${body}</div></div>`;
+}
+function bpTextBar(feld) {
+  return `<div class="bp-bar" data-tbar="${feld}"></div><div class="bp-pruef" id="bPruef-${feld}"></div>`;
+}
 function renderBew() {
-  const doc = BEW.doc, st = BEW.step || "text";
+  const doc = BEW.doc;
+  if (!BEW.open) BEW.open = new Set([doc.updated ? "" : "anschreiben"].filter(Boolean));
+  BEW.edit = BEW.edit || new Set();
+  const neu = !doc.updated && doc.text === BEW.ctx.vorlage?.text;
   $("bBody").innerHTML = `
-    <div class="stabs three" role="tablist" aria-label="Schritte der Bewerbung">${[["text", "1 Text"], ["unterlagen", "2 Unterlagen"], ["senden", "3 Senden"]]
-      .map(([v, l]) => `<button type="button" role="tab" data-bstep="${v}" aria-selected="${v === st}">${l}</button>`).join("")}</div>
-    <section data-bsec="text"${st === "text" ? "" : " hidden"}>
     <div class="panel" id="bClaude">
       ${BEW.ctx.key ? "" : '<p class="hint warnline">Noch kein Claude-Schlüssel hinterlegt: Mehr → «Claude für Bewerbungen». Ihr könnt trotzdem schreiben.</p>'}
-      <button type="button" class="btn ki" data-ki="entwurf">✦ Entwurf für diese Wohnung</button>
-      <div class="kbar"><button type="button" class="btn sm" data-ki="hinweise">Stolpersteine</button><button type="button" class="btn sm" data-ki="pruefen">Rechtschreibung</button></div>
+      <button type="button" class="btn ki" data-ki="entwurf">${neu ? "✦ Entwurf für diese Wohnung" : "✦ Neuen Entwurf schreiben lassen"}</button>
       <p class="hint" id="bState" aria-live="polite"></p>
       <div id="bLearn"></div><div id="bTips"></div><div id="bDiff"></div>
     </div>
-    <div class="panel"><h2>Anschreiben</h2>
-      <label class="f" for="bAdr"><small>Adresse unter «Wohnungsbewerbung»</small><input class="field" id="bAdr" value="${esc(doc.adresse)}"></label>
-      <div class="row2">
-        <label class="f" for="bAnrede"><small>Anrede</small><select class="field" id="bAnrede">${ANREDEN.map((a) => `<option${a === doc.anrede ? " selected" : ""}>${a}</option>`).join("")}</select></label>
-        <label class="f" for="bName"><small>Name</small><input class="field" id="bName" value="${esc(doc.name || "")}" placeholder="z.B. Muster"></label>
+    ${bpPart("anschreiben", "Anschreiben", `
+      <div class="bp-read" id="bRead-text"></div>
+      <div class="bp-edit" data-tedit="text" hidden>
+        <label class="f" for="bAdr"><small>Adresse unter «Wohnungsbewerbung»</small><input class="field" id="bAdr" value="${esc(doc.adresse)}"></label>
+        <div class="row2">
+          <label class="f" for="bAnrede"><small>Anrede</small><select class="field" id="bAnrede">${ANREDEN.map((a) => `<option${a === doc.anrede ? " selected" : ""}>${a}</option>`).join("")}</select></label>
+          <label class="f" for="bName"><small>Name</small><input class="field" id="bName" value="${esc(doc.name || "")}" placeholder="z.B. Muster"></label>
+        </div>
+        <textarea class="field bewtext" id="bText" spellcheck="true" lang="de-CH">${esc(doc.text)}</textarea>
+        <p class="hint">Absätze mit einer Leerzeile trennen. Text in [eckigen Klammern] ist noch offen und erscheint im PDF blau.</p>
+        ${kmtBlock("text")}
+        <button type="button" class="linkbtn" id="bGrund" style="justify-self:start">Diese Fassung als Grundtext für künftige Bewerbungen übernehmen</button>
       </div>
-      <textarea class="field bewtext" id="bText" spellcheck="true" lang="de-CH">${esc(doc.text)}</textarea>
-      <p class="hint">Absätze mit einer Leerzeile trennen. Text in [eckigen Klammern] ist noch offen und erscheint im PDF blau.</p>
-      ${kmtBlock("text")}
-      <button type="button" class="linkbtn" id="bGrund" style="justify-self:start">Diese Fassung als Grundtext für künftige Bewerbungen übernehmen</button>
-    </div>
-    <div class="panel"><h2>Bemerkung fürs Online-Formular</h2>
-      <textarea class="field bewnote" id="bNote" spellcheck="true" lang="de-CH" placeholder="Wird mit «Entwurf für diese Wohnung» erstellt.">${esc(doc.bemerkung || "")}</textarea>
-      <div class="kbar"><button type="button" class="btn sm" id="bCopy">Kopieren</button><span class="hint" id="bCount"></span></div>
-      ${kmtBlock("bemerkung")}
-    </div>
-    </section>
-    <section data-bsec="unterlagen"${st === "unterlagen" ? "" : " hidden"}>
-    <div class="panel" id="bFoto"><h2>Foto im Anschreiben</h2><div id="bFotoBody"></div></div>
-    <div class="panel" id="bDossier"><h2>Dossier</h2>
-      <details class="dosdet" id="bDossierDet"><summary id="bDossierSum">Dokumente</summary>
-        <p class="hint">Häkchen = kommt ins Dossier. ⬇ lädt ein Dokument einzeln herunter (für Plattformen mit Einzel-Upload).</p>
-        <div id="bDossierList"></div></details>
-      <div class="kbar"><label class="btn sm" for="bUpload">+ Weiteres Dokument</label><input type="file" id="bUpload" accept="application/pdf,image/*" multiple hidden></div>
-    </div>
-    ${formPanel()}
-    <details class="panel adv" id="bStamm"><summary>Personalien &amp; Referenzen</summary>
-      <div class="advbody"><p class="hint">Gilt für alle Bewerbungen und für die Personalien-Seite im Dossier.</p><div id="bStammBody"></div></div>
-    </details>
-    </section>
-    <section data-bsec="senden"${st === "senden" ? "" : " hidden"}>
-    <div class="panel"><h2>Anschreiben als PDF</h2>
-      <button type="button" class="btn primary" id="bPdf">PDF erstellen</button>
-      <div id="bPdfLink">${doc.pdf ? `<a href="#" class="doclink" data-doc="${esc(doc.pdf)}">📄 Letztes PDF (${esc(ago(doc.pdf_at))})</a>` : ""}</div>
-    </div>
-    <div class="panel"><h2>Ganzes Dossier</h2>
-      <p class="hint" id="bDossierSum2"></p>
-      <button type="button" class="btn" id="bDossierPdf">Dossier als ein PDF</button>
-      <div id="bDossierLink"></div>
-    </div>
-    <div class="panel"><h2>Bemerkung</h2><p class="hint">Für das Feld «Bemerkung» im Online-Formular der Verwaltung.</p>
-      <div class="kbar"><button type="button" class="btn sm" data-copynote>Bemerkung kopieren</button></div></div>
-    </section>
-    <div class="bewfoot"><span class="hint warnline" id="bDirty" hidden>Nicht gespeichert</span><button type="button" class="btn sm" id="bSave">Gespeichert</button>
-      ${st !== "senden" ? `<button type="button" class="btn sm primary" data-bstep="${st === "text" ? "unterlagen" : "senden"}">Weiter: ${st === "text" ? "Unterlagen" : "Senden"} ›</button>` : ""}</div>`;
+      ${bpTextBar("text")}`)}
+    ${bpPart("foto", "Foto", `<div class="panel" id="bFoto"><div id="bFotoBody"></div></div>`)}
+    ${bpPart("unterlagen", "Unterlagen", `
+      <div class="panel" id="bDossier"><h2>Dossier</h2>
+        <details class="dosdet" id="bDossierDet"><summary id="bDossierSum">Dokumente</summary>
+          <p class="hint">Häkchen = kommt ins Dossier. ⬇ lädt ein Dokument einzeln herunter (für Plattformen mit Einzel-Upload).</p>
+          <div id="bDossierList"></div></details>
+        <div class="kbar"><label class="btn sm" for="bUpload">+ Weiteres Dokument</label><input type="file" id="bUpload" accept="application/pdf,image/*" multiple hidden></div>
+      </div>
+      ${formPanel()}
+      <details class="panel adv" id="bStamm"><summary>Personalien &amp; Referenzen</summary>
+        <div class="advbody"><p class="hint">Gilt für alle Bewerbungen und für die Personalien-Seite im Dossier.</p><div id="bStammBody"></div></div>
+      </details>`)}
+    ${bpPart("begleit", "Begleit-Mail / Bemerkung", `
+      <p class="hint">Kurzer Text, mit dem ihr das Dossier schickt – als Mail oder im Feld «Bemerkung» eines Online-Formulars.</p>
+      <div class="bp-read" id="bRead-bemerkung"></div>
+      <div class="bp-edit" data-tedit="bemerkung" hidden>
+        <label class="f" for="bBetreff"><small>Betreff (für die Mail)</small><input class="field" id="bBetreff" value="${esc(doc.betreff || "")}" placeholder="${esc(bpBetreffVor())}"></label>
+        <textarea class="field bewnote" id="bNote" spellcheck="true" lang="de-CH" placeholder="Wird mit «Entwurf für diese Wohnung» erstellt.">${esc(doc.bemerkung || "")}</textarea>
+        <div class="kbar"><span class="hint" id="bCount"></span></div>
+        ${kmtBlock("bemerkung")}
+      </div>
+      ${bpTextBar("bemerkung")}
+      <div class="kbar"><button type="button" class="btn sm" id="bCopy">Text kopieren</button></div>`)}
+    ${bpPart("senden", "Senden", `
+      <div class="panel"><h2>Anschreiben als PDF</h2>
+        <button type="button" class="btn primary" id="bPdf">PDF erstellen</button>
+        <div id="bPdfLink">${doc.pdf ? `<a href="#" class="doclink" data-doc="${esc(doc.pdf)}">📄 Letztes PDF (${esc(ago(doc.pdf_at))})</a>` : ""}</div>
+      </div>
+      <div class="panel"><h2>Ganzes Dossier</h2>
+        <p class="hint" id="bDossierSum2"></p>
+        <button type="button" class="btn" id="bDossierPdf">Dossier als ein PDF</button>
+        <div id="bDossierLink"></div>
+      </div>`)}
+    <div class="bewfoot"><span class="hint warnline" id="bDirty" hidden>Nicht gespeichert</span><button type="button" class="btn sm" id="bSave">Gespeichert</button></div>`;
   bewTips(); bewCount(); renderDossier(); renderStamm(); renderForm(); renderCopy(); bewMark(); dossierSum(); FOTO.img = null; fotoRender();
+  bpRenderText("text"); bpRenderText("bemerkung"); bpStatus();
+}
+const bpBetreffVor = () => `Bewerbung ${[BEW.x?.street, BEW.x?.rooms ? BEW.x.rooms + " Zimmer" : ""].filter(Boolean).join(", ")}`.trim();
+// Lese-Ansicht: sieht aus wie das fertige Schreiben; [Platzhalter] blau, Prüf-Vorschläge markiert
+function bpMarkup(feld) {
+  const doc = BEW.doc, t = feld === "text" ? doc.text || "" : doc.bemerkung || "";
+  const open = bpOpen(feld);
+  let h = esc(t);
+  open.forEach(({ v, i }) => { const a = esc(v.alt); if (a && h.includes(a)) h = h.replace(a, `<mark class="bp-mk" data-pv="${feld}:${i}">${a}</mark>`); });
+  h = h.replace(/\[[^\]<]*\]/g, (m) => `<span class="bp-ph">${m}</span>`);
+  return h.split(/\n{2,}/).map((p) => `<p>${p.replace(/\n/g, "<br>")}</p>`).join("");
+}
+function bpRenderText(feld) {
+  const el = $("bRead-" + feld); if (!el) return;
+  const doc = BEW.doc, editing = BEW.edit.has(feld);
+  el.hidden = editing; document.querySelector(`[data-tedit="${feld}"]`).hidden = !editing;
+  if (!editing) {
+    const empty = !(feld === "text" ? doc.text : doc.bemerkung || "").trim();
+    el.innerHTML = feld === "text"
+      ? `<div class="bp-meta">${esc(doc.adresse || "")}</div><p>${esc(anredeZeile(doc.anrede, doc.name))}</p>${bpMarkup("text")}`
+      : empty ? `<p class="hint">Noch leer – «✦ Entwurf für diese Wohnung» schreibt ihn, oder «Bearbeiten».</p>`
+        : `<div class="bp-meta">Betreff: ${esc(doc.betreff || bpBetreffVor())}</div>${bpMarkup("bemerkung")}`;
+  }
+  const bar = document.querySelector(`[data-tbar="${feld}"]`);
+  bar.innerHTML = editing
+    ? `<button type="button" class="btn sm primary" data-tsave="${feld}">Speichern</button><button type="button" class="btn sm ki" data-tcheck="${feld}">Prüfen</button><button type="button" class="linkbtn" data-tcancel="${feld}">Abbrechen</button>`
+    : `<button type="button" class="btn sm" data-tedit-on="${feld}">Bearbeiten</button><button type="button" class="btn sm ki" data-tcheck="${feld}">Prüfen</button>`;
+  bpRenderPruef(feld);
+}
+function bpEdit(feld, on) {
+  if (on) { bewRead(); BEW.snap = BEW.snap || {}; BEW.snap[feld] = JSON.stringify(BEW.doc); BEW.edit.add(feld); }
+  else BEW.edit.delete(feld);
+  bpRenderText(feld); bpStatus();
+  if (on) { const ta = $(feld === "text" ? "bText" : "bNote"); setTimeout(() => { ta.focus({ preventScroll: true }); ta.scrollIntoView({ block: "center", behavior: "smooth" }); }, 30); }
+}
+function bpCancel(feld) {
+  const s = BEW.snap?.[feld] ? JSON.parse(BEW.snap[feld]) : null;
+  if (s) {
+    if (feld === "text") { $("bAdr").value = s.adresse || ""; $("bAnrede").value = s.anrede; $("bName").value = s.name || ""; $("bText").value = s.text || ""; }
+    else { $("bBetreff").value = s.betreff || ""; $("bNote").value = s.bemerkung || ""; }
+    bewRead(); bewCount(); bewMark();
+  }
+  bpEdit(feld, false);
+}
+async function bpSave(feld) { bewLearnMaybe(); await bewSave(false); bpEdit(feld, false); }
+// --- Prüfen ---
+const PRUEF_TOOL = { name: "pruefung", description: "Vorschläge zum geprüften Text. Der Text selbst wird nicht geändert.",
+  input_schema: { type: "object", required: ["vorschlaege"], properties: {
+    vorschlaege: { type: "array", items: { type: "object", required: ["alt", "neu", "grund"], properties: {
+      alt: { type: "string", description: "wörtliches, kurzes Zitat aus dem Text, das genau einmal vorkommt (ganze Wörter)" },
+      neu: { type: "string", description: "Ersatz für «alt» (leer = streichen)" },
+      grund: { type: "string", description: "wenige Worte, warum" },
+      art: { type: "string", enum: ["rechtschreibung", "stil", "inhalt"] } } } },
+    zu_klaeren: { type: "array", items: { type: "object", required: ["text"], properties: { stelle: { type: "string" }, text: { type: "string" } } } } } } };
+
+function bpOpen(feld) {
+  const p = BEW.doc.pruef?.[feld]; if (!p) return [];
+  const t = feld === "text" ? BEW.doc.text || "" : BEW.doc.bemerkung || "";
+  return (p.vorschlaege || []).map((v, i) => ({ v, i })).filter(({ v }) => v.st === "offen" && v.alt && t.includes(v.alt));
+}
+async function bpCheck(feld) {
+  if (BEW.busy) return;
+  if (!BEW.ctx.key) { toast("Zuerst den Claude-Schlüssel hinterlegen (Mehr).", "err"); return; }
+  bewRead();
+  if (!(feld === "text" ? BEW.doc.text : BEW.doc.bemerkung || "").trim()) { toast("Der Text ist noch leer.", "err"); return; }
+  if (BEW.edit.has(feld)) { bewLearnMaybe(); BEW.edit.delete(feld); bpRenderText(feld); }
+  if (bewDirty()) await bewSave(true);
+  BEW.busy = true;
+  const box = $("bPruef-" + feld); box.innerHTML = `<p class="hint">Claude prüft … (ca. 20–40 Sek.)</p>`;
+  try {
+    const res = await claudeCall("pruefung", "", feld);
+    const vs = (res.vorschlaege || []).filter((v) => v && v.alt && v.alt !== v.neu).slice(0, 12).map((v) => ({ alt: String(v.alt), neu: String(v.neu ?? ""), grund: v.grund || "", art: v.art || "stil", st: "offen" }));
+    const kl = (res.zu_klaeren || []).filter((k) => k && k.text).slice(0, 3).map((k) => ({ stelle: k.stelle || "", text: k.text, st: "offen" }));
+    BEW.doc.pruef = { ...(BEW.doc.pruef || {}), [feld]: { at: new Date().toISOString(), by: S.person, vorschlaege: vs, klaeren: kl, basis: feld === "text" ? BEW.doc.text : BEW.doc.bemerkung } };
+    BEW.pundo = null;
+    await bewSave(true);
+    bpRenderText(feld); bpStatus();
+    const n = bpOpen(feld).length + kl.length;
+    toast(n ? `${n} Vorschl${n === 1 ? "ag" : "äge"}` : "Alles in Ordnung", "ok");
+    const tgt = $("bPruef-" + feld); tgt.scrollIntoView({ behavior: "smooth", block: "nearest" }); tgt.classList.add("act-flash"); setTimeout(() => tgt.classList.remove("act-flash"), 1700);
+  } catch (e) { box.innerHTML = `<p class="hint warnline">Prüfen fehlgeschlagen: ${esc(e.message)}</p>`; toast("Claude: " + e.message, "err", 7000); }
+  finally { BEW.busy = false; }
+}
+function bpRenderPruef(feld) {
+  const box = $("bPruef-" + feld); if (!box) return;
+  const p = BEW.doc.pruef?.[feld];
+  if (!p) { box.innerHTML = ""; return; }
+  const open = bpOpen(feld), kl = (p.klaeren || []).map((k, i) => ({ k, i })).filter(({ k }) => k.st === "offen");
+  const undo = BEW.pundo?.feld === feld ? `<button type="button" class="linkbtn" data-pundo>Rückgängig</button>` : "";
+  if (!open.length && !kl.length) { box.innerHTML = `<p class="bp-okline">✓ Geprüft${p.at ? " " + esc(ago(p.at)) : ""} – keine offenen Vorschläge. ${undo}</p>`; return; }
+  const ART = { rechtschreibung: "Rechtschreibung", stil: "Stil", inhalt: "Inhalt" };
+  box.innerHTML = (open.length ? `<div class="bp-vhead"><span class="ftitle sm">Vorschläge von Claude (${open.length})</span>${open.length > 1 ? `<button type="button" class="btn sm primary" data-pall="${feld}">Alle übernehmen</button>` : ""}</div>
+    ${open.map(({ v, i }) => `<div class="bp-v" data-pvrow="${feld}:${i}">
+      <div class="bp-vtext" role="button" tabindex="0" data-pgo="${feld}:${i}"><del>${esc(v.alt)}</del> → ${v.neu ? `<ins>${esc(v.neu)}</ins>` : "<i>streichen</i>"}<small>${esc(ART[v.art] || "")}${v.grund ? " · " + esc(v.grund) : ""}</small></div>
+      <div class="bp-vbtn"><button type="button" class="btn sm" data-pok="${feld}:${i}">Übernehmen</button><button type="button" class="btn sm" data-pno="${feld}:${i}">Verwerfen</button></div></div>`).join("")}` : "")
+    + (kl.length ? `<div class="ftitle sm">Zu klären</div>${kl.map(({ k, i }) => `<div class="tip bp-k">${esc(k.text)}<button type="button" class="linkbtn" data-kok="${feld}:${i}">Erledigt</button></div>`).join("")}` : "")
+    + (undo ? `<p>${undo}</p>` : "");
+}
+function bpApply(feld, idxs) {
+  const p = BEW.doc.pruef?.[feld]; if (!p) return;
+  bewRead();
+  const key = feld === "text" ? "text" : "bemerkung";
+  BEW.pundo = { feld, text: BEW.doc[key], states: p.vorschlaege.map((v) => v.st) };
+  let t = BEW.doc[key] || "", n = 0;
+  for (const i of idxs) {
+    const v = p.vorschlaege[i]; if (!v || v.st !== "offen") continue;
+    const at = t.indexOf(v.alt);
+    if (at < 0) { v.st = "weg"; continue; }
+    t = t.slice(0, at) + v.neu + t.slice(at + v.alt.length);
+    if (!v.neu) t = t.replace(/ {2,}/g, " ").replace(/ ([.,;:!?])/g, "$1").replace(/ +\n/g, "\n").replace(/\n +/g, "\n");
+    v.st = "ok"; n++;
+  }
+  BEW.doc[key] = t; $(feld === "text" ? "bText" : "bNote").value = t;
+  if (!bpOpen(feld).length) p.basis = t;
+  BEW.doc.ki = { text: BEW.doc.text, bemerkung: BEW.doc.bemerkung || "", at: new Date().toISOString() };  // Übernahme von Claude: nicht «lernen»
+  bewCount(); bpRenderText(feld); bpStatus();
+  bewSave(true).then(() => toast(n === 1 ? "Übernommen" : `${n} übernommen`, "ok"));
+}
+function bpUndo() {
+  const u = BEW.pundo; if (!u) return;
+  const p = BEW.doc.pruef?.[u.feld], key = u.feld === "text" ? "text" : "bemerkung";
+  BEW.doc[key] = u.text; $(u.feld === "text" ? "bText" : "bNote").value = u.text;
+  if (p) u.states.forEach((s, i) => { if (p.vorschlaege[i]) p.vorschlaege[i].st = s; });
+  BEW.doc.ki = { text: BEW.doc.text, bemerkung: BEW.doc.bemerkung || "", at: new Date().toISOString() };
+  BEW.pundo = null; bewCount(); bpRenderText(u.feld); bpStatus(); bewSave(true).then(() => toast("Rückgängig gemacht", "ok"));
+}
+// Status je Teil (Kopfzeile)
+function bpTextSt(feld) {
+  const t = feld === "text" ? BEW.doc.text || "" : BEW.doc.bemerkung || "";
+  if (!t.trim()) return ["noch leer", "muted"];
+  if (BEW.edit.has(feld)) return ["wird bearbeitet", "warn"];
+  const p = BEW.doc.pruef?.[feld], open = bpOpen(feld).length + (p?.klaeren || []).filter((k) => k.st === "offen").length;
+  const ph = (t.match(/\[[^\]]*\]/g) || []).length;
+  if (open) return [`${open} Vorschl${open === 1 ? "ag" : "äge"} offen`, "warn"];
+  if (ph) return [`${ph} Platzhalter offen`, "warn"];
+  if (p && p.basis === t) return ["geprüft ✓", "ok"];
+  return [p ? "geändert seit Prüfung" : "nicht geprüft", "muted"];
+}
+function bpStatus() {
+  const set = (id, [txt, cls]) => { const el = $("bpSt-" + id); if (el) { el.textContent = txt; el.className = "bp-st " + cls; } };
+  if (!$("bpSt-anschreiben")) return;
+  set("anschreiben", bpTextSt("text"));
+  set("begleit", bpTextSt("bemerkung"));
+  set("foto", BEW.doc.foto?.path ? ["eigenes Foto", "ok"] : ["Standardfoto", "muted"]);
+  const items = dossierItems().filter(dossierOn), old = items.filter((b) => baustAlter(b)?.alt).length;
+  set("unterlagen", [`${items.length} Dokumente${old ? ` · ${old} zu alt` : ""}`, old ? "warn" : "ok"]);
+  set("senden", BEW.doc.pdf ? [`PDF ${ago(BEW.doc.pdf_at)}`, "ok"] : ["noch kein PDF", "muted"]);
+}
+function bpToggle(id, force) {
+  const el = document.querySelector(`[data-bpart="${id}"]`); if (!el) return;
+  const on = force ?? !el.classList.contains("open");
+  el.classList.toggle("open", on); el.querySelector(".bp-head").setAttribute("aria-expanded", on);
+  if (on) BEW.open.add(id); else BEW.open.delete(id);
+  if (on && id === "unterlagen") sfFitAll?.();
 }
 // Zusammenfassung des Dossiers: «11 Dokumente · alles gültig»
 function dossierSum() {
@@ -3511,22 +3704,40 @@ function dossierSum() {
   if ($("bDossierSum")) $("bDossierSum").innerHTML = `${esc(t)} <span class="chg">ändern ›</span>`;
   if ($("bDossierSum2")) $("bDossierSum2").textContent = t;
   $("bDossierSum")?.classList.toggle("warnline", !!old);
+  bpStatus();
 }
-function bewStep(v) {
-  bewRead(); BEW.step = v;
-  const sc = $("bBody").scrollTop; renderBew(); $("bBody").scrollTop = 0; void sc;
+function bewStep(v) {      // früher Tabs; heute: passenden Teil aufklappen
+  const ids = { text: ["anschreiben"], unterlagen: ["foto", "unterlagen"], senden: ["senden"], begleit: ["begleit"] }[v] || [v];
+  ids.forEach((id) => bpToggle(id, true));
+  document.querySelector(`[data-bpart="${ids[0]}"]`)?.scrollIntoView({ block: "start" });
 }
 function bewRead() {
   if (!$("bText")) return BEW.doc;
   Object.assign(BEW.doc, { adresse: $("bAdr").value.trim(), anrede: $("bAnrede").value, name: $("bName").value.trim(),
-    text: $("bText").value.replace(/\r/g, ""), bemerkung: $("bNote").value.replace(/\r/g, "") });
+    text: $("bText").value.replace(/\r/g, ""), bemerkung: $("bNote").value.replace(/\r/g, ""), betreff: ($("bBetreff")?.value || "").trim() });
   return BEW.doc;
 }
 function bewCount() { const n = ($("bNote")?.value || "").length; if ($("bCount")) $("bCount").textContent = n ? `${n} Zeichen` : ""; }
-$("bBody").addEventListener("input", (e) => { if (e.target.id === "bNote") bewCount(); if (/^b(Text|Note|Adr|Name)$/.test(e.target.id)) bewMark(); });
+$("bBody").addEventListener("input", (e) => { if (e.target.id === "bNote") bewCount(); if (/^b(Text|Note|Adr|Name|Betreff)$/.test(e.target.id)) bewMark(); });
 $("bBody").addEventListener("click", (e) => {
-  const bs = e.target.closest("[data-bstep]"); if (bs) { bewStep(bs.dataset.bstep); return; }
-  if (e.target.closest("[data-copynote]")) { $("bCopy").click(); }
+  const t = e.target, q = (sel) => t.closest(sel);
+  let b;
+  if ((b = q("[data-bptoggle]"))) { bpToggle(b.dataset.bptoggle); return; }
+  if ((b = q("[data-tedit-on]"))) { bpEdit(b.dataset.teditOn, true); return; }
+  if ((b = q("[data-tcancel]"))) { bpCancel(b.dataset.tcancel); return; }
+  if ((b = q("[data-tsave]"))) { bpSave(b.dataset.tsave); return; }
+  if ((b = q("[data-tcheck]"))) { bpCheck(b.dataset.tcheck); return; }
+  if ((b = q("[data-pall]"))) { const f = b.dataset.pall; bpApply(f, bpOpen(f).map((o) => o.i)); return; }
+  if ((b = q("[data-pok]"))) { const [f, i] = b.dataset.pok.split(":"); bpApply(f, [+i]); return; }
+  if ((b = q("[data-pno]"))) { const [f, i] = b.dataset.pno.split(":"); BEW.doc.pruef[f].vorschlaege[+i].st = "nein"; bpRenderText(f); bpStatus(); bewSave(true); return; }
+  if ((b = q("[data-kok]"))) { const [f, i] = b.dataset.kok.split(":"); BEW.doc.pruef[f].klaeren[+i].st = "ok"; bpRenderText(f); bpStatus(); bewSave(true); return; }
+  if (q("[data-pundo]")) { bpUndo(); return; }
+  if ((b = q("[data-pgo]")) || (b = q("mark[data-pv]"))) {
+    const [f, i] = (b.dataset.pgo || b.dataset.pv).split(":");
+    const other = b.dataset.pgo ? document.querySelector(`mark[data-pv="${f}:${i}"]`) : document.querySelector(`[data-pvrow="${f}:${i}"]`);
+    if (other) { other.scrollIntoView({ block: "center", behavior: "smooth" }); other.classList.add("act-flash"); setTimeout(() => other.classList.remove("act-flash"), 1500); }
+    return;
+  }
 });
 $("bBody").addEventListener("change", (e) => {
   if (e.target.id === "bAnrede") bewMark();
@@ -3535,13 +3746,14 @@ $("bBody").addEventListener("change", (e) => {
   if (e.target.id === "bFormFile" && e.target.files.length) { const f = e.target.files[0]; e.target.value = ""; formStart(f); }
 });
 // Gespeichert wird nur mit «Speichern» (und beim PDF). Schliessen mit ✕ verwirft nach Rückfrage.
-const bewFields = () => { const d = BEW.doc || {}; return JSON.stringify([d.adresse, d.anrede, d.name, d.text, d.bemerkung || "", d.auswahl || {}, d.beilagen || []]); };
+const bewFields = () => { const d = BEW.doc || {}; return JSON.stringify([d.adresse, d.anrede, d.name, d.text, d.bemerkung || "", d.betreff || "", d.auswahl || {}, d.beilagen || []]); };
 function bewDirty() { if (!$("bText")) return false; bewRead(); return bewFields() !== BEW.saved; }
 function bewMark() {
   const b = $("bSave"); if (!b) return;
   const dirty = bewDirty();
   b.classList.toggle("primary", dirty); b.textContent = dirty ? "Speichern" : "Gespeichert";
   if ($("bDirty")) $("bDirty").hidden = !dirty;
+  b.closest(".bewfoot")?.classList.toggle("bp-clean", !dirty);
 }
 async function bewSave(quiet) {
   bewRead();
@@ -3600,7 +3812,7 @@ $("bBody").addEventListener("keydown", (e) => {
 
 // --- Claude ---
 const BEW_SYSTEM = `Du hilfst Leonie Meier und Pascal Stadelmann (mit Sohn Lio) bei Wohnungsbewerbungen in Zürich-Wollishofen.
-Du bearbeitest zwei Texte: das Anschreiben (PDF auf ihrer Vorlage) und die Bemerkung fürs Online-Formular der Verwaltung.
+Du bearbeitest zwei Texte: das Anschreiben (PDF auf ihrer Vorlage) und die «Bemerkung»: ein kurzer Begleittext, mit dem sie das Dossier schicken – als Mail-Text (dazu ein kurzer Betreff) oder im Feld «Bemerkung» eines Online-Formulars.
 Regeln:
 - Deutsch in Schweizer Schreibweise (ss statt ß, «» als Anführungszeichen), «wir»-Form, Verwaltung wird gesiezt.
 - Die Texte sollen nach Leonie und Pascal klingen, nicht nach KI: ihren Wortlaut und Satzbau so weit wie möglich behalten. Keine Floskeln, keine Superlative, keine Adjektivketten, keine Emojis.
@@ -3620,21 +3832,29 @@ Regeln:
   Nichts doppelt, keine Hinweise ohne Nutzen. Prüfe Widersprüche zwischen Anschreiben, Bemerkung, Stammdaten und Inserat, falsche oder veraltete Fakten, riskante oder missverständliche Sätze, Floskeln, Länge (das Anschreiben muss auf eine Seite passen: höchstens etwa 230 Wörter). «stelle» ist ein wörtliches, kurzes Zitat aus dem betroffenen Text (oder leer). Keine Hinweise auf offene [Platzhalter], die sind bekannt.
 - Die gelernten Regeln stammen aus Änderungen, die Leonie und Pascal von Hand gemacht haben. Sie haben Vorrang vor allgemeinen Stilregeln.
 - Nach-Check Textstil (Pascals Wunsch, immer bevor du antwortest): Lies jeden Satz, den du geschrieben oder geändert hast, so, als würden Leonie oder Pascal ihn laut sagen. Würden sie das so sagen? Typisch künstlich/KI: das Inserat nacherzählen («spricht uns an, dass …»), allgemeine Wertesätze («schätzen eine lebendige Nachbarschaft», «legen Wert auf …»), Dreierketten und Adjektivhäufungen, zu glatte, symmetrische Sätze, «besonders», «sehr gerne», «gegenseitig», Doppelpunkt-Effekte, Gedankenstriche als Stilmittel, Sätze, die für jede Familie und jede Wohnung passen würden. Solche Sätze ersetzt du durch einen einfachen, konkreten Satz oder streichst sie. Im Zweifel kürzer. Bei «Rechtschreibung prüfen» und «Stolpersteine» änderst du den Text nicht, sondern nennst künstlich wirkende Stellen als Hinweis.
-- Antworte ausschliesslich mit dem Werkzeug «bewerbung».`;
+- Antworte mit dem Werkzeug «bewerbung» (ausser der Auftrag nennt ein anderes).`;
 const BEW_TOOL = { name: "bewerbung", description: "Ergebnis: beide Texte (vollständig) und Hinweise.",
   input_schema: { type: "object", required: ["anschreiben", "bemerkung", "hinweise"], properties: {
     anschreiben: { type: "string", description: "Vollständiger Anschreiben-Text ohne Anrede, Absätze durch Leerzeile getrennt" },
-    bemerkung: { type: "string", description: "Vollständige Bemerkung fürs Online-Formular (mit eigener Grusszeile am Anfang und Schluss)" },
+    bemerkung: { type: "string", description: "Vollständiger Begleittext (Mail-Text bzw. Bemerkung im Online-Formular, mit eigener Grusszeile am Anfang und Schluss)" },
+    betreff: { type: "string", description: "Kurzer Mail-Betreff, z.B. «Bewerbung 3.5-Zimmer-Wohnung Thujastrasse 31»" },
     hinweise: { type: "array", items: { type: "object", required: ["text", "art"], properties: { art: { type: "string", enum: ["klaeren", "idee", "erklaerung"] }, stelle: { type: "string" }, text: { type: "string", description: "ein kurzer Satz" } } } },
     regel_vorschlaege: { type: "array", description: "Nur bei Kommentaren, die allgemein für künftige Texte gelten: als kurze Schreibregel", items: { type: "object", required: ["regel"], properties: { regel: { type: "string" }, beispiel: { type: "string" } } } },
     aenderungen: { type: "array", description: "Nur bei Rechtschreibprüfung: was korrigiert wurde", items: { type: "object", properties: { vorher: { type: "string" }, nachher: { type: "string" } } } } } } };
 const BEW_AUFTRAG = {
   entwurf: `Erstelle beide Texte für diese Wohnung.
 Anschreiben: Gehe vom Grundtext der Vorlage aus und behalte Aufbau, Wortwahl und Ton. Passe an: die Adresse im ersten Satz (richtige Präposition, z.B. «am Elfenweg», «an der Thujastrasse»), Fakten, die heute nicht mehr stimmen, Widersprüche zum Inserat und, wo es diese Wohnung verlangt, die Gewichtung (Genossenschaft: Nachbarschaft und Mitmachen; private Verwaltung: Verlässlichkeit, sicheres Einkommen, langfristig bleiben). Frage dich: Was will diese Verwaltung lesen, um uns zu nehmen – ohne zu übertreiben? Der Grund für den Umzug (Grosseltern in Luzern betreuen Lio, von Wollishofen viel näher) bleibt drin, wo er für die Lage stimmt (siehe Regeln). Nach einer Besichtigung [Platzhalter] für das, was ihnen gefallen hat, stehen lassen; vor der Besichtigung keine. Vor der Besichtigung ist der Schluss die Bitte um einen Besichtigungstermin statt «positive Rückmeldung». Falls das Inserat konkrete Merkmale nennt, schlage sie in einem Hinweis vor (nicht in den Text schreiben).
-Bemerkung: Gehe von der Vorlage-Bemerkung aus und passe sie an dieses Inserat an (Zimmerzahl, Strasse, Genossenschaft oder private Verwaltung). Den Satz zur Belegung nur, wenn das Inserat die Personenzahl begrenzt. Kurz halten.`,
+Bemerkung (Begleittext): Gehe von der Vorlage-Bemerkung aus und passe sie an dieses Inserat an (Zimmerzahl, Strasse, Genossenschaft oder private Verwaltung). Sie muss als Mail-Text funktionieren, mit dem das Dossier geschickt wird («Im Anhang finden Sie unser Dossier …»), und ebenso im Bemerkungsfeld eines Formulars. Den Satz zur Belegung nur, wenn das Inserat die Personenzahl begrenzt. Kurz halten. Dazu ein kurzer «betreff».`,
   anweisung: `Setze die Kommentare von Leonie/Pascal (unten) um. Ändere nur die kommentierten Stellen bzw. was ein allgemeiner Kommentar verlangt; alles andere bleibt wörtlich gleich. Die Kommentare nennen, für welchen Text sie gelten; der andere Text bleibt unverändert. Ist ein Kommentar allgemein gemeint (gilt auch für künftige Texte), schlage ihn zusätzlich als kurze Schreibregel in «regel_vorschlaege» vor.`,
   pruefen: `Prüfe beide Texte nur auf Rechtschreibung, Grammatik und Zeichensetzung (Schweizer Schreibweise). Keine stilistischen Änderungen, keine Umformulierungen. Liste jede Korrektur in «aenderungen». Inhaltliche Probleme nur als Hinweis, nicht im Text ändern.`,
   hinweise: `Ändere die Texte nicht (gib sie wörtlich zurück). Liefere nur die Hinweise zu Stolpersteinen.`,
+  pruefung: (feld) => `Prüfe nur den Text «${feld === "text" ? "Anschreiben" : "Bemerkung (Begleit-Mail / Bemerkung im Online-Formular)"}». Leonie oder Pascal haben ihn eben bearbeitet. Ändere ihn nicht selbst, sondern liefere jede Verbesserung als Vorschlag:
+- «alt»: wörtliches, möglichst kurzes Zitat aus dem Text (ganze Wörter, kommt genau einmal vor), «neu»: der Ersatz (leer = streichen), «grund»: wenige Worte.
+- Prüfe: Rechtschreibung, Grammatik, Zeichensetzung (Schweizer Schreibweise), den Nach-Check Textstil (künstlich wirkende Sätze → einfacher, konkreter Ersatz in ihrem Ton), falsche oder veraltete Fakten und Widersprüche zu Stammdaten, Inserat und dem anderen Text, Länge.
+- Höchstens 12 Vorschläge, die wichtigsten zuerst. Nur echte Verbesserungen – ihr Wortlaut hat Vorrang.
+- Was sie selbst entscheiden müssen und sich nicht als Ersatz schreiben lässt, kommt in «zu_klaeren» (höchstens 3, je ein Satz).
+- Keine Vorschläge zu offenen [Platzhaltern]. Ist alles gut: leere Listen.
+Antworte für diesen Auftrag mit dem Werkzeug «pruefung».`,
 };
 function bewInserat() {
   const x = BEW.x, d = BEW.d || {}, f = d.facts || {};
@@ -3644,7 +3864,7 @@ function bewInserat() {
     merkmale: d.attributes, einschaetzung_claude: x.ai?.text, haken: x.ai?.haken, beschreibung: desc, eigene_notiz: itemOf(BEW.k).note || undefined,
     stand: ({ besichtigung: "Besichtigung vereinbart oder gemacht", beworben: "schon beworben", angefragt: "angefragt, noch nicht besichtigt" })[itemOf(BEW.k).status?.value] || "noch nicht besichtigt (Erstkontakt)" }, null, 1);
 }
-async function claudeCall(mode, instr) {
+async function claudeCall(mode, instr, feld) {
   const c = BEW.ctx, doc = bewRead();
   const user = `Heute ist ${new Date().toLocaleDateString("de-CH", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}.
 
@@ -3681,14 +3901,14 @@ Adresse: ${doc.adresse}
 Anrede: ${anredeZeile(doc.anrede, doc.name)}
 --- Anschreiben ---
 ${doc.text}
---- Bemerkung ---
-${doc.bemerkung || "(noch leer)"}
+--- Bemerkung (Begleittext) ---
+${doc.betreff ? `Betreff: ${doc.betreff}\n` : ""}${doc.bemerkung || "(noch leer)"}
 </aktuell>
 
 <auftrag>
-${BEW_AUFTRAG[mode]}${instr ? `\nAnweisung: ${instr}` : ""}
+${typeof BEW_AUFTRAG[mode] === "function" ? BEW_AUFTRAG[mode](feld) : BEW_AUFTRAG[mode]}${instr ? `\nAnweisung: ${instr}` : ""}
 </auftrag>`;
-  return claudeTool(BEW_SYSTEM, user, BEW_TOOL, "anschreiben");
+  return mode === "pruefung" ? claudeTool(BEW_SYSTEM, user, PRUEF_TOOL, "vorschlaege") : claudeTool(BEW_SYSTEM, user, BEW_TOOL, "anschreiben");
 }
 async function claudeTool(system, user, tool, need) {
   const r = await fetch("https://api.anthropic.com/v1/messages", { method: "POST",
@@ -3719,12 +3939,13 @@ async function bewKi(mode, instrIn, kfeld) {
     if (mode !== "hinweise") {
       if (text) $("bText").value = text;
       if (note) $("bNote").value = note;
+      if (res.betreff && $("bBetreff")) $("bBetreff").value = String(res.betreff).trim();
     }
     BEW.doc.hinweise = (res.hinweise || []).filter((h) => h && h.text).slice(0, 8);
     bewRead(); bewCount();
     const changed = before.text !== BEW.doc.text || before.bemerkung !== BEW.doc.bemerkung;
     BEW.prev = changed ? before : null;
-    bewTips(); bewDiff(before, res.aenderungen, mode);
+    bewTips(); bewDiff(before, res.aenderungen, mode); bpRenderText("text"); bpRenderText("bemerkung"); bpStatus();
     $("bState").textContent = mode === "pruefen" ? (changed ? "Korrekturen sind unten markiert." : "Keine Fehler gefunden.")
       : changed ? "Fertig. Änderungen sind unten markiert." : "Fertig.";
     if (mode === "anweisung" && kfeld) { kmtApplied(kfeld); BEW.kmtUndo = kfeld; }
@@ -3752,9 +3973,11 @@ function bewTips() {
     + (er.length ? `<p class="hint erkl">${er.map((t) => esc(t.text)).join(" ")}</p>` : "");
 }
 function bewShow(q) {
-  for (const id of ["bText", "bNote"]) {
+  for (const [id, feld] of [["bText", "text"], ["bNote", "bemerkung"]]) {
     const el = $(id), i = el.value.indexOf(q);
-    if (i >= 0) { el.focus(); el.setSelectionRange(i, i + q.length); el.scrollIntoView({ block: "center", behavior: "smooth" }); return; }
+    if (i < 0) continue;
+    if (!BEW.edit?.has(feld)) { bpToggle(feld === "text" ? "anschreiben" : "begleit", true); bpEdit(feld, true); }
+    setTimeout(() => { el.focus(); el.setSelectionRange(i, i + q.length); el.scrollIntoView({ block: "center", behavior: "smooth" }); }, 60); return;
   }
   toast("Stelle nicht mehr gefunden.", "");
 }
@@ -3785,7 +4008,7 @@ function bewDiff(before, aend) {
 function bewUndo() {
   if (!BEW.prev) return;
   $("bText").value = BEW.prev.text; $("bNote").value = BEW.prev.bemerkung || "";
-  BEW.prev = null; bewRead(); bewCount(); $("bDiff").innerHTML = ""; $("bState").textContent = "Rückgängig gemacht.";
+  BEW.prev = null; bewRead(); bewCount(); $("bDiff").innerHTML = ""; $("bState").textContent = "Rückgängig gemacht."; bpRenderText("text"); bpRenderText("bemerkung"); bpStatus();
   if (BEW.kmtUndo) { kmtRestore(BEW.kmtUndo); BEW.kmtUndo = null; }
   BEW.doc.ki = { text: BEW.doc.text, bemerkung: BEW.doc.bemerkung || "", at: new Date().toISOString() };
   bewMark();
@@ -4076,7 +4299,7 @@ sonst so viel Haus wie möglich. Nichts beschönigen, aber auch nichts erfinden.
 Hinweise auf Deutsch in Schweizer Schreibweise (ss statt ß), je ein kurzer Satz, nur was wirklich zählt.`;
 const FOTO = { img: null, w: 0, h: 0, crop: null, res: null, file: null, busy: false };
 function fotoRender() {
-  const box = $("bFotoBody"); if (!box) return;
+  const box = $("bFotoBody"); if (!box) return; bpStatus();
   if (FOTO.img) {            // Bearbeiten
     const r = FOTO.res || {};
     box.innerHTML = `<p class="hint">Verschieben mit dem Finger, Grösse mit dem Regler. Der Kreis ist genau, was ins Schreiben kommt.</p>
