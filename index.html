@@ -671,16 +671,16 @@ label.f small, div.f small { color: var(--muted); font: 500 12.5px var(--body) }
 .tip.ok{color:var(--ok)} .tip.warn{color:var(--bad)}
 /* Rückmeldung an Knöpfen (v84) */
 button, .btn, .linkbtn, label[for] { transition: transform .12s ease, opacity .12s }
-.tap { transform: scale(.95) }
-.busy, .done, .fail { position: relative; pointer-events: none }
-.busy::after, .done::after, .fail::after { content: attr(data-busy); position: absolute; inset: 0; display: flex; align-items: center;
+.act-tap { transform: scale(.95) }
+.act-busy, .act-done, .act-fail { position: relative; pointer-events: none }
+.act-busy::after, .act-done::after, .act-fail::after { content: attr(data-busy); position: absolute; inset: 0; display: flex; align-items: center;
   justify-content: center; padding: 0 8px; border-radius: inherit; font: 600 13px/1.1 var(--body); white-space: nowrap; overflow: hidden;
   background: var(--accent-soft); color: var(--accent); box-shadow: inset 0 0 0 1.5px var(--accent) }
-.busy::after { animation: actpulse 1.2s ease-in-out infinite }
-.done::after { background: var(--ok-soft); color: var(--ok); box-shadow: inset 0 0 0 1.5px var(--ok) }
-.fail::after { background: #FDECEB; color: var(--bad); box-shadow: inset 0 0 0 1.5px var(--bad) }
+.act-busy::after { animation: actpulse 1.2s ease-in-out infinite }
+.act-done::after { background: var(--ok-soft); color: var(--ok); box-shadow: inset 0 0 0 1.5px var(--ok) }
+.act-fail::after { background: #FDECEB; color: var(--bad); box-shadow: inset 0 0 0 1.5px var(--bad) }
 @keyframes actpulse { 50% { opacity: .65 } }
-.flash { animation: actflash 1.6s ease-out }
+.act-flash { animation: actflash 1.6s ease-out }
 @keyframes actflash { 0% { box-shadow: 0 0 0 3px var(--accent) } 100% { box-shadow: 0 0 0 0 transparent } }
 .shotgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
 .shotgrid .f small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
@@ -1019,7 +1019,7 @@ function actArm(b) {
 }
 document.addEventListener("click", (e) => {
   const b = e.target.closest("button, .btn, .linkbtn, label[for]"); if (!b || b.disabled) return;
-  b.classList.add("tap"); setTimeout(() => b.classList.remove("tap"), 170);
+  b.classList.add("act-tap"); setTimeout(() => b.classList.remove("act-tap"), 170);
   // Tabs, Filter, Sortierung schalten nur um – keine Lauf-Anzeige (sonst würde ein Hintergrund-Laden dort erscheinen)
   if (!b.closest(".toast, .seg, .stabs, .tabbar, [data-filter], [data-sort], [data-tab], [data-stab], [data-bstep]")) actArm(b);
 }, true);
@@ -1030,7 +1030,7 @@ document.addEventListener("change", (e) => {
 function actPaint() {
   const el = actEl(); if (!el) return;
   const s = Math.round((Date.now() - ACT.t0) / 1000), small = el.offsetWidth < 96;
-  el.classList.add("busy"); el.classList.remove("done", "fail");
+  el.classList.add("act-busy"); el.classList.remove("act-done", "act-fail");
   el.setAttribute("data-busy", small ? (ACT.ki ? `✦ ${s} s` : s >= 1 ? `${s} s` : "…") : ACT.ki ? `Claude arbeitet … ${s} s` : s >= 2 ? `läuft … ${s} s` : "läuft …");
 }
 function actBegin(url) {
@@ -1043,9 +1043,9 @@ function actBegin(url) {
 }
 function actShow(el, ok, text) {
   if (!el) return;
-  el.classList.remove("busy"); el.classList.add(ok ? "done" : "fail");
+  el.classList.remove("act-busy"); el.classList.add(ok ? "act-done" : "act-fail");
   el.setAttribute("data-busy", el.offsetWidth < 96 ? (ok ? "✓" : "✕") : (ok ? "✓ " : "✕ ") + text);
-  setTimeout(() => { el.classList.remove("done", "fail"); el.removeAttribute("data-busy"); }, ok ? 2500 : 6000);
+  setTimeout(() => { el.classList.remove("act-done", "act-fail"); el.removeAttribute("data-busy"); }, ok ? 2500 : 6000);
 }
 function actFinish(tok) {
   if (!tok) return;
@@ -1179,7 +1179,7 @@ function applyDeep(final) {
     const card = document.querySelector(`.card[data-key="${CSS.escape(k)}"]`);
     if (!card) return;
     card.scrollIntoView({ block: "start", behavior: "smooth" });
-    card.classList.remove("flash"); void card.offsetWidth; card.classList.add("flash");
+    card.classList.remove("act-flash"); void card.offsetWidth; card.classList.add("act-flash");
     if (d.comments) { const t = card.querySelector(".cform textarea"); if (t) setTimeout(() => t.focus({ preventScroll: true }), 500); }
   }, 60);
 }
@@ -1511,7 +1511,7 @@ ${instr}
       $("kTips").innerHTML = tips.map((h) => `<div class="tip">${esc(h.text)}</div>`).join("") || `<div class="tip">Passt so.</div>`;
       if (st) st.textContent = `✦ Geprüft – ${tips.length && !/^passt so/i.test(tips[0].text) ? tips.length + " Hinweis" + (tips.length > 1 ? "e" : "") : "passt so"}. Euer Text ist unverändert.`;
       toast(tips.length && !/^passt so/i.test(tips[0].text) ? `${tips.length} Hinweis${tips.length > 1 ? "e" : ""}` : "Passt so", "ok");
-      $("kTips").scrollIntoView({ behavior: "smooth", block: "center" }); $("kTips").classList.add("flash"); setTimeout(() => $("kTips")?.classList.remove("flash"), 1700);
+      $("kTips").scrollIntoView({ behavior: "smooth", block: "center" }); $("kTips").classList.add("act-flash"); setTimeout(() => $("kTips")?.classList.remove("act-flash"), 1700);
       return;
     }
     if (S.detailKey === k && $("kText") && text) {
@@ -1525,7 +1525,7 @@ ${instr}
       if (lv.length) learnBox("kLearn", lv);
       kontaktSave(k, text, true); kontaktButtons();
       toast(instr ? "Überarbeitet" : "Entwurf geschrieben", "ok");
-      $("kText").scrollIntoView({ behavior: "smooth", block: "center" }); $("kText").classList.add("flash"); setTimeout(() => $("kText")?.classList.remove("flash"), 1700);
+      $("kText").scrollIntoView({ behavior: "smooth", block: "center" }); $("kText").classList.add("act-flash"); setTimeout(() => $("kText")?.classList.remove("act-flash"), 1700);
     }
   } catch (e) { if (st) st.textContent = "Claude: " + e.message; toast("Claude: " + e.message, "err", 7000); }
   finally { KON.busy = false; $("kKi") && ($("kKi").disabled = false); }
@@ -3276,7 +3276,7 @@ let installEvt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("installBtn").hidden = false; $("installHint").hidden = true; });
 $("installBtn").addEventListener("click", async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("installBtn").hidden = true; });
 if (window.matchMedia("(display-mode: standalone)").matches) { $("installHint").textContent = "Läuft als App."; }
-const APP_VERSION = "85 · 14.11.2026";
+const APP_VERSION = "86 · 14.11.2026";
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").then((reg) => { reg.update().catch(() => {}); }).catch(() => {});
   let reloaded = false;
@@ -3643,7 +3643,7 @@ async function bewKi(mode, instrIn, kfeld) {
     const nt = (BEW.doc.hinweise || []).length;
     toast(changed ? "Geändert – unten markiert" : nt ? `${nt} Hinweis${nt > 1 ? "e" : ""}` : mode === "pruefen" ? "Keine Fehler" : "Fertig", "ok");
     const tgt = changed ? $("bDiff") : nt ? $("bTips") : null;
-    if (tgt && tgt.innerHTML.trim()) { tgt.scrollIntoView({ behavior: "smooth", block: "center" }); tgt.classList.add("flash"); setTimeout(() => tgt.classList.remove("flash"), 1700); }
+    if (tgt && tgt.innerHTML.trim()) { tgt.scrollIntoView({ behavior: "smooth", block: "center" }); tgt.classList.add("act-flash"); setTimeout(() => tgt.classList.remove("act-flash"), 1700); }
   } catch (e) { $("bState").textContent = "Fehler: " + e.message; toast("Claude: " + e.message, "err", 7000); }
   finally { BEW.busy = false; document.querySelectorAll("#bClaude [data-ki]").forEach((b) => (b.disabled = false)); }
 }
