@@ -672,7 +672,7 @@ label.f small, div.f small { color: var(--muted); font: 500 12.5px var(--body) }
 
 <header class="appbar">
   <h1>Wolli<span class="w2">hood</span><span class="sub" id="subline">Wohnungssuche Wollishofen</span></h1>
-  <button class="iconbtn" id="addLinkBtn" type="button" aria-label="Wohnung per Link hinzufügen">
+  <button class="iconbtn" id="addLinkBtn" type="button" aria-label="Wohnung hinzufügen (Link oder Screenshots)">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
   </button>
   <button class="iconbtn" id="refreshBtn" type="button" aria-label="Neu laden">
@@ -1940,6 +1940,11 @@ const MAN_PATTERNS = [
   ["Flatfox", /flatfox\.ch\/[^\s?#]*?\/(\d{4,10})\/?(?:[?#\s]|$)/i, "flatfox", "https://flatfox.ch/de/flat/{id}/"],
 ];
 const firstLink = (t) => { const m = String(t || "").match(/https?:\/\/[^\s<>"']+/); return m ? m[0].replace(/[.,;)]+$/, "") : ""; };
+// Ohne Link (nur Screenshots, 14.11.): Schlüssel aus der Eintrags-Nummer – Suchskript: manual.key_without_link
+async function manualKeyNoLink(id) {
+  const h = await crypto.subtle.digest("SHA-1", new TextEncoder().encode("hand:" + id));
+  return "manual:" + [...new Uint8Array(h)].map((b) => b.toString(16).padStart(2, "0")).join("").slice(0, 12);
+}
 async function manualKey(url) {
   for (const [portal, rx, prefix, canon] of MAN_PATTERNS) {
     const m = url.match(rx);
@@ -1966,9 +1971,9 @@ function mergeManual() {
     if (!it.key || hitByKey(it.key)) continue;
     const d = done[it.id];
     if (d && d.ok) continue;    // verarbeitet, aber (noch) nicht in der Liste: nicht doppelt zeigen
-    S.hits.unshift({ keys: [it.key], url: it.url, portal: it.portal, title: it.street || it.portal, street: it.street || null,
+    S.hits.unshift({ keys: [it.key], url: it.url || null, portal: it.portal, title: it.street || it.portal, street: it.street || null,
       plz: it.plz || null, city: it.city || null, rooms: it.rooms ?? null, rent: it.rent ?? null, m2: it.m2 ?? null,
-      first_seen: it.at, published: it.at, published_precision: "found", sources: [{ portal: it.portal, url: it.url, at: it.at }],
+      first_seen: it.at, published: it.at, published_precision: "found", sources: it.url ? [{ portal: it.portal, url: it.url, at: it.at }] : [],
       manual: { by: it.by, at: it.at, pending: true, error: d && !d.ok ? (d.error || "unbekannt") : null } });
   }
 }
@@ -2026,12 +2031,12 @@ async function saveManualItem(item) {
 function openManual(pre = {}) {
   if (needPerson()) return;
   S.detailKey = null; S.manFiles = [...(pre.files || [])];
-  $("dTitle").textContent = "Wohnung per Link";
+  $("dTitle").textContent = "Wohnung hinzufügen";
   $("detail").hidden = false; document.body.style.overflow = "hidden";
   $("dBody").innerHTML = `<div class="panel manform">
-    <p class="hint">Kommt in die Treffer, egal was das Suchraster sagt. Bei Flatfox holt Wollihood alle Angaben selbst; bei Homegate, ImmoScout24 &amp; Co. zählen eure Angaben und Screenshots.</p>
-    <label class="f">Link zum Inserat<input class="field" id="mUrl" type="url" inputmode="url" placeholder="https://…" value="${esc(pre.url || "")}"></label>
-    <div class="f"><small>Screenshots (optional)</small>
+    <p class="hint">Kommt in die Treffer, egal was das Suchraster sagt. Link oder Screenshots genügen. Bei Flatfox holt Wollihood alle Angaben selbst; sonst liest Claude sie aus den Screenshots.</p>
+    <label class="f">Link zum Inserat (optional)<input class="field" id="mUrl" type="url" inputmode="url" placeholder="https://…" value="${esc(pre.url || "")}"></label>
+    <div class="f"><small>Screenshots</small>
       <div class="manthumbs" id="mThumbs"></div>
       <label class="btn" for="mFiles">Screenshots wählen</label><input type="file" id="mFiles" accept="image/*,application/pdf" multiple hidden>
       <p class="hint" id="mKi" hidden></p></div>
@@ -2059,11 +2064,14 @@ function openManual(pre = {}) {
 }
 async function saveManual() {
   const raw = $("mUrl").value.trim(), url = firstLink(raw) || (/^www\./i.test(raw) ? "https://" + raw : "");
-  if (!url) { toast("Bitte einen Link einfügen (https://…).", "err"); $("mUrl").focus(); return; }
+  const hasShots = S.manFiles.some((f) => f.type.startsWith("image/"));
+  if (raw && !url) { toast("Das ist kein Link (https://…). Feld leeren, wenn ihr nur Screenshots habt.", "err"); $("mUrl").focus(); return; }
+  if (!url && !hasShots && !$("mStreet").value.trim()) { toast("Bitte einen Link oder Screenshots hinzufügen.", "err"); return; }
   const btn = $("mSave"); btn.disabled = true; btn.textContent = "Speichere …";
   try {
-    const mk = await manualKey(url), k = mk.key;
-    const known = hitByKey(k) || hitByUrl(url, mk.url);
+    const id = "m" + Date.now().toString(36);
+    const mk = url ? await manualKey(url) : { key: await manualKeyNoLink(id), portal: "Screenshot", url: null }, k = mk.key;
+    const known = hitByKey(k) || (url ? hitByUrl(url, mk.url) : null);
     const note = $("mNote").value.trim();
     if (known) {
       // schon in der Liste (oder wird gerade geholt): nur Screenshots/Notiz dazu
@@ -2072,15 +2080,17 @@ async function saveManual() {
       S.manFiles = [];
       toast(known.manual?.pending ? "Diese Wohnung wird schon geholt." : "Diese Wohnung ist schon in der Liste.", "ok"); openDetail(keyOf(known)); return;
     }
-    const item = { id: "m" + Date.now().toString(36), url: mk.url, key: k, portal: mk.portal, by: S.person, at: new Date().toISOString(),
+    const item = { id, url: mk.url, key: k, portal: mk.portal, by: S.person, at: new Date().toISOString(),
       street: $("mStreet").value.trim() || null, plz: $("mPlz").value.trim() || null, city: $("mCity").value.trim() || null,
       rooms: numIn($("mRooms").value), rent: numIn($("mRent").value), m2: numIn($("mM2").value), note: note || null, text: S.manText || null };
     toast("Speichere …", "", 0);
     await saveManualItem(item);
     S.hits = S.hits.filter((h) => !(h.manual?.pending && keyOf(h) === k)); mergeManual();
     S.seen.add(k); saveSeen();
+    const shotImgs = S.manFiles.filter((f) => f.type.startsWith("image/"));
     if (S.manFiles.length || note) await uploadOwn(k, S.manFiles, note);
     S.manFiles = []; renderHits();
+    if (shotImgs.length && !k.startsWith("flatfox:")) setTimeout(() => shotsRun(k, shotImgs), 600);   // Fotos ausschneiden
     toast("Hinzugefügt. Wollihood holt die Details, in ca. 2 Min. ist sie fertig.", "ok", 6000);
     openDetail(k);
     setTimeout(load, 150000);
@@ -3154,7 +3164,7 @@ let installEvt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("installBtn").hidden = false; $("installHint").hidden = true; });
 $("installBtn").addEventListener("click", async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("installBtn").hidden = true; });
 if (window.matchMedia("(display-mode: standalone)").matches) { $("installHint").textContent = "Läuft als App."; }
-const APP_VERSION = "82 · 12.11.2026";
+const APP_VERSION = "83 · 14.11.2026";
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").then((reg) => { reg.update().catch(() => {}); }).catch(() => {});
   let reloaded = false;
