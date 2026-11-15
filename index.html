@@ -645,6 +645,7 @@ label.f small, div.f small { color: var(--muted); font: 500 12.5px var(--body) }
 #bBody > .panel { box-shadow: none; border: 1px solid var(--hair); margin: 0 }
 #dStand .bewfoot { position: sticky; bottom: 0; margin: 0; border-radius: 12px; padding: 10px 12px }
 .d-restbtn { justify-self: center; padding: 10px }
+.dfacts .dadr { grid-column: 1 / -1 }
 /* v91: Verschicken & Dateien */
 #bSendBody { display: grid; gap: 12px }
 .s-weg { display: grid; gap: 10px; padding: 12px; border-radius: 12px; background: var(--sunk) }
@@ -1902,15 +1903,19 @@ function renderDetail(x, a, d) {
     : a.online === "online" ? `<div class="onl online">Noch online · gesichert ${esc(ago(a.archived_at))}</div>`
     : `<div class="onl">Gesichert ${esc(ago(a.archived_at))} · Online-Status bei diesem Portal nicht prüfbar</div>`;
   const imgs = (d?.images || []);
-  const sfs = shotFotos(S.detailKey), sfm = (shotOk(S.detailKey)?.fotos || []).filter((f) => f.path);
-  const gal = sfs.length ? `<div class="gal">${sfs.map((pth, i) => `<figure><img data-src="${esc(pth)}" data-full="${esc(pth)}" alt=""><figcaption>${i + 1}/${sfs.length} · ${sfm[i]?.muster ? "Musterfoto" : sfm[i]?.art === "grundriss" ? "Grundriss" : "aus Screenshot"}</figcaption></figure>`).join("")}${imgs.map((im) => `<figure><img data-src="archiv/${esc(a.id)}/${esc(im.file)}" alt=""><figcaption>Inserat</figcaption></figure>`).join("")}</div>`
-    : imgs.length ? `<div class="gal">${imgs.map((im, i) => `<figure><img data-src="archiv/${esc(a.id)}/${esc(im.file)}" alt="${esc(im.caption || "")}"><figcaption>${i + 1}/${imgs.length}</figcaption></figure>`).join("")}</div>`
-    : x.image ? `<div class="gal"><figure><img src="${esc(x.image)}" alt="" referrerpolicy="no-referrer"></figure></div>`
-    : ownPhoto(S.detailKey) ? `<div class="gal"><figure><img data-src="${esc(ownPhoto(S.detailKey))}" data-full="${esc(ownPhoto(S.detailKey))}" alt=""><figcaption>Eigener Screenshot</figcaption></figure></div>`
+  const sfs = shotFotos(S.detailKey), sfm = (shotOk(S.detailKey)?.fotos || []).filter((f) => f.path), own = ownFotos(S.detailKey);
+  const figs = [
+    ...sfs.map((pth, i) => ({ html: `<img data-src="${esc(pth)}" data-full="${esc(pth)}" alt="">`, cap: sfm[i]?.muster ? "Musterfoto" : sfm[i]?.art === "grundriss" ? "Grundriss" : "aus Screenshot" })),
+    ...imgs.map((im) => ({ html: `<img data-src="archiv/${esc(a.id)}/${esc(im.file)}" alt="${esc(im.caption || "")}">`, cap: "Inserat" })),
+    ...(!sfs.length && !imgs.length && x.image ? [{ html: `<img src="${esc(x.image)}" alt="" referrerpolicy="no-referrer">`, cap: "Inserat" }] : []),
+    ...own.map((pth) => ({ html: `<img data-src="${esc(pth)}" data-full="${esc(pth)}" alt="">`, cap: "eigenes Foto" })),
+  ];
+  const gal = figs.length ? `<div class="gal">${figs.map((f, i) => `<figure>${f.html}<figcaption>${i + 1}/${figs.length} · ${f.cap}</figcaption></figure>`).join("")}</div>`
     : aerialUrl(x) ? `<div class="gal"><figure><img src="${esc(aerialUrl(x))}" alt="Luftbild"><figcaption>Luftbild · © swisstopo · kein Inseratefoto</figcaption></figure></div>` : "";
   const f = d?.facts || {};
   const fact = (l, v) => (v != null && v !== "" ? `<div><span class="cap">${l}</span><b>${esc(v)}</b></div>` : "");
-  const facts = `<div class="dfacts">${fact("Miete brutto", (f.rent_gross || x.rent) ? "CHF " + fmtN(f.rent_gross || x.rent) : null)}${fact("Netto + NK", f.rent_net ? `${fmtN(f.rent_net)} + ${fmtN(f.rent_charges || 0)}` : null)}
+  const adr = [x.street, [x.plz, x.city].filter(Boolean).join(" ")].filter(Boolean).join(", ");
+  const facts = `<div class="dfacts">${adr ? `<div class="dadr"><span class="cap">Adresse</span><b>${esc(adr)}</b></div>` : ""}${fact("Miete brutto", (f.rent_gross || x.rent) ? "CHF " + fmtN(f.rent_gross || x.rent) : null)}${fact("Netto + NK", f.rent_net ? `${fmtN(f.rent_net)} + ${fmtN(f.rent_charges || 0)}` : null)}
     ${fact("Zimmer", x.rooms ?? f.number_of_rooms)}${fact("Fläche", (x.m2 || f.livingspace) ? (x.m2 || f.livingspace) + " m²" : null)}${fact("Etage", f.floor != null ? (f.floor === 0 ? "EG" : f.floor + ". OG") : x.floor_text || null)}
     ${fact("Baujahr", f.year_built)}${fact("Renoviert", f.year_renovated)}${fact("Bezug", f.moving_date ? new Date(f.moving_date).toLocaleDateString("de-CH") : f.moving_date_type === "imm" ? "sofort" : (x.moving_date ? new Date(x.moving_date).toLocaleDateString("de-CH") : x.moving_date_text || null))}${fact("Befristung", x.limited_text)}</div>`;
   // Kontakt
@@ -2158,7 +2163,7 @@ async function shotsRun(k, files) {
     delete S.shotBusy[k];
     socialOp(`${PEOPLE[S.person]}: Screenshots gelesen (${x.street || "Inserat"})`, (items) => {
       const it = items[k] || (items[k] = { votes: {}, comments: [] });
-      it.shots = { status: "vorschlag", angaben, kontakt, fotos, by: S.person, at: new Date().toISOString() };
+      it.shots = { status: "vorschlag", angaben, kontakt, fotos, quellen: files.map((f) => f.name).filter(Boolean), by: S.person, at: new Date().toISOString() };
     });
     toast("Claude hat die Screenshots gelesen – bitte prüfen.", "ok");
   } catch (e) {
@@ -2208,7 +2213,7 @@ $("dBody").addEventListener("click", async (e) => {
   box.querySelectorAll("[data-shk]").forEach((el) => { const v = el.value.trim(); if (v) kontakt[el.dataset.shk] = v; else delete kontakt[el.dataset.shk]; });
   const keep = new Set([...box.querySelectorAll("[data-shfoto]")].filter((c) => c.checked).map((c) => Number(c.dataset.shfoto)));
   const fotos = (sh.fotos || []).filter((_, i) => keep.has(i));
-  const ok = { status: "ok", angaben, kontakt, fotos, by: S.person, at: new Date().toISOString() };
+  const ok = { status: "ok", angaben, kontakt, fotos, quellen: sh.quellen || [], by: S.person, at: new Date().toISOString() };
   socialOp(`${PEOPLE[S.person]}: Angaben aus Screenshots übernommen`, (items) => { const it = items[k] || (items[k] = { votes: {}, comments: [] }); it.shots = ok; it.updated = ok.at; });
   if (kontakt.firma && (kontakt.telefon || kontakt.mail)) agencyAdd(kontakt.firma, kontakt);
   const x = hitByKey(k); if (x) shotOverlay(x);
@@ -2436,7 +2441,7 @@ async function handleShare(id) {
 $("dBody").addEventListener("click", async (e) => {
   const k0 = S.detailKey;
   const stb = e.target.closest("[data-stab]"); if (stb && k0) { S.dTab = stb.dataset.stab; refreshStand(k0); return; }
-  const sp = e.target.closest("[data-step]"); if (sp && k0) { setStep(k0, sp.dataset.step, sp.dataset.step === "besichtigung" ? { done: true } : {}); return; }
+  const sp = e.target.closest("[data-step]"); if (sp && k0) { if (sp.dataset.step === "bewerbung" && !confirm("Habt ihr die Bewerbung wirklich abgeschickt?")) return; setStep(k0, sp.dataset.step, sp.dataset.step === "besichtigung" ? { done: true } : {}); return; }
   const us = e.target.closest("[data-unstep]"); if (us && k0) { setStep(k0, us.dataset.unstep, null); return; }
   const an = e.target.closest("[data-answer]"); if (an && k0) { setStep(k0, "antwort", { value: an.dataset.answer }); return; }
   if (e.target.id === "kKi" && k0) { kontaktKi(k0); return; }
@@ -2584,7 +2589,18 @@ const placeName = (x) => x.street || [x.rooms != null ? `${x.rooms}-Zimmer-Wohnu
 const shotOk = (k) => { const sh = itemOf(k).shots; return sh && sh.status === "ok" ? sh : null; };
 const shotFotos = (k) => (shotOk(k)?.fotos || []).map((f) => f.path).filter(Boolean);
 // Ein ganzer Screenshot (Text, Knöpfe) ist kein Wohnungsfoto: nur solange Claude ihn nicht gelesen hat, als Notlösung
-const ownPhoto = (k) => shotFotos(k)[0] || (itemOf(k).shots?.status === "ok" ? null : (itemOf(k).files || []).find((f) => f.type !== "application/pdf")?.path) || null;
+// Eigene Fotos (15.11.: Pascals Besichtigungsfotos wurden nicht gezeigt, weil bestätigte Screenshot-Angaben – hier aus dem Chat –
+// alle eigenen Bilder als «gelesene Screenshots» ausschlossen; stattdessen Luftbild). Jetzt: nur echte Screenshots fallen weg
+// (Name «Screenshot…»/«Bildschirmfoto…» oder in shots.quellen), Fotos zählen immer.
+function isShotFile(f, k) {
+  const n = f.name || "", sh = itemOf(k).shots;
+  if (/screenshot|bildschirm|screen_?shot/i.test(n)) return true;
+  if (/^(PXL|IMG|DSC|DCIM|photo|foto)[_-]/i.test(n)) return false;          // Kamera-Fotos zählen immer
+  if (sh?.quellen) return sh.quellen.includes(n);
+  return !!sh && sh.quelle !== "chat" && sh.status === "ok" && (!f.at || !sh.at || f.at <= sh.at);   // ältere Einträge ohne Quellenliste
+}
+const ownFotos = (k) => (itemOf(k).files || []).filter((f) => f.type !== "application/pdf" && !isShotFile(f, k)).map((f) => f.path);
+const ownPhoto = (k) => shotFotos(k)[0] || ownFotos(k)[0] || null;
 function aerialUrl(x) {
   if (x.lat == null || x.lon == null) return null;
   const d = 0.0008, dl = d * 1.48;          // ca. 90 × 120 m, Haus in der Mitte
@@ -3459,7 +3475,7 @@ let installEvt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("installBtn").hidden = false; $("installHint").hidden = true; });
 $("installBtn").addEventListener("click", async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("installBtn").hidden = true; });
 if (window.matchMedia("(display-mode: standalone)").matches) { $("installHint").textContent = "Läuft als App."; }
-const APP_VERSION = "95 · 15.11.2026";
+const APP_VERSION = "96 · 15.11.2026";
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").then((reg) => { reg.update().catch(() => {}); }).catch(() => {});
   let reloaded = false;
