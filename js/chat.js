@@ -123,7 +123,7 @@ Melden sie einen Schritt (angefragt, Besichtigung am …, besichtigt, beworben, 
 Stimmen Angaben nicht (z.B. fehlende Hausnummer im Titel), korrigiere sie in «angaben» (nur geänderte Felder). Erwähnen sie, wie die Bewerbung eingereicht wird (per Mail, über eine Online-Plattform oder ein Online-Formular, über ein Portal wie Flatfox, auf Papier), setze IMMER zusätzlich «weg» (mail, plattform, portal, papier) – auch wenn sie es nur nebenbei sagen.
 
 <texte>
---- Anschreiben (Anrede: ${doc.anrede || ""} ${doc.name || ""}) ---
+--- Anschreiben (Anrede: ${anredeZeile(doc.anrede, doc.name) || "keine separate, steht im Text"}) ---
 ${doc.text || "(leer)"}
 --- Begleit-Mail (Betreff: ${doc.betreff || "(leer)"}) ---
 ${doc.bemerkung || "(leer)"}

@@ -2,9 +2,10 @@
 // ---------- Bewerbung: Anschreiben + Bemerkung mit Claude, PDF auf der Canva-Vorlage ----------
 // Persönliche Daten (Stammdaten, Vorlage, Schriften, Claude-Schlüssel) liegen nur im privaten Repo unter dossier/.
 const BEW = { k: null, aid: null, x: null, d: null, doc: null, sha: null, ctx: null, prev: null, busy: false };
-const ANREDEN = ["Guten Tag", "Liebe Frau", "Lieber Herr", "Sehr geehrte Frau", "Sehr geehrter Herr", "Sehr geehrte Damen und Herren"];
+const KEINE_ANREDE = "Keine (steht im Text)";   // 15.11., Pascal: Anrede selbst in den Text schreiben
+const ANREDEN = ["Guten Tag", "Liebe Frau", "Lieber Herr", "Sehr geehrte Frau", "Sehr geehrter Herr", "Sehr geehrte Damen und Herren", KEINE_ANREDE];
 const bewPath = (f = "anschreiben.json") => `archiv/${BEW.aid}/bewerbung/${f}`;
-const anredeZeile = (a, n) => (n && a !== "Sehr geehrte Damen und Herren" ? `${a} ${n.trim()}` : a);
+const anredeZeile = (a, n) => (a === KEINE_ANREDE ? "" : n && a !== "Sehr geehrte Damen und Herren" ? `${a} ${n.trim()}` : a);
 
 
 
@@ -148,7 +149,7 @@ function txRender(feld) {
   if (!editing) {
     const doc = BEW.doc;
     el.innerHTML = feld === "text"
-      ? `<div class="bp-meta">${esc(doc.adresse || "")}</div><p>${esc(anredeZeile(doc.anrede, doc.name))}</p>${bpMarkup("text")}`
+      ? `<div class="bp-meta">${esc(doc.adresse || "")}</div>${anredeZeile(doc.anrede, doc.name) ? `<p>${esc(anredeZeile(doc.anrede, doc.name))}</p>` : ""}${bpMarkup("text")}`
       : empty ? `<p class="hint">Noch leer – ${feld === "kontakt" ? "«✦ Entwurf schreiben»" : "«✦ Entwurf für diese Wohnung»"} oder «Bearbeiten».</p>`
       : feld === "bemerkung" ? `<div class="bp-meta">Betreff: ${esc(doc.betreff || bpBetreffVor())}</div>${bpMarkup("bemerkung")}`
       : bpMarkup(feld);
@@ -441,7 +442,7 @@ Regeln:
 - Der Grosseltern-Grund (sie betreuen Lio in Luzern) gilt nur, wenn er für diese Lage stimmt: Wollishofen, Leimbach, Enge, Wiedikon, Friesenberg, Adliswil, Kilchberg und überhaupt Süden/Westen der Stadt sind näher Richtung Luzern als Schwamendingen. Liegt die Wohnung woanders (z.B. Zürichberg, Oerlikon, Altstetten Nord), den Grund weglassen, nicht umbiegen und keinen Platzhalter dafür.
 - Alter aus den Geburtsdaten und dem heutigen Datum berechnen. Befristete oder endende Jobs nicht als dauerhaft darstellen (Datum beachten).
 - Bei Genossenschaften das gemeinschaftliche Wohnen betonen, bei privaten Verwaltungen eher Verlässlichkeit und Stabilität.
-- Die Anrede steht NICHT im Anschreiben-Text (sie wird separat gewählt). Absätze im Anschreiben durch eine Leerzeile trennen; der Schluss ist «Über eine positive Rückmeldung …», dann «Freundliche Grüsse» und in der nächsten Zeile «Leonie, Pascal und Lio».
+- Die Anrede steht NICHT im Anschreiben-Text (sie wird separat gewählt) – ausser unter «Anrede» steht «keine separate»: dann bleibt die Anrede, die sie selbst in den Text geschrieben haben, als erste Zeile im Text. Absätze im Anschreiben durch eine Leerzeile trennen; der Schluss ist «Über eine positive Rückmeldung …», dann «Freundliche Grüsse» und in der nächsten Zeile «Leonie, Pascal und Lio».
 - Hinweise: je genau ein kurzer Satz, mit «art»:
   · «klaeren»: höchstens 3, nur echte Stolpersteine, bei denen Leonie und Pascal etwas tun oder entscheiden müssen.
   · «idee»: höchstens 3 Vorschläge, die sie nutzen können oder nicht (anderes Detail aus dem Inserat, Frage für die Besichtigung).
@@ -504,7 +505,7 @@ ${bewInserat()}
 
 <aktuell>
 Adresse: ${doc.adresse}
-Anrede: ${anredeZeile(doc.anrede, doc.name)}
+Anrede: ${anredeZeile(doc.anrede, doc.name) || "keine separate (steht im Text selbst)"}
 --- Anschreiben ---
 ${doc.text}
 --- Bemerkung (Begleittext) ---

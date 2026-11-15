@@ -133,7 +133,7 @@ function layoutPdf(doc, fonts) {
   };
   const para = (p, maxW) => { p.split("\n").forEach((l) => wrapLine(l.trim(), maxW).forEach(pushLine)); top += LAY.lead; };
   const { body, schluss } = splitParas(doc.text);
-  para(anredeZeile(doc.anrede, doc.name), LAY.xmax - LAY.x0);
+  if (anredeZeile(doc.anrede, doc.name)) para(anredeZeile(doc.anrede, doc.name), LAY.xmax - LAY.x0);
   body.forEach((p) => para(p, LAY.xmax - LAY.x0));
   if (top - LAY.lead > LAY.bodyMax) warn.push("Der Haupttext ist zu lang und läuft in die blaue Fläche. Bitte kürzen.");
   schluss.forEach((p) => para(p, LAY.xmaxSchluss - LAY.x0));
