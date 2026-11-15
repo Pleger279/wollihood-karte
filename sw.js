@@ -1,7 +1,7 @@
 // Hält die App-Hülle offline bereit und zeigt Push-Meldungen an.
 const CACHE = "wollihood-v96";
 const SHARE = "wollihood-share";   // geteilte Screenshots, bis die App sie einer Wohnung zuordnet
-const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icons/icon-192.png", "./icons/icon-512.png", "./icons/badge-96.png"];
+const SHELL = ["./", "./index.html", "./css/app.css?v=96", "./js/core.js?v=96", "./js/treffer.js?v=96", "./js/wohnung.js?v=96", "./js/liste.js?v=96", "./js/suche.js?v=96", "./js/mehr.js?v=96", "./js/bewerbung.js?v=96", "./js/chat.js?v=96", "./js/dossier.js?v=96", "./js/formular.js?v=96", "./js/senden.js?v=96", "./manifest.webmanifest", "./icons/icon-192.png", "./icons/icon-512.png", "./icons/badge-96.png"];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
