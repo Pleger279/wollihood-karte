@@ -711,3 +711,8 @@ button, .btn, .linkbtn, label[for] { transition: transform .12s ease, opacity .1
 .dvote { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 0 2px }
 .dvote .vmini { width: 52px; height: 44px }
 .ch-kurz .ch-msg p { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden }
+
+/* v102: Ganzes Dossier über «Als beworben markieren» */
+.dq-box { margin: 14px 0 10px }
+.dq-box > .btn { width: 100%; justify-content: center }
+.dq-box .doclink { margin-top: 8px }

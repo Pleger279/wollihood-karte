@@ -294,6 +294,7 @@ document.addEventListener("click", (e) => {
   if ((b = q("[data-tcancel]"))) { bpCancel(b.dataset.tcancel); return; }
   if ((b = q("[data-tsave]"))) { bpSave(b.dataset.tsave); return; }
   if ((b = q("[data-tcheck]"))) { bpCheck(b.dataset.tcheck); return; }
+  if ((b = q("#bDossierQuick"))) { dossierPdf(b, $("bDossierQuickLink")); return; }   // v102: immer sichtbar über «Als beworben markieren»
   if ((b = q("[data-pall]"))) { const f = b.dataset.pall; bpApply(f, bpOpen(f).map((o) => o.i)); return; }
   if ((b = q("[data-pok]"))) { const [f, i] = b.dataset.pok.split(":"); bpApply(f, [+i]); return; }
   if ((b = q("[data-pno]"))) { const [f, i] = b.dataset.pno.split(":"); TX.pruef(f).vorschlaege[+i].st = "nein"; txRefresh(f); TX.persist(f); return; }
@@ -323,8 +324,8 @@ function bpStatus() {
   set("anschreiben", bpTextSt("text"));
   set("begleit", bpTextSt("bemerkung"));
   set("foto", BEW.doc.foto?.path ? ["eigenes Foto", "ok"] : ["Standardfoto", "muted"]);
-  const items = dossierItems().filter(dossierOn), old = items.filter((b) => baustAlter(b)?.alt).length;
-  set("unterlagen", [`${items.length} Dokumente${old ? ` · ${old} zu alt` : ""}`, old ? "warn" : "ok"]);
+  const items = dossierItems().filter(dossierOn), old = items.filter((b) => baustAlter(b)?.alt).length, bald = items.filter((b) => baustAlter(b)?.bald).length;
+  set("unterlagen", [`${items.length} Dokumente${old ? ` · ${old} abgelaufen` : bald ? ` · ${bald} läuft bald ab` : ""}`, old || bald ? "warn" : "ok"]);
   const wg = WEGE.find(([w]) => w === (BEW.doc.weg || sendWegVorschlag()[0]))?.[1] || "";
   set("senden", stepsOf(BEW.k).bewerbung ? ["verschickt ✓", "ok"] : [(BEW.doc.weg ? "" : "✦ ") + wg.replace("Per ", "").replace(" / Flatfox", ""), "muted"]);
 }

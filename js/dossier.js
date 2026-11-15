@@ -534,7 +534,7 @@ async function dossierBytes() {
   out.setTitle("Bewerbungsdossier " + BEW.doc.adresse); out.setAuthor("Leonie Meier, Pascal Stadelmann");
   return out.save();
 }
-async function dossierPdf() {
+async function dossierPdf(btn = $("bDossierPdf"), linkBox = $("bDossierLink")) {
   bewRead();
   const sel = dossierItems().filter(dossierOn);
   if (!sel.length) { toast("Nichts ausgewählt.", "err"); return; }
@@ -542,7 +542,7 @@ async function dossierPdf() {
   if (alt.length && !confirm(`Zu alt: ${alt.join(", ")}\n\nTrotzdem ins Dossier nehmen?`)) return;
   const offen = (BEW.doc.text + " " + BEW.doc.name).match(/\[[^\]]*\]/g);
   if (sel.some((b) => b.id === "anschreiben") && offen && !confirm(`Im Anschreiben noch offen: ${offen.join(", ")}\n\nTrotzdem erstellen?`)) return;
-  const btn = $("bDossierPdf"); btn.disabled = true; btn.textContent = "Erstelle Dossier …";
+  const label = btn.textContent; btn.disabled = true; btn.textContent = "Erstelle Dossier …";
   if (sel.some((b) => b.id === "anschreiben")) bewPdfStore().catch(() => { });
   try {
     await pdfAssets();
@@ -550,11 +550,11 @@ async function dossierPdf() {
     const name = `Bewerbungsdossier_${fileSlug(BEW.x.street || "Wohnung")}.pdf`;
     const url = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
     const mb = (bytes.length / 1048576).toFixed(1);
-    $("bDossierLink").innerHTML = `<a class="doclink" href="${url}" target="_blank" rel="noopener">📄 Dossier öffnen</a> <a class="doclink" href="${url}" download="${esc(name)}">⬇ Herunterladen</a>
+    linkBox.innerHTML = `<a class="doclink" href="${url}" target="_blank" rel="noopener">📄 Dossier öffnen</a> <a class="doclink" href="${url}" download="${esc(name)}">⬇ Herunterladen</a>
       <p class="hint">${sel.length} Teile, ${mb} MB${mb > 9 ? " – für manche Mail-Postfächer zu gross, dann einzeln senden" : ""}.</p>`;
     toast("Dossier erstellt.", "ok");
   } catch (e) { toast("Dossier fehlgeschlagen: " + e.message, "err"); }
-  finally { if ($("bDossierPdf")) { $("bDossierPdf").disabled = false; $("bDossierPdf").textContent = "⬇ Dossier als ein PDF"; } }
+  finally { btn.disabled = false; btn.textContent = label; }
 }
 async function beilageUpload(files) {
   const added = [];

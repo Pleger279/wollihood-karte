@@ -60,6 +60,7 @@ function standPanel(k) {
         : `<button type="button" class="btn" data-step="besichtigung">Als besichtigt markieren</button>`}`;
   }
   if (tab === "bewerbung") body = `<div id="bSlot"></div>
+      <div class="dq-box"><button type="button" class="btn" id="bDossierQuick">⬇ Ganzes Dossier (PDF)</button><div id="bDossierQuickLink"></div></div>
       ${steps.bewerbung ? doneLine("bewerbung", "Beworben") : `<button type="button" class="btn" data-step="bewerbung">Als beworben markieren</button>`}`;
   if (tab === "antwort") { const v = steps.antwort?.value;
     body = `<div class="seg"><button type="button" class="opt" data-answer="zusage" aria-pressed="${v === "zusage"}">Zusage</button><button type="button" class="opt" data-answer="absage" aria-pressed="${v === "absage"}">Absage</button></div>
