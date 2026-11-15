@@ -517,17 +517,30 @@ ${typeof BEW_AUFTRAG[mode] === "function" ? BEW_AUFTRAG[mode](feld) : BEW_AUFTRA
   return mode === "pruefung" ? claudeTool(BEW_SYSTEM, user, PRUEF_TOOL, "vorschlaege") : claudeTool(BEW_SYSTEM, user, BEW_TOOL, "anschreiben");
 }
 async function claudeTool(system, user, tool, need, textAs) {
-  const r = await fetch("https://api.anthropic.com/v1/messages", { method: "POST",
+  const call = (messages) => fetch("https://api.anthropic.com/v1/messages", { method: "POST",
     headers: { "content-type": "application/json", "x-api-key": BEW.ctx.key, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
     body: JSON.stringify({ model: S.config?.ai?.model || "claude-opus-5-5", max_tokens: 6000, system, tools: [tool],
-      tool_choice: { type: "auto" }, messages: [{ role: "user", content: user }] }) });
-  let j = {}; try { j = await r.json(); } catch { }
-  if (!r.ok) throw new Error(r.status === 401 ? "Der Claude-Schlüssel ist ungültig." : j?.error?.message || `Claude meldet Fehler ${r.status}.`);
-  const tu = (j.content || []).find((b) => b.type === "tool_use");
-  if (tu?.input?.[need] != null) return tu.input;
-  const t = (j.content || []).filter((b) => b.type === "text").map((b) => b.text).join("");
-  const m = t.match(/\{[\s\S]*\}/); if (m) { try { const o = JSON.parse(m[0]); if (o[need] != null) return o; } catch { } }
-  if (textAs && t.trim()) return { [textAs]: t.trim() };     // 15.11.: Chat antwortete als Text ohne Werkzeug → Fehler; Text ist eine gültige Antwort
+      tool_choice: { type: "auto" }, messages }) });
+  // Opus 5.5 erlaubt kein erzwungenes Werkzeug → Antwort auswerten; ohne Werkzeug einmal nachfragen (15.11.: «Prüfen» antwortete nur mit Text)
+  const parse = (j) => {
+    const tu = (j.content || []).find((b) => b.type === "tool_use");
+    if (tu?.input?.[need] != null) return tu.input;
+    if (tu?.input && tool.input_schema?.properties?.[need]?.type === "array") return { ...tu.input, [need]: [] };   // leere Liste weggelassen
+    const t = (j.content || []).filter((b) => b.type === "text").map((b) => b.text).join("");
+    const m = t.match(/\{[\s\S]*\}/); if (m) { try { const o = JSON.parse(m[0]); if (o[need] != null) return o; } catch { } }
+    return { _text: t.trim(), _tool: !!tu };
+  };
+  const messages = [{ role: "user", content: user }];
+  for (let i = 0; i < 2; i++) {
+    const r = await call(messages);
+    let j = {}; try { j = await r.json(); } catch { }
+    if (!r.ok) throw new Error(r.status === 401 ? "Der Claude-Schlüssel ist ungültig." : j?.error?.message || `Claude meldet Fehler ${r.status}.`);
+    const res = parse(j);
+    if (!("_text" in res)) return res;
+    if (textAs && res._text) return { [textAs]: res._text };     // Chat: Text ist eine gültige Antwort
+    if (i || res._tool || !res._text) { console.warn("claudeTool: unerwartete Antwort", j); break; }
+    messages.push({ role: "assistant", content: res._text }, { role: "user", content: `Bitte gib das Ergebnis jetzt ausschliesslich mit dem Werkzeug «${tool.name}» zurück, ohne weiteren Text.` });
+  }
   throw new Error("Claude hat nicht im erwarteten Format geantwortet.");
 }
 // «✦ Entwurf für diese Wohnung»: beide Texte neu, Hinweise, Diff mit «Rückgängig» (einziger Modus seit v97; Prüfen = bpCheck, Änderungen = Chat)
