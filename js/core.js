@@ -80,7 +80,7 @@ document.addEventListener("click", (e) => {
   const b = e.target.closest("button, .btn, .linkbtn, label[for]"); if (!b || b.disabled) return;
   b.classList.add("act-tap"); setTimeout(() => b.classList.remove("act-tap"), 170);
   // Tabs, Filter, Sortierung schalten nur um – keine Lauf-Anzeige (sonst würde ein Hintergrund-Laden dort erscheinen)
-  if (!b.closest(".toast, .seg, .stabs, .tabbar, [data-filter], [data-sort], [data-tab], [data-stab], [data-bstep], [data-bptoggle], [data-tedit-on], [data-tcancel]")) actArm(b);
+  if (!b.closest(".toast, .seg, .stabs, .tabbar, [data-filter], [data-sort], [data-tab], [data-stab], [data-bptoggle], [data-tedit-on], [data-tcancel]")) actArm(b);
 }, true);
 document.addEventListener("change", (e) => {
   const t = e.target; if (t.type !== "file" || !t.id) return;

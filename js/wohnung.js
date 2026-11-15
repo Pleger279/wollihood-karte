@@ -104,7 +104,6 @@ async function kontaktLoad(k) {
   if (KON.k !== k) { KON.k = k; KON.sha = null; KON.data = null;
     try { const r = await readJson(`archiv/${aid}/bewerbung/kontakt.json`); KON.data = r.data; KON.sha = r.sha; } catch { } }
   if (S.detailKey !== k || !$("kText")) return;
-  kmtLoad(k);
   if (!KON.edit) $("kText").value = KON.data?.text || "";
   else if (KON.draft != null) $("kText").value = KON.draft;
   saveBtnState();
@@ -112,7 +111,6 @@ async function kontaktLoad(k) {
   txRender("kontakt");
   if (KON.data?.text && $("kState")) $("kState").textContent = `Gespeichert${KON.data.by ? " von " + (PEOPLE[KON.data.by] || KON.data.by) : ""}, ${ago(KON.data.updated)}`;
 }
-function kontaktButtons() { if ($("bRead-kontakt") && !KON.edit) txRender("kontakt"); }
 async function kontaktSave(k, text, quiet) {
   if (needPerson()) return;
   const aid = await aidOf(k);
@@ -123,8 +121,7 @@ async function kontaktSave(k, text, quiet) {
 }
 const KON_TOOL = { name: "nachricht", description: "Die erste Nachricht ans Kontaktfeld des Inserats und kurze Hinweise.",
   input_schema: { type: "object", required: ["nachricht"], properties: { nachricht: { type: "string", description: "Vollständige Nachricht mit Anrede «Guten Tag» und Grussformel" },
-    hinweise: { type: "array", items: { type: "object", required: ["text"], properties: { art: { type: "string", enum: ["klaeren", "idee", "erklaerung"] }, text: { type: "string" } } } },
-    regel_vorschlaege: { type: "array", description: "Nur wenn ein Kommentar allgemein für künftige Texte gilt: als kurze Schreibregel", items: { type: "object", required: ["regel"], properties: { regel: { type: "string" }, beispiel: { type: "string" } } } } } } };
+    hinweise: { type: "array", items: { type: "object", required: ["text"], properties: { art: { type: "string", enum: ["klaeren", "idee", "erklaerung"] }, text: { type: "string" } } } } } } };
 function kontaktUser(c, auftrag) {
   return `Heute ist ${new Date().toLocaleDateString("de-CH", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}.
 
@@ -152,42 +149,25 @@ ${TX.get("kontakt") || "(noch leer)"}
 ${auftrag}
 </auftrag>`;
 }
-async function kontaktKi(k, instr, mode) {
+// «✦ Entwurf schreiben» / «✦ Neu schreiben»: Claude schreibt die Kontakt-Nachricht (Prüfen = bpCheck, Änderungen = Chat)
+async function kontaktKi(k) {
   if (KON.busy) return;
   const st = $("kState");
   try {
     const c = await bewCtx();
     if (!c.key) { if (st) st.textContent = "Kein Claude-Schlüssel (Mehr → «Claude für Bewerbungen»). Schreibt die Nachricht selbst."; return; }
-    KON.busy = true; if (st) st.textContent = mode === "pruefen" ? "Claude prüft die Nachricht … (ca. 15–30 Sek.)" : instr ? "Claude überarbeitet die Nachricht … (ca. 15–30 Sek.)" : "Claude schreibt die Nachricht … (ca. 15–30 Sek.)"; $("kKi") && ($("kKi").disabled = true);
-    const user = kontaktUser(c, `${mode === "pruefen" ? `Prüfe die Nachricht unter <aktuell>, die Leonie und Pascal selbst geschrieben haben, nach allen Regeln oben (Erstkontakt vor der Besichtigung, Nach-Check Textstil, nichts Erfundenes, gelernte Regeln) und auf Rechtschreibung (Schweizer Schreibweise). Ändere die Nachricht NICHT: gib sie in «nachricht» wörtlich zurück. Nenne in «hinweise» höchstens 4 konkrete Punkte (art «klaeren»), je ein Satz mit Vorschlag, z.B. «‹…› klingt steif – lieber ‹…›». Ist alles gut, ein einziger Hinweis «Passt so.».` : instr ? `Überarbeite die Nachricht unter <aktuell> nach diesen Kommentaren von Leonie und Pascal. Ändere nur, was die Kommentare verlangen; alles andere bleibt wörtlich gleich. Ist ein Kommentar allgemein gemeint (gilt auch für künftige Texte), schlage ihn zusätzlich als kurze Schreibregel in «regel_vorschlaege» vor. Hinweise nur, wenn ein Kommentar unklar ist.
-<kommentare>
-${instr}
-</kommentare>` : `Schreibe die erste Nachricht fürs Kontaktfeld im Inserat: Erstkontakt vor der Besichtigung (Regeln oben). Kurz, natürlich, mit «Guten Tag» und Grussformel «Freundliche Grüsse» plus «Leonie Meier und Pascal Stadelmann». Nur die Nachricht, kein Anschreiben. Hinweise höchstens 2, nur «klaeren».`}`);
-    const sys = BEW_SYSTEM.replace("Werkzeug «bewerbung»", "Werkzeug «nachricht»");
-    const res = await claudeTool(sys, user, KON_TOOL, "nachricht");
+    KON.busy = true; if (st) st.textContent = "Claude schreibt die Nachricht … (ca. 15–30 Sek.)"; $("kKi") && ($("kKi").disabled = true);
+    const user = kontaktUser(c, `Schreibe die erste Nachricht fürs Kontaktfeld im Inserat: Erstkontakt vor der Besichtigung (Regeln oben). Kurz, natürlich, mit «Guten Tag» und Grussformel «Freundliche Grüsse» plus «Leonie Meier und Pascal Stadelmann». Nur die Nachricht, kein Anschreiben. Hinweise höchstens 2, nur «klaeren».`);
+    const res = await claudeTool(BEW_SYSTEM.replace("Werkzeug «bewerbung»", "Werkzeug «nachricht»"), user, KON_TOOL, "nachricht");
     const text = String(res.nachricht || "").replace(/\r/g, "").trim();
-    if (mode === "pruefen" && S.detailKey === k && $("kTips")) {
-      const tips = (res.hinweise || []).filter((h) => h && h.text).slice(0, 4);
-      $("kTips").innerHTML = tips.map((h) => `<div class="tip">${esc(h.text)}</div>`).join("") || `<div class="tip">Passt so.</div>`;
-      if (st) st.textContent = `✦ Geprüft – ${tips.length && !/^passt so/i.test(tips[0].text) ? tips.length + " Hinweis" + (tips.length > 1 ? "e" : "") : "passt so"}. Euer Text ist unverändert.`;
-      toast(tips.length && !/^passt so/i.test(tips[0].text) ? `${tips.length} Hinweis${tips.length > 1 ? "e" : ""}` : "Passt so", "ok");
-      $("kTips").scrollIntoView({ behavior: "smooth", block: "center" }); $("kTips").classList.add("act-flash"); setTimeout(() => $("kTips")?.classList.remove("act-flash"), 1700);
-      return;
-    }
-    if (S.detailKey === k && $("kText") && text) {
-      const before = $("kText").value;
-      $("kText").value = text;
-      if (instr) { KON.prev = before; kmtApplied("kontakt"); }
-      $("kTips").innerHTML = (res.hinweise || []).filter((h) => h && h.text && (h.art || "klaeren") === "klaeren").slice(0, 2).map((h) => `<div class="tip">${esc(h.text)}</div>`).join("");
-      if (st) st.textContent = instr ? "✦ Überarbeitet – Änderungen unten markiert." : "✦ Von Claude geschrieben – anpassen und dann kopieren.";
-      if (instr && before !== text) $("kTips").innerHTML += `<div class="diff">${wdiff(before, text)}</div><button type="button" class="btn" id="kUndo">Rückgängig</button>`;
-      const lv = (res.regel_vorschlaege || []).filter((r) => r && r.regel).slice(0, 3);
-      if (lv.length) learnBox("kLearn", lv);
-      kontaktSave(k, text, true).then(() => txRender("kontakt"));
-      toast(instr ? "Überarbeitet" : "Entwurf geschrieben", "ok");
-      const tg = KON.edit ? $("kText") : $("bRead-kontakt");
-      tg.scrollIntoView({ behavior: "smooth", block: "center" }); tg.classList.add("act-flash"); setTimeout(() => tg?.classList.remove("act-flash"), 1700);
-    }
+    if (S.detailKey !== k || !$("kText") || !text) return;
+    $("kText").value = text;
+    $("kTips").innerHTML = (res.hinweise || []).filter((h) => h && h.text && (h.art || "klaeren") === "klaeren").slice(0, 2).map((h) => `<div class="tip">${esc(h.text)}</div>`).join("");
+    if (st) st.textContent = "✦ Von Claude geschrieben – anpassen und dann kopieren.";
+    kontaktSave(k, text, true).then(() => txRender("kontakt"));
+    toast("Entwurf geschrieben", "ok");
+    const tg = KON.edit ? $("kText") : $("bRead-kontakt");
+    tg.scrollIntoView({ behavior: "smooth", block: "center" }); tg.classList.add("act-flash"); setTimeout(() => tg?.classList.remove("act-flash"), 1700);
   } catch (e) { if (st) st.textContent = "Claude: " + e.message; toast("Claude: " + e.message, "err", 7000); }
   finally { KON.busy = false; $("kKi") && ($("kKi").disabled = false); }
 }
@@ -233,7 +213,6 @@ const QUARTER = { "8001": "Altstadt", "8004": "Aussersihl", "8005": "Industriequ
 // ---------- Details & Archiv ----------
 S.archive = {}; S.agencies = {}; S.agenciesSha = null;
 const archEntry = (x) => { if (!x) return null; for (const k of x.keys || [keyOf(x)]) { if (S.archive[k]) return S.archive[k]; } return null; };
-const agencyOf = (x) => x.agency || archEntry(x)?.agency || null;
 const agencyKey = (n) => String(n || "").toLowerCase().replace(/\b(ag|sa|gmbh|sàrl|ltd)\b\.?/g, "").replace(/[^a-z0-9äöü]+/g, " ").trim();
 const ATTR = { balconygarden: "Balkon/Garten", lift: "Lift", garage: "Garage", parkingspace: "Parkplatz", dishwasher: "Geschirrspüler",
   washingmachine: "Waschmaschine", tumbledryer: "Tumbler", parquetflooring: "Parkett", view: "Aussicht", cable: "Kabel-TV",
@@ -486,17 +465,6 @@ async function aidOf(k) {
   if (a) return a.id;
   const h = await crypto.subtle.digest("SHA-1", new TextEncoder().encode(k));
   return [...new Uint8Array(h)].map((b) => b.toString(16).padStart(2, "0")).join("").slice(0, 12);
-}
-function ownBlock(k) {
-  const it = itemOf(k), files = it.files || [];
-  return `<div class="panel"><h2>Eigene Notizen & Dateien</h2>
-    <p class="hint">Für euch beide. Screenshots aus Homegate & Co. könnt ihr auch direkt über «Teilen → Wollihood» hierher schicken.</p>
-    <textarea class="field" id="ownNote" rows="3" placeholder="z.B. Kontakt Frau Muster, 044 …, Besichtigung Do 18 Uhr">${esc(it.note || "")}</textarea>
-    <button type="button" class="btn" id="ownNoteSave">Notiz speichern</button>
-    <div class="ownfiles">${files.map((f) => f.type === "application/pdf" ? `<a href="#" data-doc="${esc(f.path)}">📄 ${esc(f.name || "Dokument")}</a>`
-      : `<img data-src="${esc(f.path)}" data-full="${esc(f.path)}" alt="${esc(f.name || "")}">`).join("")}</div>
-    <label class="btn" for="ownFiles">Fotos / Screenshots hinzufügen</label>
-    <input type="file" id="ownFiles" accept="image/*,application/pdf" multiple hidden></div>`;
 }
 async function shrinkImage(file) {
   if (!file.type.startsWith("image/")) return file;

@@ -6,11 +6,6 @@ const ANREDEN = ["Guten Tag", "Liebe Frau", "Lieber Herr", "Sehr geehrte Frau", 
 const bewPath = (f = "anschreiben.json") => `archiv/${BEW.aid}/bewerbung/${f}`;
 const anredeZeile = (a, n) => (n && a !== "Sehr geehrte Damen und Herren" ? `${a} ${n.trim()}` : a);
 
-function bewPanelAlt() {
-  return `<div class="panel" id="dBew"><h2>Bewerbung</h2>
-    <p class="hint" id="dBewInfo">Anschreiben und Bemerkung mit Claude vorbereiten, PDF auf eurer Vorlage.</p>
-    <div class="brow"><button type="button" class="btn primary" data-bew>Bewerbung erstellen</button></div><div id="dBewPdf"></div></div>`;
-}
 
 
 async function repoText(path) { const d = await gh(path); return b64decode(d.content); }
@@ -47,12 +42,10 @@ async function bewLoad(k) {
   if (!BEW.doc.ki) BEW.doc.ki = { text: BEW.doc.text, bemerkung: BEW.doc.bemerkung || "" };
   BEW.prev = null; BEW.saved = bewFields();
   if (BEW.k !== k) return;
-  renderBew(); formLoad(); kmtLoad(k);
+  renderBew(); formLoad();
 }
 // Bewerbung v89 (Pascal 14.11.): eine Seite mit Teilen, Texte nur lesbar bis «Bearbeiten»; danach «Speichern» oder «Prüfen».
 // «Prüfen» liefert Vorschläge (Übernehmen/Verwerfen/Alle übernehmen). Die Textfelder bleiben im DOM (versteckt), damit alles andere weiterläuft.
-const BP_PARTS = [["anschreiben", "Anschreiben"], ["foto", "Foto"], ["unterlagen", "Unterlagen"], ["begleit", "Begleit-Mail / Bemerkung"], ["senden", "Senden"]];
-const BP_FELD = { text: "Anschreiben", bemerkung: "Begleit-Mail / Bemerkung" };
 function bpPart(id, title, body) {
   const open = BEW.open?.has(id);
   return `<div class="panel bp-part${open ? " open" : ""}" data-bpart="${id}">
@@ -236,7 +229,7 @@ async function bpCheck(feld) {
   try {
     const res = feld === "kontakt"
       ? await claudeTool(BEW_SYSTEM, kontaktUser(c, `Prüfe die Kontakt-Nachricht unter <aktuell> (Erstkontakt vor der Besichtigung), die Leonie oder Pascal geschrieben haben. ${PRUEF_REGELN}`), PRUEF_TOOL, "vorschlaege")
-      : await claudeCall("pruefung", "", feld);
+      : await claudeCall("pruefung", feld);
     if ((feld === "kontakt" ? KON.k : BEW.k) !== k) return;
     const vs = (res.vorschlaege || []).filter((v) => v && v.alt && v.alt !== v.neu).slice(0, 12).map((v) => ({ alt: String(v.alt), neu: String(v.neu ?? ""), grund: v.grund || "", art: v.art || "stil", st: "offen" }));
     const kl = (res.zu_klaeren || []).filter((x) => x && x.text).slice(0, 3).map((x) => ({ stelle: x.stelle || "", text: x.text, st: "offen" }));
@@ -350,11 +343,6 @@ function dossierSum() {
   $("bDossierSum")?.classList.toggle("warnline", !!old);
   bpStatus();
 }
-function bewStep(v) {      // früher Tabs; heute: passenden Teil aufklappen
-  const ids = { text: ["anschreiben"], unterlagen: ["foto", "unterlagen"], senden: ["senden"], begleit: ["begleit"] }[v] || [v];
-  ids.forEach((id) => bpToggle(id, true));
-  document.querySelector(`[data-bpart="${ids[0]}"]`)?.scrollIntoView({ block: "start" });
-}
 function bewRead() {
   if (!$("bText")) return BEW.doc;
   Object.assign(BEW.doc, { adresse: $("bAdr").value.trim(), anrede: $("bAnrede").value, name: $("bName").value.trim(),
@@ -427,7 +415,7 @@ $("bBody").addEventListener("click", async (e) => {
   const dl = e.target.closest("[data-doc]");
   if (dl) { e.preventDefault(); openDoc(dl.dataset.doc, dl.textContent.replace(/^📄\s*/, "")); return; }
   const tip = e.target.closest("[data-stelle]"); if (tip) { bewShow(tip.dataset.stelle); return; }
-  const ki = e.target.closest("[data-ki]"); if (ki) bewKi(ki.dataset.ki);
+  if (e.target.closest("[data-ki]")) bewKi();
 });
 let formTimer = null;
 $("bBody").addEventListener("input", (e) => {
@@ -467,16 +455,11 @@ const BEW_TOOL = { name: "bewerbung", description: "Ergebnis: beide Texte (volls
     anschreiben: { type: "string", description: "Vollständiger Anschreiben-Text ohne Anrede, Absätze durch Leerzeile getrennt" },
     bemerkung: { type: "string", description: "Vollständiger Begleittext (Mail-Text bzw. Bemerkung im Online-Formular, mit eigener Grusszeile am Anfang und Schluss)" },
     betreff: { type: "string", description: "Kurzer Mail-Betreff, z.B. «Bewerbung 3.5-Zimmer-Wohnung Thujastrasse 31»" },
-    hinweise: { type: "array", items: { type: "object", required: ["text", "art"], properties: { art: { type: "string", enum: ["klaeren", "idee", "erklaerung"] }, stelle: { type: "string" }, text: { type: "string", description: "ein kurzer Satz" } } } },
-    regel_vorschlaege: { type: "array", description: "Nur bei Kommentaren, die allgemein für künftige Texte gelten: als kurze Schreibregel", items: { type: "object", required: ["regel"], properties: { regel: { type: "string" }, beispiel: { type: "string" } } } },
-    aenderungen: { type: "array", description: "Nur bei Rechtschreibprüfung: was korrigiert wurde", items: { type: "object", properties: { vorher: { type: "string" }, nachher: { type: "string" } } } } } } };
+    hinweise: { type: "array", items: { type: "object", required: ["text", "art"], properties: { art: { type: "string", enum: ["klaeren", "idee", "erklaerung"] }, stelle: { type: "string" }, text: { type: "string", description: "ein kurzer Satz" } } } } } } };
 const BEW_AUFTRAG = {
   entwurf: `Erstelle beide Texte für diese Wohnung.
 Anschreiben: Gehe vom Grundtext der Vorlage aus und behalte Aufbau, Wortwahl und Ton. Passe an: die Adresse im ersten Satz (richtige Präposition, z.B. «am Elfenweg», «an der Thujastrasse»), Fakten, die heute nicht mehr stimmen, Widersprüche zum Inserat und, wo es diese Wohnung verlangt, die Gewichtung (Genossenschaft: Nachbarschaft und Mitmachen; private Verwaltung: Verlässlichkeit, sicheres Einkommen, langfristig bleiben). Frage dich: Was will diese Verwaltung lesen, um uns zu nehmen – ohne zu übertreiben? Der Grund für den Umzug (Grosseltern in Luzern betreuen Lio, von Wollishofen viel näher) bleibt drin, wo er für die Lage stimmt (siehe Regeln). Nach einer Besichtigung [Platzhalter] für das, was ihnen gefallen hat, stehen lassen; vor der Besichtigung keine. Vor der Besichtigung ist der Schluss die Bitte um einen Besichtigungstermin statt «positive Rückmeldung». Falls das Inserat konkrete Merkmale nennt, schlage sie in einem Hinweis vor (nicht in den Text schreiben).
 Bemerkung (Begleittext): Gehe von der Vorlage-Bemerkung aus und passe sie an dieses Inserat an (Zimmerzahl, Strasse, Genossenschaft oder private Verwaltung). Sie muss als Mail-Text funktionieren, mit dem das Dossier geschickt wird («Im Anhang finden Sie unser Dossier …»), und ebenso im Bemerkungsfeld eines Formulars. Den Satz zur Belegung nur, wenn das Inserat die Personenzahl begrenzt. Kurz halten. Dazu ein kurzer «betreff».`,
-  anweisung: `Setze die Kommentare von Leonie/Pascal (unten) um. Ändere nur die kommentierten Stellen bzw. was ein allgemeiner Kommentar verlangt; alles andere bleibt wörtlich gleich. Die Kommentare nennen, für welchen Text sie gelten; der andere Text bleibt unverändert. Ist ein Kommentar allgemein gemeint (gilt auch für künftige Texte), schlage ihn zusätzlich als kurze Schreibregel in «regel_vorschlaege» vor.`,
-  pruefen: `Prüfe beide Texte nur auf Rechtschreibung, Grammatik und Zeichensetzung (Schweizer Schreibweise). Keine stilistischen Änderungen, keine Umformulierungen. Liste jede Korrektur in «aenderungen». Inhaltliche Probleme nur als Hinweis, nicht im Text ändern.`,
-  hinweise: `Ändere die Texte nicht (gib sie wörtlich zurück). Liefere nur die Hinweise zu Stolpersteinen.`,
   pruefung: (feld) => `Prüfe nur den Text «${feld === "text" ? "Anschreiben" : "Bemerkung (Begleit-Mail / Bemerkung im Online-Formular)"}». Leonie oder Pascal haben ihn eben bearbeitet. Achte auch auf Widersprüche zum anderen Text. ${PRUEF_REGELN}`,
 };
 function bewInserat(k = BEW.k, x0 = BEW.x, d0 = BEW.d) {
@@ -487,7 +470,7 @@ function bewInserat(k = BEW.k, x0 = BEW.x, d0 = BEW.d) {
     merkmale: d.attributes, einschaetzung_claude: x.ai?.text, haken: x.ai?.haken, beschreibung: desc, eigene_notiz: itemOf(k).note || undefined,
     stand: ({ besichtigung: "Besichtigung vereinbart oder gemacht", beworben: "schon beworben", angefragt: "angefragt, noch nicht besichtigt" })[itemOf(k).status?.value] || "noch nicht besichtigt (Erstkontakt)" }, null, 1);
 }
-async function claudeCall(mode, instr, feld) {
+async function claudeCall(mode, feld) {
   const c = BEW.ctx, doc = bewRead();
   const user = `Heute ist ${new Date().toLocaleDateString("de-CH", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}.
 
@@ -529,7 +512,7 @@ ${doc.betreff ? `Betreff: ${doc.betreff}\n` : ""}${doc.bemerkung || "(noch leer)
 </aktuell>
 
 <auftrag>
-${typeof BEW_AUFTRAG[mode] === "function" ? BEW_AUFTRAG[mode](feld) : BEW_AUFTRAG[mode]}${instr ? `\nAnweisung: ${instr}` : ""}
+${typeof BEW_AUFTRAG[mode] === "function" ? BEW_AUFTRAG[mode](feld) : BEW_AUFTRAG[mode]}
 </auftrag>`;
   return mode === "pruefung" ? claudeTool(BEW_SYSTEM, user, PRUEF_TOOL, "vorschlaege") : claudeTool(BEW_SYSTEM, user, BEW_TOOL, "anschreiben");
 }
@@ -547,39 +530,30 @@ async function claudeTool(system, user, tool, need, textAs) {
   if (textAs && t.trim()) return { [textAs]: t.trim() };     // 15.11.: Chat antwortete als Text ohne Werkzeug → Fehler; Text ist eine gültige Antwort
   throw new Error("Claude hat nicht im erwarteten Format geantwortet.");
 }
-async function bewKi(mode, instrIn, kfeld) {
+// «✦ Entwurf für diese Wohnung»: beide Texte neu, Hinweise, Diff mit «Rückgängig» (einziger Modus seit v97; Prüfen = bpCheck, Änderungen = Chat)
+async function bewKi() {
   if (BEW.busy) return;
   if (!BEW.ctx.key) { toast("Zuerst den Claude-Schlüssel hinterlegen (Mehr).", "err"); return; }
-  const instr = mode === "anweisung" ? (instrIn || "").trim() : "";
-  if (mode === "anweisung" && !instr) return;
   BEW.busy = true; document.querySelectorAll("#bClaude [data-ki]").forEach((b) => (b.disabled = true));
-  const label = { entwurf: "schreibt den Entwurf", anweisung: "setzt die Anweisung um", pruefen: "prüft die Rechtschreibung", hinweise: "sucht Stolpersteine" }[mode];
-  $("bState").textContent = `Claude ${label} … (ca. 20–40 Sek.)`;
+  $("bState").textContent = "Claude schreibt den Entwurf … (ca. 20–40 Sek.)";
   const before = { text: bewRead().text, bemerkung: BEW.doc.bemerkung };
-  if (mode !== "hinweise") bewLearnMaybe();
+  bewLearnMaybe();
   try {
-    const res = await claudeCall(mode, instr);
+    const res = await claudeCall("entwurf");
     const text = String(res.anschreiben || "").replace(/\r/g, "").trim(), note = String(res.bemerkung || "").replace(/\r/g, "").trim();
-    if (mode !== "hinweise") {
-      if (text) $("bText").value = text;
-      if (note) $("bNote").value = note;
-      if (res.betreff && $("bBetreff")) $("bBetreff").value = String(res.betreff).trim();
-    }
+    if (text) $("bText").value = text;
+    if (note) $("bNote").value = note;
+    if (res.betreff && $("bBetreff")) $("bBetreff").value = String(res.betreff).trim();
     BEW.doc.hinweise = (res.hinweise || []).filter((h) => h && h.text).slice(0, 8);
     bewRead(); bewCount();
     const changed = before.text !== BEW.doc.text || before.bemerkung !== BEW.doc.bemerkung;
     BEW.prev = changed ? before : null;
-    bewTips(); bewDiff(before, res.aenderungen, mode); bpRenderText("text"); bpRenderText("bemerkung"); bpStatus();
-    $("bState").textContent = mode === "pruefen" ? (changed ? "Korrekturen sind unten markiert." : "Keine Fehler gefunden.")
-      : changed ? "Fertig. Änderungen sind unten markiert." : "Fertig.";
-    if (mode === "anweisung" && kfeld) { kmtApplied(kfeld); BEW.kmtUndo = kfeld; }
-    const lv = (res.regel_vorschlaege || []).filter((r) => r && r.regel).slice(0, 3);
-    if (lv.length) { BEW.learn = lv; bewLearnShow(); }
-    if (mode !== "hinweise") BEW.doc.ki = { text: BEW.doc.text, bemerkung: BEW.doc.bemerkung || "", at: new Date().toISOString() };
+    bewTips(); bewDiff(before); bpRenderText("text"); bpRenderText("bemerkung"); bpStatus();
+    $("bState").textContent = changed ? "Fertig. Änderungen sind unten markiert." : "Fertig.";
+    BEW.doc.ki = { text: BEW.doc.text, bemerkung: BEW.doc.bemerkung || "", at: new Date().toISOString() };
     bewMark();
-    // Ergebnis sichtbar machen (14.11.): Meldung am Knopf + hinscrollen + kurz hervorheben
     const nt = (BEW.doc.hinweise || []).length;
-    toast(changed ? "Geändert – unten markiert" : nt ? `${nt} Hinweis${nt > 1 ? "e" : ""}` : mode === "pruefen" ? "Keine Fehler" : "Fertig", "ok");
+    toast(changed ? "Geändert – unten markiert" : nt ? `${nt} Hinweis${nt > 1 ? "e" : ""}` : "Fertig", "ok");
     const tgt = changed ? $("bDiff") : nt ? $("bTips") : null;
     if (tgt && tgt.innerHTML.trim()) { tgt.scrollIntoView({ behavior: "smooth", block: "center" }); tgt.classList.add("act-flash"); setTimeout(() => tgt.classList.remove("act-flash"), 1700); }
   } catch (e) { $("bState").textContent = "Fehler: " + e.message; toast("Claude: " + e.message, "err", 7000); }
@@ -620,12 +594,11 @@ function wdiff(a, b) {
   while (j < m) out += `<ins>${esc(B[j++])}</ins>`;
   return out;
 }
-function bewDiff(before, aend) {
+function bewDiff(before) {
   if (!BEW.prev) { $("bDiff").innerHTML = ""; return; }
   const part = (t, a, b) => a === b ? "" : `<div class="ftitle sm">${t}</div><div class="diff">${wdiff(a, b)}</div>`;
   $("bDiff").innerHTML = `<div class="ftitle sm">Was Claude geändert hat</div>
     ${part("Anschreiben", before.text, BEW.doc.text)}${part("Bemerkung", before.bemerkung || "", BEW.doc.bemerkung)}
-    ${(aend || []).length ? `<p class="hint">${aend.map((x) => `${esc(x.vorher)} → ${esc(x.nachher)}`).join(" · ")}</p>` : ""}
     ${bewErkl().length ? `<p class="hint erkl">${bewErkl().map((t) => esc(t.text)).join(" ")}</p>` : ""}
     <div class="brow"><button type="button" class="btn" id="bUndo">Rückgängig</button></div>`;
 }
@@ -633,87 +606,8 @@ function bewUndo() {
   if (!BEW.prev) return;
   $("bText").value = BEW.prev.text; $("bNote").value = BEW.prev.bemerkung || "";
   BEW.prev = null; bewRead(); bewCount(); $("bDiff").innerHTML = ""; $("bState").textContent = "Rückgängig gemacht."; bpRenderText("text"); bpRenderText("bemerkung"); bpStatus();
-  if (BEW.kmtUndo) { kmtRestore(BEW.kmtUndo); BEW.kmtUndo = null; }
   BEW.doc.ki = { text: BEW.doc.text, bemerkung: BEW.doc.bemerkung || "", at: new Date().toISOString() };
   bewMark();
 }
 
-// --- Kommentare zu Texten (v68): Stelle markieren → Kommentar → «Überarbeiten» ---
-// archiv/<id>/bewerbung/kommentare.json = { items: [{ id, feld: kontakt|text|bemerkung, stelle, text, by, at }] }, gilt für beide.
-const KMT = { k: null, aid: null, sha: null, items: [], pend: null, backup: {} };
-const KMT_TA = { kontakt: "kText", text: "bText", bemerkung: "bNote" };
-const KMT_NAME = { kontakt: "Nachricht", text: "Anschreiben", bemerkung: "Bemerkung" };
-function kmtBlock(feld) {
-  return `<div class="kmt" data-kfeld="${feld}">
-    <div class="kmtbar"><button type="button" class="btn sm" data-kmtnew="${feld}">Ändern lassen</button><span class="hint">Stelle im Text markieren, dann antippen – ohne Markierung gilt es für den ganzen Text.</span></div>
-    <div class="kmtform" hidden></div><div class="kmtlist"></div>
-    <button type="button" class="btn ki" data-kmtgo="${feld}" hidden>✦ Umsetzen</button></div>`;
-}
-async function kmtLoad(k) {
-  const aid = await aidOf(k);
-  if (KMT.k !== k) { KMT.k = k; KMT.aid = aid; KMT.sha = null; KMT.items = []; KMT.pend = null;
-    try { const r = await readJson(`archiv/${aid}/bewerbung/kommentare.json`); KMT.items = r.data.items || []; KMT.sha = r.sha; } catch { } }
-  kmtRender();
-}
-function kmtRender() {
-  document.querySelectorAll(".kmt[data-kfeld]").forEach((box) => {
-    const feld = box.dataset.kfeld, list = KMT.items.filter((c) => c.feld === feld);
-    box.querySelector(".kmtlist").innerHTML = (list.length ? '<div class="ftitle sm">Änderungswünsche</div>' : "") + list.map((c) => `<div class="kmtitem">${c.stelle ? `<q>${esc(c.stelle.length > 90 ? c.stelle.slice(0, 90) + " …" : c.stelle)}</q>` : '<q class="all">ganzer Text</q>'}
-      <span>${esc(c.text)}</span><small>${esc(PEOPLE[c.by] || c.by || "")}</small><button type="button" class="kmtdel" data-kmtdel="${esc(c.id)}" aria-label="Änderungswunsch löschen">✕</button></div>`).join("");
-    const go = box.querySelector("[data-kmtgo]");
-    go.hidden = !list.length; go.textContent = `✦ Umsetzen (${list.length})`;
-  });
-}
-async function kmtSave(fn) {
-  for (let i = 0; i < 3; i++) {
-    try {
-      let cur = { data: { items: [] }, sha: null };
-      try { cur = await readJson(`archiv/${KMT.aid}/bewerbung/kommentare.json`); } catch (e) { if (e.status !== 404) throw e; }
-      const items = fn(cur.data.items || []);
-      KMT.sha = await writeJson(`archiv/${KMT.aid}/bewerbung/kommentare.json`, { items }, cur.sha, `Änderungswunsch zum Text (${PEOPLE[S.person] || ""})`);
-      KMT.items = items; kmtRender(); return true;
-    } catch (e) { if (!(e.status === 409 || e.status === 422) || i === 2) { toast("Änderungswunsch nicht gespeichert: " + e.message, "err"); return false; } }
-  }
-}
-function kmtInstr(feld) {
-  return KMT.items.filter((c) => c.feld === feld).map((c) => `- ${KMT_NAME[feld]}${c.stelle ? `, Stelle «${c.stelle}»` : ", ganzer Text"}: ${c.text}`).join("\n");
-}
-function kmtApplied(feld) {         // umgesetzte Kommentare weg (für «Rückgängig» merken)
-  KMT.backup[feld] = KMT.items.filter((c) => c.feld === feld);
-  kmtSave((items) => items.filter((c) => c.feld !== feld));
-}
-function kmtRestore(feld) {
-  const b = KMT.backup[feld] || []; KMT.backup[feld] = null;
-  if (b.length) kmtSave((items) => items.concat(b.filter((x) => !items.some((y) => y.id === x.id))));
-}
-document.addEventListener("click", (e) => {
-  const nw = e.target.closest("[data-kmtnew]");
-  if (nw) {
-    if (needPerson()) return;
-    const feld = nw.dataset.kmtnew, ta = $(KMT_TA[feld]); if (!ta) return;
-    const sel = ta.value.slice(ta.selectionStart || 0, ta.selectionEnd || 0).trim().slice(0, 240);
-    KMT.pend = { feld, stelle: sel };
-    const form = nw.closest(".kmt").querySelector(".kmtform");
-    form.hidden = false;
-    form.innerHTML = `${sel ? `<q>${esc(sel.length > 120 ? sel.slice(0, 120) + " …" : sel)}</q>` : '<q class="all">ganzer Text</q>'}
-      <textarea class="field" rows="2" id="kmtIn" placeholder="Was soll anders werden? z.B. «zu steif», «Lio weglassen»"></textarea>
-      <div class="brow"><button type="button" class="btn primary" data-kmtadd>Hinzufügen</button><button type="button" class="btn" data-kmtcancel>Abbrechen</button></div>`;
-    setTimeout(() => $("kmtIn")?.focus(), 30); return;
-  }
-  if (e.target.closest("[data-kmtcancel]")) { const f = e.target.closest(".kmtform"); f.hidden = true; f.innerHTML = ""; KMT.pend = null; return; }
-  if (e.target.closest("[data-kmtadd]")) {
-    const t = ($("kmtIn")?.value || "").trim(); if (!t || !KMT.pend) { $("kmtIn")?.focus(); return; }
-    const c = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 5), feld: KMT.pend.feld, stelle: KMT.pend.stelle, text: t.slice(0, 500), by: S.person, at: new Date().toISOString() };
-    const f = e.target.closest(".kmtform"); f.hidden = true; f.innerHTML = ""; KMT.pend = null;
-    KMT.items = KMT.items.concat(c); kmtRender();
-    kmtSave((items) => items.some((x) => x.id === c.id) ? items : items.concat(c)); return;
-  }
-  const del = e.target.closest("[data-kmtdel]");
-  if (del) { const id = del.dataset.kmtdel; KMT.items = KMT.items.filter((x) => x.id !== id); kmtRender(); kmtSave((items) => items.filter((x) => x.id !== id)); return; }
-  const go = e.target.closest("[data-kmtgo]");
-  if (go) {
-    const feld = go.dataset.kmtgo, instr = kmtInstr(feld); if (!instr) return;
-    if (feld === "kontakt") kontaktKi(S.detailKey, instr); else bewKi("anweisung", instr, feld);
-  }
-});
 // Regelvorschläge aus allgemeinen Kommentaren (Kontakt-Nachricht)

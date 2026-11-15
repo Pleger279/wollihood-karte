@@ -1,5 +1,5 @@
 name: App-Check
-# Schutz vor kaputten Releases: Service Worker vorhanden und mit Push-Anzeige, Versionen passen zusammen.
+# Schutz vor kaputten Releases: Service Worker vorhanden und mit Push-Anzeige, Versionen passen zusammen, alle js/css-Dateien da.
 on: [push]
 jobs:
   check:
@@ -17,6 +17,15 @@ jobs:
           new Function(sw);
           const swv = (sw.match(/wollihood-v(\d+)/) || [])[1], appv = (html.match(/APP_VERSION = "(\d+)/) || [])[1];
           if (!swv || swv !== appv) fail(`Versionen passen nicht: sw.js v${swv}, App v${appv}`);
+          // Seit v97: App in css/ und js/ aufgeteilt – jede Datei muss da sein, gültig sein, dieselbe Version tragen und im Cache (SHELL) stehen
+          const assets = [...html.matchAll(/(?:src|href)="((?:js|css)\/[\w-]+\.(?:js|css))\?v=(\d+)"/g)];
+          if (assets.length < 5) fail("index.html: js/css-Dateien fehlen");
+          for (const [, f, v] of assets) {
+            if (v !== appv) fail(`${f}: ?v=${v} passt nicht zu App v${appv}`);
+            if (!fs.existsSync(f) || fs.statSync(f).size < 200) fail(`${f} fehlt oder ist leer`);
+            if (!sw.includes(`"./${f}?v=${v}"`)) fail(`sw.js: ${f} fehlt in SHELL`);
+            if (f.endsWith(".js")) new Function(fs.readFileSync(f, "utf8"));
+          }
           const man = JSON.parse(fs.readFileSync("manifest.webmanifest", "utf8"));
           if (!man.share_target) fail("manifest: share_target fehlt");
           console.log("OK: App v" + appv);'

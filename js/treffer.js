@@ -8,17 +8,6 @@ function sortHits(list) {
   const k = by === "price" ? (x) => x.rent ?? 1e9 : by === "size" ? (x) => -(x.m2 ?? -1) : (x) => -pubTime(x);
   return [...list].sort((a, b) => k(a) - k(b));
 }
-function pubLabel(x) {
-  const prec = x.published_precision;
-  if (!x.published || prec === "found") return `gefunden ${ago(x.first_seen)}`;
-  let rel = ago(x.published);
-  if (prec === "day") {
-    const d = new Date(x.published), t = new Date(); const days = Math.round((new Date(t.toDateString()) - new Date(d.toDateString())) / 864e5);
-    rel = days <= 0 ? "ca. heute" : days === 1 ? "ca. gestern" : "ca. " + d.toLocaleDateString("de-CH", { day: "2-digit", month: "2-digit" });
-  }
-  const gap = new Date(x.first_seen) - new Date(x.published);
-  return `<b>Inseriert ${esc(rel)}</b>` + (gap > 2 * 3600e3 ? ` · gefunden ${esc(ago(x.first_seen))}` : "");
-}
 const MINI_ZOOM = 14;
 function miniMap(x) {
   if (x.lat == null || x.lon == null) return "";
@@ -41,10 +30,6 @@ function initMini(el) {
   L.circleMarker(ll, { radius: 7, color: "#fff", weight: 3, fillColor: accent(), fillOpacity: 1, interactive: false }).addTo(m);
   m.on("click", () => showOnMap(el.dataset.mapkey));
   minis.set(el, m);
-}
-function mountMinis() {
-  minis.forEach((m, el) => { if (!el.isConnected || !el.closest("#dBody")) { m.remove(); minis.delete(el); } });
-  document.querySelectorAll("#hitList .mini[data-lat]").forEach((el) => (miniObserver ? miniObserver.observe(el) : initMini(el)));
 }
 function showOnMap(k) {
   const x = S.hits.find((h) => keyOf(h) === k); if (!x || x.lat == null) return;
@@ -284,9 +269,4 @@ function deleteComment(k, id) {
     const it = items[k]; if (!it) return;
     it.comments = (it.comments || []).filter((x) => !(x.id === id && x.by === S.person));
   });
-}
-function stLine(k) {
-  const st = itemOf(k).status;
-  if (!st || !st.value) return "";
-  return `<button type="button" class="stline" data-detail><span>Stand: <b>${esc(statusLabel(st))}</b>${st.by ? ` · ${esc(PEOPLE[st.by] || st.by)}, ${esc(ago(st.at))}` : ""}</span><span aria-hidden="true">›</span></button>`;
 }

@@ -224,7 +224,6 @@ $("dBody").addEventListener("click", async (e) => {
   const us = e.target.closest("[data-unstep]"); if (us && k0) { setStep(k0, us.dataset.unstep, null); return; }
   const an = e.target.closest("[data-answer]"); if (an && k0) { setStep(k0, "antwort", { value: an.dataset.answer }); return; }
   if (e.target.id === "kKi" && k0) { kontaktKi(k0); return; }
-  if (e.target.id === "kUndo" && k0 && KON.prev != null) { $("kText").value = KON.prev; KON.prev = null; kontaktSave(k0, $("kText").value.trim(), true).then(() => txRender("kontakt")); kmtRestore("kontakt"); $("kTips").innerHTML = ""; $("kState").textContent = "Rückgängig gemacht."; return; }
   if (e.target.id === "kCopy" && k0) {
     const t = $("kText").value.trim(), x = S.hits.find((h) => keyOf(h) === k0) || {};
     if (!t) { toast("Noch keine Nachricht.", "err"); return; }
@@ -323,36 +322,6 @@ function sourcesHtml(x) {
   const list = (x.sources && x.sources.length ? x.sources : [{ portal: x.portal, url: x.url, at: x.first_seen }])
     .concat((x.also_urls || []).filter((u) => !(x.sources || []).some((s) => s.url === u)).map((u) => ({ portal: "weiterer Link", url: u, at: null })));
   return list.map((s) => `<a href="${esc(TRACK_RX.test(s.url || "") ? searchUrl(x) : s.url)}" target="_blank" rel="noopener" data-open>${esc(s.portal || "Link")}</a>${s.at ? " " + esc(new Date(s.at).toLocaleDateString("de-CH", { day: "2-digit", month: "2-digit" })) : ""}`).join(" · ");
-}
-function outBtn(k) {
-  const o = itemOf(k).out;
-  if (verdict(k) !== "out") return `<button type="button" class="btn outbtn" data-out="1" aria-label="Aussortieren">${icon.x}<span>Aussortieren</span></button>`;
-  return `<button type="button" class="btn outbtn back" data-out="0">${icon.undo}<span>Zurückholen</span></button>`;
-}
-function socialBlock(x) {
-  const k = keyOf(x), it = itemOf(k), mine = myVote(k);
-  const other = S.person ? otherOf(S.person) : null;
-  const ov = other ? (it.votes || {})[other] : null;
-  const n = (it.comments || []).length, open = S.openThreads.has(k);
-  const otherHtml = other
-    ? `<span class="other ${ov || ""}" title="${esc(PEOPLE[other])}: ${ov === "up" ? "Daumen hoch" : ov === "down" ? "Daumen runter" : "noch nicht bewertet"}">${esc(PEOPLE[other])}<span class="ob">${ov ? thumb(ov) : "–"}</span></span>`
-    : `<span class="other">Wer bist du?</span>`;
-  const thread = open ? `<div class="thread">
-      ${(it.comments || []).map((c) => `<div class="cmt ${c.by === S.person ? "mine" : ""}">
-        <div class="who">${esc(PEOPLE[c.by] || c.by)}<span>${esc(ago(c.at))}</span></div>
-        <p>${esc(c.text)}</p>${c.by === S.person ? `<button type="button" class="del" data-del="${esc(c.id)}">löschen</button>` : ""}</div>`).join("") || '<p class="hint">Noch keine Kommentare.</p>'}
-      <div class="cform"><textarea class="field" rows="1" placeholder="${other ? "Antwort an " + esc(PEOPLE[other]) : "Kommentar"} …" data-cinput></textarea>
-        <button type="button" class="btn primary" data-csend>Senden</button></div>
-    </div>` : "";
-  const last = (it.comments || []).slice(-1)[0];
-  return `<div class="votes">
-      <button type="button" class="vbtn up" data-vote="up" aria-pressed="${mine === "up"}" aria-label="Daumen hoch">${thumb("up")}</button>
-      <button type="button" class="vbtn down" data-vote="down" aria-pressed="${mine === "down"}" aria-label="Daumen runter">${thumb("down")}</button>
-      <button type="button" class="vbtn star" data-fav aria-pressed="${isFav(k)}" aria-label="Favorit">${isFav(k) ? icon.star : icon.starO}</button>
-      ${otherHtml}
-    </div>
-    <button type="button" class="cbtn" data-thread aria-expanded="${open}">${bubble}<span>${n ? n + " " : ""}Kommentar${n === 1 ? "" : "e"}</span>${!open && last ? `<span class="last">${esc(PEOPLE[last.by] || last.by)}: ${esc(last.text)}</span>` : ""}<span class="chev">${open ? "–" : "+"}</span></button>
-    ${thread}`;
 }
 function setPerson(p) {
   S.person = p; store.set("wh_person", p);
