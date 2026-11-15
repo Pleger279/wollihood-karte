@@ -643,6 +643,11 @@ label.f small, div.f small { color: var(--muted); font: 500 12.5px var(--body) }
 #bBody > .panel { box-shadow: none; border: 1px solid var(--hair); margin: 0 }
 #dStand .bewfoot { position: sticky; bottom: 0; margin: 0; border-radius: 12px; padding: 10px 12px }
 .d-restbtn { justify-self: center; padding: 10px }
+/* v91: Verschicken & Dateien */
+#bSendBody { display: grid; gap: 12px }
+.s-weg { display: grid; gap: 10px; padding: 12px; border-radius: 12px; background: var(--sunk) }
+.s-weg .btn.primary { justify-self: stretch; text-align: center; text-decoration: none }
+.s-files { display: grid; gap: 6px }
 #dRest { display: grid; gap: inherit; grid-template-columns: minmax(0, 1fr) } #dRest[hidden] { display: none }
 
 .dosdet summary { cursor: pointer; list-style: none; font-size: 14.5px; display: flex; justify-content: space-between; gap: 8px; padding: 4px 0 }
@@ -3428,7 +3433,7 @@ let installEvt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("installBtn").hidden = false; $("installHint").hidden = true; });
 $("installBtn").addEventListener("click", async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("installBtn").hidden = true; });
 if (window.matchMedia("(display-mode: standalone)").matches) { $("installHint").textContent = "Läuft als App."; }
-const APP_VERSION = "90 · 15.11.2026";
+const APP_VERSION = "91 · 15.11.2026";
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").then((reg) => { reg.update().catch(() => {}); }).catch(() => {});
   let reloaded = false;
@@ -3528,7 +3533,8 @@ function renderBew() {
         ${kmtBlock("text")}
         <button type="button" class="linkbtn" id="bGrund" style="justify-self:start">Diese Fassung als Grundtext für künftige Bewerbungen übernehmen</button>
       </div>
-      ${bpTextBar("text")}`)}
+      ${bpTextBar("text")}
+      <div class="kbar"><button type="button" class="btn sm" id="bPdf">PDF ansehen</button><span id="bPdfLink">${doc.pdf ? `<a href="#" class="doclink" data-doc="${esc(doc.pdf)}">📄 Gespeichertes PDF (${esc(ago(doc.pdf_at))})</a>` : ""}</span></div>`)}
     ${bpPart("foto", "Foto", `<div class="panel" id="bFoto"><div id="bFotoBody"></div></div>`)}
     ${bpPart("unterlagen", "Unterlagen", `
       <div class="panel" id="bDossier"><h2>Dossier</h2>
@@ -3551,20 +3557,11 @@ function renderBew() {
         ${kmtBlock("bemerkung")}
       </div>
       ${bpTextBar("bemerkung")}
-      <div class="kbar"><button type="button" class="btn sm" id="bCopy">Text kopieren</button></div>`)}
-    ${bpPart("senden", "Senden", `
-      <div class="panel"><h2>Anschreiben als PDF</h2>
-        <button type="button" class="btn primary" id="bPdf">PDF erstellen</button>
-        <div id="bPdfLink">${doc.pdf ? `<a href="#" class="doclink" data-doc="${esc(doc.pdf)}">📄 Letztes PDF (${esc(ago(doc.pdf_at))})</a>` : ""}</div>
-      </div>
-      <div class="panel"><h2>Ganzes Dossier</h2>
-        <p class="hint" id="bDossierSum2"></p>
-        <button type="button" class="btn" id="bDossierPdf">Dossier als ein PDF</button>
-        <div id="bDossierLink"></div>
-      </div>`)}
+      <div class="kbar"><button type="button" class="btn sm" id="bNoteCopy">Text kopieren</button></div>`)}
+    ${bpPart("senden", "Verschicken & Dateien", `<div id="bSendBody"></div>`)}
     <div class="bewfoot"><span class="hint warnline" id="bDirty" hidden>Nicht gespeichert</span><button type="button" class="btn sm" id="bSave">Gespeichert</button></div>`;
   bewTips(); bewCount(); renderDossier(); renderStamm(); renderForm(); renderCopy(); bewMark(); dossierSum(); FOTO.img = null; fotoRender();
-  bpRenderText("text"); bpRenderText("bemerkung"); bpStatus();
+  bpRenderText("text"); bpRenderText("bemerkung"); renderSend(); bpStatus();
 }
 const bpBetreffVor = () => `Bewerbung ${[BEW.x?.street, BEW.x?.rooms ? BEW.x.rooms + " Zimmer" : ""].filter(Boolean).join(", ")}`.trim();
 // Texte lesen / bearbeiten / prüfen (v89 Bewerbung, v90 auch Kontakt-Nachricht). Felder: text, bemerkung (BEW.doc), kontakt (KON.data).
@@ -3782,7 +3779,8 @@ function bpStatus() {
   set("foto", BEW.doc.foto?.path ? ["eigenes Foto", "ok"] : ["Standardfoto", "muted"]);
   const items = dossierItems().filter(dossierOn), old = items.filter((b) => baustAlter(b)?.alt).length;
   set("unterlagen", [`${items.length} Dokumente${old ? ` · ${old} zu alt` : ""}`, old ? "warn" : "ok"]);
-  set("senden", BEW.doc.pdf ? [`PDF ${ago(BEW.doc.pdf_at)}`, "ok"] : ["noch kein PDF", "muted"]);
+  const wg = WEGE.find(([w]) => w === (BEW.doc.weg || sendWegVorschlag()[0]))?.[1] || "";
+  set("senden", stepsOf(BEW.k).bewerbung ? ["verschickt ✓", "ok"] : [wg + (BEW.doc.weg ? "" : " (Vorschlag)"), "muted"]);
 }
 function bpToggle(id, force) {
   const el = document.querySelector(`[data-bpart="${id}"]`); if (!el) return;
@@ -3820,7 +3818,7 @@ $("bBody").addEventListener("click", (e) => {
 });
 $("bBody").addEventListener("change", (e) => {
   if (e.target.id === "bAnrede") bewMark();
-  if (e.target.matches("[data-dsel]")) { BEW.doc.auswahl = { ...(BEW.doc.auswahl || {}), [e.target.dataset.dsel]: e.target.checked }; bewMark(); dossierSum(); }
+  if (e.target.matches("[data-dsel]")) { BEW.doc.auswahl = { ...(BEW.doc.auswahl || {}), [e.target.dataset.dsel]: e.target.checked }; bewMark(); dossierSum(); renderDossier(); renderSend(); }
   if (e.target.id === "bUpload" && e.target.files.length) { beilageUpload(e.target.files); e.target.value = ""; }
   if (e.target.id === "bFormFile" && e.target.files.length) { const f = e.target.files[0]; e.target.value = ""; formStart(f); }
 });
@@ -3867,7 +3865,7 @@ $("bBody").addEventListener("click", async (e) => {
   const sdel = e.target.closest("[data-spdel]");
   if (sdel) { stammCollect(); const p = sdel.dataset.spdel.split("."), i = +p.pop(); spGet(BEW.ctx.stamm, p.join(".")).splice(i, 1); renderStamm(); return; }
   if (e.target.id === "bLearnOk" || e.target.id === "bLearnNo") return bewLearnDecide(e.target.id === "bLearnOk");
-  if (e.target.id === "bCopy") {
+  if (e.target.id === "bNoteCopy") {
     const offen = ($("bNote").value.match(/\[[^\]]*\]/g) || []);
     if (offen.length && !confirm(`In der Bemerkung steht noch: ${offen.join(", ")}\n\nTrotzdem kopieren?`)) return;
     try { await navigator.clipboard.writeText($("bNote").value); toast("Bemerkung kopiert.", "ok"); } catch { $("bNote").select(); toast("Markiert – jetzt kopieren.", ""); } return; }
@@ -4322,6 +4320,15 @@ function layoutPdf(doc, fonts) {
   lines.forEach((l) => l.segs.forEach((s) => (s.w = w(s.t, s.mark))));
   return { lines, warn };
 }
+async function bewPdfStore() {
+  const bytes = await anschreibenBytes(false); if (!bytes) return;
+  const blob = new Blob([bytes], { type: "application/pdf" }), path = bewPath("Anschreiben.pdf");
+  let sha; try { sha = (await gh(path)).sha; } catch { }
+  await gh(path, { method: "PUT", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message: `Bewerbung PDF: ${BEW.x.street || BEW.k}`, content: await blobB64(blob), branch: "main", ...(sha ? { sha } : {}) }) });
+  fileCache.delete(path); BEW.doc.pdf = path; BEW.doc.pdf_at = new Date().toISOString();
+  bewLearnMaybe(); await bewSave(true); bewFertig().catch(() => { });
+}
 async function bewPdf() {
   bewRead();
   const offen = (BEW.doc.text + " " + BEW.doc.adresse + " " + BEW.doc.name).match(/\[[^\]]*\]/g);
@@ -4345,7 +4352,7 @@ async function bewPdf() {
     $("bPdfLink").innerHTML = `<a class="doclink" href="${url}" target="_blank" rel="noopener">📄 PDF öffnen</a> <a class="doclink" href="${url}" download="${esc(name)}">⬇ Herunterladen</a>`;
     toast("PDF erstellt und gespeichert.", "ok");
   } catch (e) { toast("PDF fehlgeschlagen: " + e.message, "err"); }
-  finally { btn.disabled = false; btn.textContent = "PDF erstellen"; }
+  finally { btn.disabled = false; btn.textContent = "PDF ansehen"; }
 }
 
 // --- Foto im Anschreiben (v85, Pascal 14.11.: «wir machen gerne ein Foto vor dem Haus») ---
@@ -4715,6 +4722,7 @@ async function dossierPdf() {
   const offen = (BEW.doc.text + " " + BEW.doc.name).match(/\[[^\]]*\]/g);
   if (sel.some((b) => b.id === "anschreiben") && offen && !confirm(`Im Anschreiben noch offen: ${offen.join(", ")}\n\nTrotzdem erstellen?`)) return;
   const btn = $("bDossierPdf"); btn.disabled = true; btn.textContent = "Erstelle Dossier …";
+  if (sel.some((b) => b.id === "anschreiben")) bewPdfStore().catch(() => { });
   try {
     await pdfAssets();
     const bytes = await dossierBytes();
@@ -4725,7 +4733,7 @@ async function dossierPdf() {
       <p class="hint">${sel.length} Teile, ${mb} MB${mb > 9 ? " – für manche Mail-Postfächer zu gross, dann einzeln senden" : ""}.</p>`;
     toast("Dossier erstellt.", "ok");
   } catch (e) { toast("Dossier fehlgeschlagen: " + e.message, "err"); }
-  finally { btn.disabled = false; btn.textContent = "Dossier als ein PDF"; }
+  finally { if ($("bDossierPdf")) { $("bDossierPdf").disabled = false; $("bDossierPdf").textContent = "⬇ Dossier als ein PDF"; } }
 }
 async function beilageUpload(files) {
   const added = [];
@@ -5139,7 +5147,7 @@ function formPanel() {
   return `<div class="panel" id="bForm"><h2>Formular der Verwaltung</h2>
     <p class="hint">Foto oder PDF des Anmeldeformulars. Claude füllt es mit euren Angaben aus, ihr prüft und korrigiert. Das ausgefüllte Formular kommt ins Dossier.</p>
     <div id="bFormBody"></div>
-    <details class="adv-inner" id="bCopy"><summary>Online-Formular: Angaben zum Kopieren</summary><div id="bCopyBody"></div></details></div>`;
+    <div id="bCopyHome"><details class="adv-inner" id="bCopy"><summary>Online-Formular: Angaben zum Kopieren</summary><div id="bCopyBody"></div></details></div></div>`;
 }
 function renderForm() {
   const el = $("bFormBody"); if (!el) return;
@@ -5261,6 +5269,119 @@ function copyRows() {
   rows.push(["h", "Bemerkung"], ["Bemerkung", bewRead().bemerkung]);
   return rows.filter((r) => r[0] === "h" || (r[1] != null && String(r[1]).trim() !== ""));
 }
+// --- Verschicken & Dateien (v91, Pascal 15.11.: «nicht nur senden, auch Dateien einzeln, ganzes Dossier … möglichst individuell») ---
+// Wollihood verschickt nie selbst: Mail-App (Teilen mit Anhängen bzw. mailto), Plattform/Portal öffnen, Dateien laden.
+const WEGE = [["mail", "Per Mail"], ["plattform", "Online-Plattform"], ["portal", "Portal / Flatfox"], ["papier", "Ausdrucken"]];
+function sendContact() {
+  const x = BEW.x || {}, d = BEW.d || {}, ag = d.agency || (x.agency ? { name: x.agency } : null);
+  const book = ag ? (S.agencies[agencyKey(ag.name)] || {}) : {};
+  const ksh = shotOk(BEW.k)?.kontakt || x.contact_shots || {};
+  return { mail: book.email || (d.contacts?.emails || [])[0] || ksh.mail || "", apply: d.apply_url || "", url: typeof goodUrl === "function" ? goodUrl(x) : (x.url || "") };
+}
+function sendWegVorschlag() {
+  const c = sendContact(), x = BEW.x || {}, txt = ((BEW.d?.description || "") + " " + (x.text || "")).toLowerCase();
+  if (/per (e-?)?mail|an (die )?folgende (e-?)?mail|unterlagen[^.]{0,60}(an|per) [\w.-]+@/.test(txt) || (c.mail && !c.apply)) return ["mail", c.mail ? "Mail-Adresse der Verwaltung bekannt" : "Inserat verlangt Unterlagen per Mail"];
+  if (c.apply || /bewerbungsformular|online[- ]?(bewerb|formular|anmeld)|plattform|emeria|wohnungsbewerbung\.ch/.test(txt)) return ["plattform", c.apply ? "Inserat hat einen Bewerbungslink" : "Inserat nennt ein Online-Formular"];
+  if (/flatfox/.test(txt) || String(BEW.k).startsWith("flatfox:")) return ["portal", "Inserat auf Flatfox"];
+  return ["mail", "Standard"];
+}
+function sendSelected() { return dossierItems().filter(dossierOn); }
+function renderSend() {
+  const el = $("bSendBody"); if (!el) return;
+  { const cp = $("bCopy"), home = $("bCopyHome"); if (cp && home && cp.parentElement !== home) home.appendChild(cp); }   // vor dem Neuzeichnen heimholen
+  const [vor, warum] = sendWegVorschlag(), weg = BEW.doc.weg || vor, c = sendContact(), doc = BEW.doc;
+  const sel = sendSelected(), alt = sel.filter((b) => baustAlter(b)?.alt).length;
+  const betreff = doc.betreff || bpBetreffVor();
+  const wegBox = {
+    mail: `<label class="f"><small>An</small><input class="field" id="sTo" type="email" value="${esc(doc.an ?? c.mail)}" placeholder="vermietung@…"></label>
+      <p class="hint">Betreff: ${esc(betreff)} · Text: Begleit-Mail ${(doc.bemerkung || "").trim() ? "✓" : "<b>noch leer</b>"}</p>
+      <div class="seg sm" role="group" aria-label="Anhänge"><button type="button" class="opt" data-sanh="ein" aria-pressed="${(doc.anhang || "ein") === "ein"}">Ein PDF</button><button type="button" class="opt" data-sanh="einzeln" aria-pressed="${doc.anhang === "einzeln"}">Einzelne Dateien</button></div>
+      <button type="button" class="btn primary" id="sMail">Mail mit Anhängen vorbereiten</button>
+      <p class="hint">Öffnet «Teilen» → eure Mail-App wählen. Ihr schickt selbst, von eurer Adresse. Empfänger und Betreff setzt ihr dort ein: <button type="button" class="linkbtn" id="sCopyTo">Adresse kopieren</button> · <button type="button" class="linkbtn" id="sCopySub">Betreff kopieren</button></p>
+      <a class="linkbtn" id="sMailto" href="#">Nur Text in der Mail-App (ohne Anhänge)</a>`,
+    plattform: `${c.apply || c.url ? `<a class="btn primary" href="${esc(c.apply || c.url)}" target="_blank" rel="noopener">${c.apply ? "Bewerbungs-Plattform öffnen ↗" : "Inserat öffnen ↗"}</a>` : ""}
+      <p class="hint">Dort die Dateien einzeln hochladen (unten ⬇) und die Angaben hineinkopieren.</p>
+      <button type="button" class="btn sm" id="sCopyNote">Begleittext kopieren</button>
+      <div id="sCopySlot"></div>`,
+    portal: `${c.url ? `<a class="btn primary" href="${esc(c.url)}" target="_blank" rel="noopener">Inserat öffnen ↗</a>` : ""}
+      <p class="hint">Im Portal den Begleittext ins Nachrichtenfeld und das Dossier als ein PDF anhängen.</p>
+      <div class="kbar"><button type="button" class="btn sm" id="sCopyNote">Begleittext kopieren</button><button type="button" class="btn sm" id="sShareOne">Dossier-PDF teilen</button></div>`,
+    papier: `<p class="hint">Dossier als ein PDF öffnen und drucken (oder im Copyshop).</p><button type="button" class="btn primary" id="sOpenOne">Dossier-PDF öffnen</button>`,
+  }[weg];
+  el.innerHTML = `<div class="seg wrap" role="group" aria-label="Wie verschickt ihr?">${WEGE.map(([w, l]) => `<button type="button" class="opt" data-sweg="${w}" aria-pressed="${w === weg}">${l}${w === vor ? " ✦" : ""}</button>`).join("")}</div>
+    <p class="hint">✦ Vorschlag: ${esc(warum)}. Jede Verwaltung ist anders – wählt, was das Inserat verlangt.</p>
+    <div class="s-weg">${wegBox}</div>
+    <div class="s-files"><div class="ftitle sm">Dateien (${sel.length} ausgewählt${alt ? ` · <span class="warnline">${alt} zu alt</span>` : ""})</div>
+      ${dossierItems().map((b) => `<div class="drow"><label><input type="checkbox" data-dsel="${esc(b.id)}"${dossierOn(b) ? " checked" : ""}><span>${esc(b.titel)}</span></label><button type="button" class="iconbtn" data-dl="${esc(b.id)}" aria-label="${esc(b.titel)} herunterladen">⬇</button></div>`).join("")}
+      <div class="kbar"><button type="button" class="btn sm" id="bDossierPdf">⬇ Dossier als ein PDF</button><button type="button" class="btn sm" id="sAllDl">⬇ Ausgewählte einzeln</button><button type="button" class="btn sm" id="sShareSel">Ausgewählte teilen …</button></div>
+      <div id="bDossierLink"></div>
+      <p class="hint">Reihenfolge und weitere Dokumente unter «Unterlagen».</p></div>`;
+  if (weg === "plattform") { const cp = $("bCopy"); if (cp) $("sCopySlot").appendChild(cp); }
+}
+// Dateien für den Versand bauen
+async function sendFiles(mode) {
+  bewRead(); await pdfAssets();
+  const sel = sendSelected(); if (!sel.length) throw new Error("Keine Datei ausgewählt.");
+  const alt = sel.filter((b) => baustAlter(b)?.alt).map((b) => b.titel);
+  if (alt.length && !confirm(`Zu alt: ${alt.join(", ")}\n\nTrotzdem verwenden?`)) return null;
+  const offen = (BEW.doc.text + " " + BEW.doc.name).match(/\[[^\]]*\]/g);
+  if (sel.some((b) => b.id === "anschreiben") && offen && !confirm(`Im Anschreiben noch offen: ${offen.join(", ")}\n\nTrotzdem?`)) return null;
+  if (sel.some((b) => b.id === "anschreiben")) bewPdfStore().catch(() => { });   // Anschreiben.pdf sichern + «fertige Texte» lernen
+  if (mode === "ein") {
+    const bytes = await dossierBytes();
+    return [new File([bytes], `Bewerbungsdossier_${fileSlug(BEW.x.street || "Wohnung")}.pdf`, { type: "application/pdf" })];
+  }
+  const out = [];
+  for (const [i, b] of sel.entries()) { const { bytes, type } = await itemBytes(b); out.push(new File([bytes], `${String(i + 1).padStart(2, "0")}_${itemName(b, type)}`, { type })); }
+  return out;
+}
+async function sendShare(mode, withText) {
+  const files = await sendFiles(mode); if (!files) return;
+  const doc = BEW.doc, data = { files };
+  if (withText) { data.title = doc.betreff || bpBetreffVor(); data.text = doc.bemerkung || ""; }
+  const mb = files.reduce((s, f) => s + f.size, 0) / 1048576;
+  if (navigator.canShare && navigator.canShare({ files })) {
+    try { await navigator.share(data); toast(`Geteilt (${mb.toFixed(1)} MB)`, "ok"); sendDone(); }
+    catch (e) { if (e.name !== "AbortError") throw e; toast("Abgebrochen", ""); }
+    return;
+  }
+  // Computer ohne Teilen: Dateien laden, Mail-App mit Text öffnen
+  files.forEach((f) => saveBlob(f, f.type, f.name));
+  if (withText) location.href = sendMailto();
+  toast(withText ? "Dateien heruntergeladen – in der Mail anhängen." : "Heruntergeladen.", "ok", 6000);
+  if (withText) sendDone();
+}
+function sendMailto() {
+  const doc = BEW.doc, to = ($("sTo")?.value || doc.an || sendContact().mail || "").trim();
+  return `mailto:${encodeURIComponent(to).replace(/%40/g, "@")}?subject=${encodeURIComponent(doc.betreff || bpBetreffVor())}&body=${encodeURIComponent(doc.bemerkung || "")}`;
+}
+function sendDone() {
+  if (stepsOf(BEW.k).bewerbung) return;
+  setTimeout(() => toastAction("Verschickt? Dann als beworben markieren.", "Beworben", () => setStep(BEW.k, "bewerbung", { weg: BEW.doc.weg || sendWegVorschlag()[0] }), 12000), 1500);
+}
+async function copyText(t, what) { try { await navigator.clipboard.writeText(t); toast(what + " kopiert.", "ok"); } catch { toast("Kopieren nicht möglich.", "err"); } }
+$("bBody").addEventListener("click", async (e) => {
+  const t = e.target, w = t.closest("[data-sweg]");
+  if (w) { BEW.doc.weg = w.dataset.sweg; renderSend(); bewMark(); return; }
+  const an = t.closest("[data-sanh]"); if (an) { BEW.doc.anhang = an.dataset.sanh; renderSend(); bewMark(); return; }
+  try {
+    if (t.id === "sMail") { if (!(BEW.doc.bemerkung || "").trim() && !confirm("Die Begleit-Mail ist noch leer. Trotzdem?")) return; await sendShare(BEW.doc.anhang || "ein", true); return; }
+    if (t.id === "sMailto") { e.preventDefault(); location.href = sendMailto(); sendDone(); return; }
+    if (t.id === "sCopyTo") return copyText(($("sTo")?.value || "").trim(), "Adresse");
+    if (t.id === "sCopySub") return copyText(BEW.doc.betreff || bpBetreffVor(), "Betreff");
+    if (t.id === "sCopyNote") {
+      const v = BEW.doc.bemerkung || ""; const offen = v.match(/\[[^\]]*\]/g);
+      if (offen && !confirm(`Im Begleittext steht noch: ${offen.join(", ")}\n\nTrotzdem kopieren?`)) return;
+      return copyText(v, "Begleittext");
+    }
+    if (t.id === "sShareOne") return sendShare("ein", false);
+    if (t.id === "sShareSel") return sendShare("einzeln", false);
+    if (t.id === "sOpenOne") { const f = await sendFiles("ein"); if (f) { const u = URL.createObjectURL(f[0]); window.open(u, "_blank") || saveBlob(f[0], f[0].type, f[0].name); } return; }
+    if (t.id === "sAllDl") { const f = await sendFiles("einzeln"); if (f) { for (const x of f) { saveBlob(x, x.type, x.name); await new Promise((r) => setTimeout(r, 400)); } toast(`${f.length} Dateien heruntergeladen.`, "ok"); } return; }
+  } catch (err) { toast("Nicht möglich: " + err.message, "err", 7000); }
+});
+$("bBody").addEventListener("change", (e) => { if (e.target.id === "sTo") { BEW.doc.an = e.target.value.trim(); bewMark(); } });
+
 function renderCopy() {
   const el = $("bCopyBody"); if (!el) return;
   BEW.copy = copyRows();
