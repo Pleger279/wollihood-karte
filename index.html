@@ -648,6 +648,14 @@ label.f small, div.f small { color: var(--muted); font: 500 12.5px var(--body) }
 .s-weg { display: grid; gap: 10px; padding: 12px; border-radius: 12px; background: var(--sunk) }
 .s-weg .btn.primary { justify-self: stretch; text-align: center; text-decoration: none }
 .s-files { display: grid; gap: 6px }
+/* v92: Chat pro Wohnung */
+.ch-list { display: grid; gap: 8px }
+.ch-msg { padding: 10px 12px; border-radius: 14px; background: var(--sunk); max-width: 92%; justify-self: start; display: grid; gap: 4px }
+.ch-msg.me { justify-self: end; background: color-mix(in srgb, var(--accent) 12%, var(--surface, #fff)) }
+.ch-msg.err { border: 1px solid var(--bad) }
+.ch-msg small { color: var(--muted); font-size: 12px } .ch-msg p { margin: 0; white-space: pre-wrap; line-height: 1.45 }
+.ch-chg summary { cursor: pointer; font-size: 13.5px; color: var(--accent) } .ch-chg .diff { margin-top: 6px; font-size: 13.5px }
+.ch-form { display: flex; gap: 8px; align-items: flex-end } .ch-form textarea { flex: 1; resize: none; min-height: 44px } .ch-form .btn { flex: none }
 #dRest { display: grid; gap: inherit; grid-template-columns: minmax(0, 1fr) } #dRest[hidden] { display: none }
 
 .dosdet summary { cursor: pointer; list-style: none; font-size: 14.5px; display: flex; justify-content: space-between; gap: 8px; padding: 4px 0 }
@@ -1531,7 +1539,6 @@ function standPanel(k) {
       <div class="bp-read" id="bRead-kontakt"><p class="hint">Lade …</p></div>
       <div class="bp-edit" data-tedit="kontakt" hidden>
         <textarea class="field" id="kText" rows="8" spellcheck="true" lang="de-CH" placeholder="Eure Nachricht – selbst schreiben oder einfügen."></textarea>
-        ${kmtBlock("kontakt")}
       </div>
       <div class="bp-bar" data-tbar="kontakt"></div><span class="hint" id="kState"></span>
       <div class="bp-pruef" id="bPruef-kontakt"></div>
@@ -1940,6 +1947,7 @@ function renderDetail(x, a, d) {
     <div class="dhead"><h1>${esc(placeName(x))}</h1><div class="sub">${esc(sub)}</div></div>
     ${facts}
     ${standPanel(S.detailKey)}
+    ${chatPanel()}
     <button type="button" class="linkbtn d-restbtn" id="dRestBtn" hidden></button>
     <div id="dRest">
     ${ai}
@@ -1958,7 +1966,7 @@ function renderDetail(x, a, d) {
   // Bilder aus dem privaten Repo nachladen
   $("dBody").querySelectorAll("img[data-src]").forEach((img) => repoFile(img.dataset.src).then((u) => (img.src = u)).catch(() => img.closest("figure")?.remove()));
   S.detailData = d;
-  afterStand(S.detailKey);
+  afterStand(S.detailKey); chatLoad(S.detailKey);
 }
 // ---------- Eigene Dateien, Notiz, «Teilen → Wollihood» ----------
 async function aidOf(k) {
@@ -3433,7 +3441,7 @@ let installEvt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("installBtn").hidden = false; $("installHint").hidden = true; });
 $("installBtn").addEventListener("click", async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("installBtn").hidden = true; });
 if (window.matchMedia("(display-mode: standalone)").matches) { $("installHint").textContent = "Läuft als App."; }
-const APP_VERSION = "91 · 15.11.2026";
+const APP_VERSION = "92 · 15.11.2026";
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").then((reg) => { reg.update().catch(() => {}); }).catch(() => {});
   let reloaded = false;
@@ -3530,7 +3538,6 @@ function renderBew() {
         </div>
         <textarea class="field bewtext" id="bText" spellcheck="true" lang="de-CH">${esc(doc.text)}</textarea>
         <p class="hint">Absätze mit einer Leerzeile trennen. Text in [eckigen Klammern] ist noch offen und erscheint im PDF blau.</p>
-        ${kmtBlock("text")}
         <button type="button" class="linkbtn" id="bGrund" style="justify-self:start">Diese Fassung als Grundtext für künftige Bewerbungen übernehmen</button>
       </div>
       ${bpTextBar("text")}
@@ -3554,7 +3561,6 @@ function renderBew() {
         <label class="f" for="bBetreff"><small>Betreff (für die Mail)</small><input class="field" id="bBetreff" value="${esc(doc.betreff || "")}" placeholder="${esc(bpBetreffVor())}"></label>
         <textarea class="field bewnote" id="bNote" spellcheck="true" lang="de-CH" placeholder="Wird mit «Entwurf für diese Wohnung» erstellt.">${esc(doc.bemerkung || "")}</textarea>
         <div class="kbar"><span class="hint" id="bCount"></span></div>
-        ${kmtBlock("bemerkung")}
       </div>
       ${bpTextBar("bemerkung")}
       <div class="kbar"><button type="button" class="btn sm" id="bNoteCopy">Text kopieren</button></div>`)}
@@ -3569,8 +3575,8 @@ const TX_TA = { text: "bText", bemerkung: "bNote", kontakt: "kText" };
 const TX = {
   get(feld) { return feld === "kontakt" ? ($("kText") && KON.edit ? $("kText").value : KON.data?.text || "") : (feld === "text" ? BEW.doc?.text : BEW.doc?.bemerkung) || ""; },
   set(feld, t) {
-    if (feld === "kontakt") { $("kText").value = t; KON.draft = null; return; }
-    BEW.doc[feld] = t; $(TX_TA[feld]).value = t;
+    if (feld === "kontakt") { KON.data = { ...(KON.data || {}), text: t }; if ($("kText")) $("kText").value = t; KON.draft = null; return; }
+    BEW.doc[feld] = t; if ($(TX_TA[feld])) $(TX_TA[feld]).value = t;
   },
   pruef(feld) { return feld === "kontakt" ? KON.data?.pruef : BEW.doc?.pruef?.[feld]; },
   setPruef(feld, p) {
@@ -4163,6 +4169,122 @@ document.addEventListener("click", (e) => {
   }
 });
 // Regelvorschläge aus allgemeinen Kommentaren (Kontakt-Nachricht)
+// --- Chat pro Wohnung (v92, Pascal 14./15.11.: «einmal pro Wohnung, nicht für jeden Bestandteil») ---
+// Unten am Schritt-Panel, in jedem Tab sichtbar. Claude beantwortet Fragen und ändert auf Wunsch Kontakt-Nachricht,
+// Anschreiben, Begleit-Mail oder Betreff (ganzer neuer Text je Feld → Diff + «Rückgängig» pro Antwort). Gespeichert in
+// archiv/<id>/bewerbung/chat.json (gilt für beide). Ersetzt die Änderungswünsche (kmt).
+const CH = { k: null, sha: null, msgs: [], busy: false, all: false };
+const CH_FELD = { kontakt: "Kontakt-Nachricht", text: "Anschreiben", bemerkung: "Begleit-Mail", betreff: "Mail-Betreff" };
+const CHAT_TOOL = { name: "chat", description: "Antwort im Chat zu dieser Wohnung, optional mit geänderten Texten.",
+  input_schema: { type: "object", required: ["antwort"], properties: {
+    antwort: { type: "string", description: "Kurze Antwort an Leonie/Pascal (du-Form, Schweizer Schreibweise). Bei Änderungen: in einem Satz, was du geändert hast." },
+    aenderungen: { type: "array", description: "Nur wenn sie eine Änderung oder einen neuen Text wollen: je Feld der vollständige neue Text",
+      items: { type: "object", required: ["feld", "neu"], properties: { feld: { type: "string", enum: ["kontakt", "text", "bemerkung", "betreff"] }, neu: { type: "string" } } } },
+    regel_vorschlaege: { type: "array", description: "Nur wenn ein Wunsch allgemein für künftige Texte gilt", items: { type: "object", required: ["regel"], properties: { regel: { type: "string" }, beispiel: { type: "string" } } } } } } };
+function chatPanel() {
+  return `<div class="panel" id="dChat"><h2>Chat mit Claude</h2>
+    <div class="ch-list" id="chList"><p class="hint">Lade …</p></div>
+    <div id="chLearn"></div>
+    <div class="ch-form"><textarea class="field" id="chIn" rows="1" placeholder="z.B. «Kontakt-Nachricht kürzer» oder eine Frage"></textarea><button type="button" class="btn primary" id="chSend" aria-label="Senden">Senden</button></div>
+  </div>`;
+}
+async function chatLoad(k) {
+  if (CH.k !== k) {
+    CH.k = k; CH.sha = null; CH.msgs = []; CH.all = false;
+    try { const r = await readJson(`archiv/${await aidOf(k)}/bewerbung/chat.json`); if (CH.k !== k) return; CH.msgs = r.data.msgs || []; CH.sha = r.sha; } catch { }
+  }
+  chatRender();
+}
+function chatRender() {
+  const el = $("chList"); if (!el || CH.k !== S.detailKey) return;
+  const list = CH.msgs, from = CH.all ? 0 : Math.max(0, list.length - 6);
+  el.innerHTML = (from ? `<button type="button" class="linkbtn" id="chMore">${from} frühere zeigen</button>` : "")
+    + (list.length ? "" : `<p class="hint">Fragt Claude etwas zu dieser Wohnung oder lasst Texte ändern – Kontakt-Nachricht, Anschreiben, Begleit-Mail. Gilt für euch beide.</p>`)
+    + list.slice(from).map((m, j) => { const i = from + j;
+      if (m.role === "user") return `<div class="ch-msg me"><small>${esc(PEOPLE[m.by] || m.by || "")} · ${esc(ago(m.at))}</small><p>${esc(m.text)}</p></div>`;
+      const ch = (m.changes || []).map((c) => `<details class="ch-chg"><summary>${m.undone ? "↶ zurückgenommen: " : "✎ "}${esc(CH_FELD[c.feld] || c.feld)}</summary><div class="diff">${wdiff(c.alt || "", c.neu || "")}</div></details>`).join("");
+      return `<div class="ch-msg ki${m.error ? " err" : ""}"><small>✦ Claude · ${esc(ago(m.at))}</small><p>${esc(m.text)}</p>${ch}${(m.changes || []).length && !m.undone ? `<button type="button" class="linkbtn" data-chundo="${i}">Rückgängig</button>` : ""}</div>`;
+    }).join("")
+    + (CH.busy ? `<div class="ch-msg ki"><small>✦ Claude</small><p class="hint">schreibt …</p></div>` : "");
+}
+async function chatSave() {
+  const aid = await aidOf(CH.k);
+  CH.sha = await writeJson(`archiv/${aid}/bewerbung/chat.json`, { msgs: CH.msgs.slice(-80) }, CH.sha, `Chat (${PEOPLE[S.person] || ""})`);
+}
+async function chatEnsureTexts(k) {
+  if (BEW.k !== k || !BEW.doc) await bewLoad(k);
+  if (KON.k !== k) { KON.k = k; KON.sha = null; KON.data = null; try { const r = await readJson(`archiv/${await aidOf(k)}/bewerbung/kontakt.json`); KON.data = r.data; KON.sha = r.sha; } catch { } }
+}
+async function chatSetFields(k, map) {          // map: feld → neuer Text; speichert Bewerbung und Kontakt je einmal
+  let bew = false, kon = false;
+  for (const [feld, neu] of Object.entries(map)) {
+    if (feld === "betreff") { BEW.doc.betreff = neu; if ($("bBetreff")) $("bBetreff").value = neu; bew = true; }
+    else if (feld === "kontakt") { TX.set("kontakt", neu); kon = true; }
+    else { TX.set(feld, neu); bew = true; }
+  }
+  if (bew) { TX.after("text"); await bewSave(true); }
+  if (kon) await kontaktSave(k, TX.get("kontakt").trim(), true);
+  ["kontakt", "text", "bemerkung"].forEach((f) => txRender(f)); bpStatus(); if (bew) renderSend();
+}
+async function chatSend() {
+  const k = S.detailKey, inp = $("chIn"), text = (inp?.value || "").trim();
+  if (!k || !text || CH.busy) return;
+  if (needPerson()) return;
+  const c = await bewCtx();
+  if (!c.key) { toast("Zuerst den Claude-Schlüssel hinterlegen (Mehr → «Claude für Bewerbungen»).", "err"); return; }
+  CH.msgs.push({ role: "user", by: S.person, text, at: new Date().toISOString() });
+  inp.value = ""; inp.style.height = ""; CH.busy = true; chatRender();
+  try {
+    await chatEnsureTexts(k);
+    if (BEW.edit?.size) bewRead();
+    const doc = BEW.doc || {}, verlauf = CH.msgs.slice(-13, -1).map((m) => `${m.role === "user" ? (PEOPLE[m.by] || "Sie") : "Claude"}: ${m.text}`).join("\n");
+    const user = kontaktUser(c, `Leonie oder Pascal schreiben dir im Chat zu dieser Wohnung. Stand: ${itemOf(k).status?.value || "noch nichts unternommen"}.
+Beantworte Fragen kurz und konkret (du-Form an sie, Schweizer Schreibweise). Wollen sie eine Änderung oder einen neuen Text, liefere in «aenderungen» je Feld den VOLLSTÄNDIGEN neuen Text: kontakt = Kontakt-Nachricht (Erstkontakt vor der Besichtigung), text = Anschreiben (nur Brieftext, ohne Anrede-Zeile), bemerkung = Begleit-Mail bzw. Bemerkung im Online-Formular, betreff = Mail-Betreff. Ändere nur, was verlangt ist; alles andere bleibt wörtlich gleich. Alle Regeln oben gelten (nichts erfinden, Nach-Check Textstil). Fehlt dir eine Angabe, frag nach statt zu raten. Ein allgemeiner Wunsch für künftige Texte → zusätzlich «regel_vorschlaege».
+
+<texte>
+--- Anschreiben (Anrede: ${doc.anrede || ""} ${doc.name || ""}) ---
+${doc.text || "(leer)"}
+--- Begleit-Mail (Betreff: ${doc.betreff || "(leer)"}) ---
+${doc.bemerkung || "(leer)"}
+</texte>
+
+<verlauf>
+${verlauf || "(neu)"}
+</verlauf>
+
+<nachricht von="${PEOPLE[S.person] || ""}">
+${text}
+</nachricht>`).replace(/<aktuell>/, "<aktuell_kontakt_nachricht>").replace(/<\/aktuell>/, "</aktuell_kontakt_nachricht>");
+    const res = await claudeTool(BEW_SYSTEM.replace("Werkzeug «bewerbung»", "Werkzeug «chat»"), user, CHAT_TOOL, "antwort");
+    if (CH.k !== k) return;
+    const map = {}, changes = [];
+    for (const a of (res.aenderungen || [])) {
+      if (!a || !CH_FELD[a.feld] || typeof a.neu !== "string") continue;
+      const neu = a.neu.replace(/\r/g, "").trim(), alt = a.feld === "betreff" ? BEW.doc.betreff || "" : TX.get(a.feld);
+      if (neu && neu !== alt) { map[a.feld] = neu; changes.push({ feld: a.feld, alt, neu }); }
+    }
+    if (changes.length) await chatSetFields(k, map);
+    CH.msgs.push({ role: "ki", text: String(res.antwort || "").trim() || "✓", changes, at: new Date().toISOString() });
+    const lv = (res.regel_vorschlaege || []).filter((r) => r && r.regel).slice(0, 3);
+    if (lv.length) learnBox("chLearn", lv);
+    toast(changes.length ? `Geändert: ${changes.map((x) => CH_FELD[x.feld]).join(", ")}` : "Claude hat geantwortet", "ok");
+  } catch (e) { CH.msgs.push({ role: "ki", text: "Fehler: " + e.message, error: true, at: new Date().toISOString() }); toast("Claude: " + e.message, "err", 7000); }
+  finally { CH.busy = false; chatRender(); chatSave().catch((e) => toast("Chat nicht gespeichert: " + e.message, "err")); $("chList")?.lastElementChild?.scrollIntoView({ block: "nearest", behavior: "smooth" }); }
+}
+async function chatUndo(i) {
+  const m = CH.msgs[i]; if (!m || m.undone) return;
+  await chatEnsureTexts(CH.k);
+  const map = {}; for (const c of m.changes || []) map[c.feld] = c.alt;
+  await chatSetFields(CH.k, map); m.undone = true; chatRender(); chatSave().catch(() => { }); toast("Rückgängig gemacht", "ok");
+}
+document.addEventListener("click", (e) => {
+  if (e.target.id === "chSend") { chatSend(); return; }
+  if (e.target.id === "chMore") { CH.all = true; chatRender(); return; }
+  const u = e.target.closest("[data-chundo]"); if (u) chatUndo(+u.dataset.chundo);
+});
+document.addEventListener("input", (e) => { if (e.target.id === "chIn") { e.target.style.height = "auto"; e.target.style.height = Math.min(e.target.scrollHeight, 160) + "px"; } });
+document.addEventListener("keydown", (e) => { if (e.target.id === "chIn" && e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); chatSend(); } });
+
 function learnBox(id, list) {
   const el = $(id); if (!el) return; KON.learn = list;
   el.innerHTML = `<div class="learn"><div class="ftitle sm">Für künftige Texte merken?</div>
