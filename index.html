@@ -3459,7 +3459,7 @@ let installEvt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("installBtn").hidden = false; $("installHint").hidden = true; });
 $("installBtn").addEventListener("click", async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("installBtn").hidden = true; });
 if (window.matchMedia("(display-mode: standalone)").matches) { $("installHint").textContent = "Läuft als App."; }
-const APP_VERSION = "94 · 15.11.2026";
+const APP_VERSION = "95 · 15.11.2026";
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").then((reg) => { reg.update().catch(() => {}); }).catch(() => {});
   let reloaded = false;
@@ -4005,7 +4005,7 @@ ${typeof BEW_AUFTRAG[mode] === "function" ? BEW_AUFTRAG[mode](feld) : BEW_AUFTRA
 </auftrag>`;
   return mode === "pruefung" ? claudeTool(BEW_SYSTEM, user, PRUEF_TOOL, "vorschlaege") : claudeTool(BEW_SYSTEM, user, BEW_TOOL, "anschreiben");
 }
-async function claudeTool(system, user, tool, need) {
+async function claudeTool(system, user, tool, need, textAs) {
   const r = await fetch("https://api.anthropic.com/v1/messages", { method: "POST",
     headers: { "content-type": "application/json", "x-api-key": BEW.ctx.key, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
     body: JSON.stringify({ model: S.config?.ai?.model || "claude-opus-5-5", max_tokens: 6000, system, tools: [tool],
@@ -4016,6 +4016,7 @@ async function claudeTool(system, user, tool, need) {
   if (tu?.input?.[need] != null) return tu.input;
   const t = (j.content || []).filter((b) => b.type === "text").map((b) => b.text).join("");
   const m = t.match(/\{[\s\S]*\}/); if (m) { try { const o = JSON.parse(m[0]); if (o[need] != null) return o; } catch { } }
+  if (textAs && t.trim()) return { [textAs]: t.trim() };     // 15.11.: Chat antwortete als Text ohne Werkzeug → Fehler; Text ist eine gültige Antwort
   throw new Error("Claude hat nicht im erwarteten Format geantwortet.");
 }
 async function bewKi(mode, instrIn, kfeld) {
@@ -4199,7 +4200,48 @@ const CHAT_TOOL = { name: "chat", description: "Antwort im Chat zu dieser Wohnun
     antwort: { type: "string", description: "Kurze Antwort an Leonie/Pascal (du-Form, Schweizer Schreibweise). Bei Änderungen: in einem Satz, was du geändert hast." },
     aenderungen: { type: "array", description: "Nur wenn sie eine Änderung oder einen neuen Text wollen: je Feld der vollständige neue Text",
       items: { type: "object", required: ["feld", "neu"], properties: { feld: { type: "string", enum: ["kontakt", "text", "bemerkung", "betreff"] }, neu: { type: "string" } } } },
+    angaben: { type: "object", description: "Nur wenn sie Angaben der Wohnung korrigieren oder ergänzen (z.B. Hausnummer, Miete): nur die geänderten Felder",
+      properties: { strasse: { type: "string", description: "Strasse mit Hausnummer" }, plz: { type: "string" }, ort: { type: "string" }, zimmer: { type: "number" },
+        miete_brutto: { type: "number" }, flaeche_m2: { type: "number" }, etage: { type: "string" }, bezug: { type: "string" }, befristung: { type: "string" } } },
+    weg: { type: "string", enum: ["mail", "plattform", "portal", "papier"], description: "Nur wenn sie sagen, wie die Bewerbung eingereicht wird" },
+    kontakt: { type: "object", description: "Nur wenn sie Kontakt der Verwaltung/Vermieter nennen: nur genannte Felder",
+      properties: { firma: { type: "string" }, name: { type: "string" }, telefon: { type: "string" }, mail: { type: "string" } } },
+    stand: { type: "object", description: "Nur wenn sie einen Schritt melden: schritt = kontakt (angefragt) | besichtigung | bewerbung (beworben) | zusage | absage; termin = ISO-Datum/Zeit der Besichtigung (Europe/Zurich), falls genannt",
+      properties: { schritt: { type: "string", enum: ["kontakt", "besichtigung", "bewerbung", "zusage", "absage"] }, termin: { type: "string" }, besichtigt: { type: "boolean" } } },
+    notiz: { type: "string", description: "Nur wenn sie etwas notieren wollen oder eine nützliche Info nennen, die nirgends sonst passt: eine kurze Zeile für die Notiz" },
     regel_vorschlaege: { type: "array", description: "Nur wenn ein Wunsch allgemein für künftige Texte gilt", items: { type: "object", required: ["regel"], properties: { regel: { type: "string" }, beispiel: { type: "string" } } } } } } };
+const CH_EXTRA = { angaben: "Angaben der Wohnung", weg: "Versandweg", kontakt_vw: "Kontakt der Verwaltung", stand: "Stand", notiz: "Notiz" };
+const ANG_LABEL = { strasse: "Strasse", plz: "PLZ", ort: "Ort", zimmer: "Zimmer", miete_brutto: "Miete brutto", flaeche_m2: "Fläche m²", etage: "Etage", bezug: "Bezug", befristung: "Befristung" };
+const angText = (a) => Object.entries(a || {}).filter(([, v]) => v !== "" && v != null).map(([f, v]) => `${ANG_LABEL[f] || f}: ${v}`).join("\n");
+function angCurrent(k) {
+  const x = hitByKey(k) || {};
+  return { strasse: x.street || "", plz: x.plz || "", ort: x.city || "", zimmer: x.rooms ?? "", miete_brutto: x.rent ?? "", flaeche_m2: x.m2 ?? "", etage: x.floor_text || "", bezug: x.moving_date_text || "", befristung: x.limited_text || "" };
+}
+// Angaben korrigieren = wie bestätigte Screenshot-Angaben (social.shots, status ok) → App sofort, Suchskript (shots.py) verortet neu
+function chatSetAngaben(k, neu, prevShots) {
+  const now = new Date().toISOString();
+  socialOp(`${PEOPLE[S.person]}: Angaben im Chat korrigiert`, (items) => {
+    const it = items[k] || (items[k] = { votes: {}, comments: [] });
+    if (prevShots !== undefined) { if (prevShots) it.shots = prevShots; else delete it.shots; }
+    else { const sh = it.shots?.status === "ok" ? it.shots : {}; it.shots = { ...sh, status: "ok", angaben: { ...(sh.angaben || {}), ...neu }, by: S.person, at: now, quelle: "chat" }; }
+    it.updated = now;
+  });
+  const x = hitByKey(k);
+  if (x) { if (prevShots === undefined) shotOverlay(x); else Object.assign(x, Object.fromEntries(Object.entries(neu).map(([f, v]) => [SHOT_PREV[f], v]).filter(([d]) => d))); }
+  setTimeout(() => { refreshDetail(); renderHits(); }, 80);
+}
+function chatSocial(k, label, fn) {
+  socialOp(`${PEOPLE[S.person]}: ${label} (Chat)`, (items) => { const it = items[k] || (items[k] = { votes: {}, comments: [] }); fn(it); it.updated = new Date().toISOString(); });
+  setTimeout(() => { refreshDetail(); renderHits(); }, 80);
+}
+function chatSetSteps(k, steps) {
+  chatSocial(k, "Stand", (it) => {
+    it.steps = steps || {}; const ns = statusFrom(it.steps);
+    if (!ns) delete it.status; else it.status = { ...ns, when: ns.when || null, by: S.person, at: new Date().toISOString() };
+  });
+}
+const stepsText = (st) => STEPS.filter(([n]) => n === "besichtigung" ? st.besichtigung && (st.besichtigung.when || st.besichtigung.done) : st[n])
+  .map(([n, l]) => n === "antwort" ? (st.antwort.value === "zusage" ? "Zusage" : "Absage") : n === "besichtigung" && st.besichtigung.when ? `${l} ${new Date(st.besichtigung.when).toLocaleString("de-CH", { dateStyle: "short", timeStyle: "short" })}` : l).join(" → ") || "(nichts)";
 function chatPanel() {
   return `<div class="panel" id="dChat"><h2>Chat mit Claude</h2>
     <div class="ch-list" id="chList"><p class="hint">Lade …</p></div>
@@ -4218,10 +4260,10 @@ function chatRender() {
   const el = $("chList"); if (!el || CH.k !== S.detailKey) return;
   const list = CH.msgs, from = CH.all ? 0 : Math.max(0, list.length - 6);
   el.innerHTML = (from ? `<button type="button" class="linkbtn" id="chMore">${from} frühere zeigen</button>` : "")
-    + (list.length ? "" : `<p class="hint">Fragen zur Wohnung oder Texte ändern lassen, z.B. «Kontakt-Nachricht kürzer». Gilt für euch beide.</p>`)
+    + (list.length ? "" : `<p class="hint">Fragen zur Wohnung, Texte ändern, Angaben korrigieren, Termin oder Stand melden – z.B. «Besichtigung am Do 18 Uhr» oder «Adresse ist Scheideggstrasse 104». Gilt für euch beide.</p>`)
     + list.slice(from).map((m, j) => { const i = from + j;
       if (m.role === "user") return `<div class="ch-msg me"><small>${esc(PEOPLE[m.by] || m.by || "")} · ${esc(ago(m.at))}</small><p>${esc(m.text)}</p></div>`;
-      const ch = (m.changes || []).map((c) => `<details class="ch-chg"><summary>${m.undone ? "↶ zurückgenommen: " : "✎ "}${esc(CH_FELD[c.feld] || c.feld)}</summary><div class="diff">${wdiff(c.alt || "", c.neu || "")}</div></details>`).join("");
+      const ch = (m.changes || []).map((c) => `<details class="ch-chg"><summary>${m.undone ? "↶ zurückgenommen: " : "✎ "}${esc(CH_FELD[c.feld] || CH_EXTRA[c.feld] || c.feld)}</summary><div class="diff">${wdiff(c.alt || "", c.neu || "")}</div></details>`).join("");
       return `<div class="ch-msg ki${m.error ? " err" : ""}"><small>✦ Claude · ${esc(ago(m.at))}</small><p>${esc(m.text)}</p>${ch}${(m.changes || []).length && !m.undone ? `<button type="button" class="linkbtn" data-chundo="${i}">Rückgängig</button>` : ""}</div>`;
     }).join("")
     + (CH.busy ? `<div class="ch-msg ki"><small>✦ Claude</small><p class="hint">schreibt …</p></div>` : "");
@@ -4260,6 +4302,15 @@ async function chatSend() {
     const user = kontaktUser(c, `Leonie oder Pascal schreiben dir im Chat zu dieser Wohnung. Stand: ${itemOf(k).status?.value || "noch nichts unternommen"}.
 Beantworte Fragen kurz und konkret (du-Form an sie, Schweizer Schreibweise). Wollen sie eine Änderung oder einen neuen Text, liefere in «aenderungen» je Feld den VOLLSTÄNDIGEN neuen Text: kontakt = Kontakt-Nachricht (Erstkontakt vor der Besichtigung), text = Anschreiben (nur Brieftext, ohne Anrede-Zeile), bemerkung = Begleit-Mail bzw. Bemerkung im Online-Formular, betreff = Mail-Betreff. Ändere nur, was verlangt ist; alles andere bleibt wörtlich gleich. Alle Regeln oben gelten (nichts erfinden, Nach-Check Textstil). Fehlt dir eine Angabe, frag nach statt zu raten. Ein allgemeiner Wunsch für künftige Texte → zusätzlich «regel_vorschlaege».
 
+<angaben_der_wohnung>
+${angText(angCurrent(k)) || "(keine)"}
+Versandweg: ${doc.weg || "(nicht gewählt)"}
+Stand: ${stepsText(stepsOf(k))}
+Notiz: ${itemOf(k).note || "(leer)"}
+</angaben_der_wohnung>
+Melden sie einen Schritt (angefragt, Besichtigung am …, besichtigt, beworben, Zusage, Absage), setze «stand». Nennen sie Kontakt der Verwaltung, setze «kontakt». Nützliche Infos ohne eigenen Platz (z.B. «Hunde nicht erlaubt», «Hauswart heisst …») → «notiz». Heute: ${new Date().toISOString().slice(0, 16)}.
+Stimmen Angaben nicht (z.B. fehlende Hausnummer im Titel), korrigiere sie in «angaben» (nur geänderte Felder). Erwähnen sie, wie die Bewerbung eingereicht wird (per Mail, über eine Online-Plattform oder ein Online-Formular, über ein Portal wie Flatfox, auf Papier), setze IMMER zusätzlich «weg» (mail, plattform, portal, papier) – auch wenn sie es nur nebenbei sagen.
+
 <texte>
 --- Anschreiben (Anrede: ${doc.anrede || ""} ${doc.name || ""}) ---
 ${doc.text || "(leer)"}
@@ -4274,8 +4325,48 @@ ${verlauf || "(neu)"}
 <nachricht von="${PEOPLE[S.person] || ""}">
 ${text}
 </nachricht>`).replace(/<aktuell>/, "<aktuell_kontakt_nachricht>").replace(/<\/aktuell>/, "</aktuell_kontakt_nachricht>");
-    const res = await claudeTool(BEW_SYSTEM.replace("Werkzeug «bewerbung»", "Werkzeug «chat»"), user, CHAT_TOOL, "antwort");
+    const res = await claudeTool(BEW_SYSTEM.replace("Werkzeug «bewerbung»", "Werkzeug «chat»"), user, CHAT_TOOL, "antwort", "antwort");
     if (CH.k !== k) return;
+    const extra = [];
+    if (res.angaben && typeof res.angaben === "object") {
+      const cur = angCurrent(k), neu = {};
+      for (const [f, v] of Object.entries(res.angaben)) if (ANG_LABEL[f] && v !== "" && v != null && String(v) !== String(cur[f])) neu[f] = v;
+      if (Object.keys(neu).length) {
+        const prev = itemOf(k).shots ? JSON.parse(JSON.stringify(itemOf(k).shots)) : null;
+        const alt = Object.fromEntries(Object.keys(neu).map((f) => [f, cur[f]]));
+        chatSetAngaben(k, neu);
+        extra.push({ feld: "angaben", alt: angText(alt), neu: angText(neu), prevShots: prev, altWerte: alt });
+      }
+    }
+    if (res.kontakt && typeof res.kontakt === "object") {
+      const kt = Object.fromEntries(Object.entries(res.kontakt).filter(([f, v]) => ["firma", "name", "telefon", "mail"].includes(f) && v));
+      if (Object.keys(kt).length) {
+        const prev = itemOf(k).shots ? JSON.parse(JSON.stringify(itemOf(k).shots)) : null, now = new Date().toISOString();
+        chatSocial(k, "Kontakt der Verwaltung", (it) => { const sh = it.shots?.status === "ok" ? it.shots : {}; it.shots = { ...sh, status: "ok", kontakt: { ...(sh.kontakt || {}), ...kt }, by: S.person, at: now, quelle: "chat" }; });
+        const fi = kt.firma || BEW.d?.agency?.name || hitByKey(k)?.agency; if (fi && (kt.telefon || kt.mail)) agencyAdd(fi, kt).catch(() => { });
+        if (kt.mail && BEW.doc && !BEW.doc.an) { BEW.doc.an = kt.mail; renderSend(); }
+        extra.push({ feld: "kontakt_vw", alt: "", neu: Object.values(kt).join(", "), prevShots: prev });
+      }
+    }
+    if (res.stand && res.stand.schritt) {
+      const prev = JSON.parse(JSON.stringify(stepsOf(k))), st = JSON.parse(JSON.stringify(prev)), now = new Date().toISOString(), me = { by: S.person, at: now };
+      const sc = res.stand.schritt;
+      if (sc === "zusage" || sc === "absage") st.antwort = { value: sc, ...me };
+      else if (sc === "besichtigung") {
+        const w = res.stand.termin && !isNaN(new Date(res.stand.termin)) ? new Date(res.stand.termin).toISOString() : st.besichtigung?.when || null;
+        st.besichtigung = { ...(st.besichtigung || {}), when: w, ...(res.stand.besichtigt ? { done: true } : {}), ...me };
+      } else st[sc] = { ...(st[sc] || {}), ...me };
+      if (JSON.stringify(st) !== JSON.stringify(prev)) { chatSetSteps(k, st); extra.push({ feld: "stand", alt: stepsText(prev), neu: stepsText(st), prevSteps: prev }); }
+    }
+    if (res.notiz && String(res.notiz).trim()) {
+      const alt = itemOf(k).note || "", neu = [alt, String(res.notiz).trim()].filter(Boolean).join("\n");
+      chatSocial(k, "Notiz", (it) => { it.note = neu; });
+      extra.push({ feld: "notiz", alt, neu });
+    }
+    if (res.weg && WEGE.some(([w]) => w === res.weg) && res.weg !== BEW.doc.weg) {
+      extra.push({ feld: "weg", alt: BEW.doc.weg || "", neu: res.weg });
+      BEW.doc.weg = res.weg; await bewSave(true); renderSend(); bpStatus();
+    }
     const map = {}, changes = [];
     for (const a of (res.aenderungen || [])) {
       if (!a || !CH_FELD[a.feld] || typeof a.neu !== "string") continue;
@@ -4283,18 +4374,27 @@ ${text}
       if (neu && neu !== alt) { map[a.feld] = neu; changes.push({ feld: a.feld, alt, neu }); }
     }
     if (changes.length) await chatSetFields(k, map);
+    changes.push(...extra);
     CH.msgs.push({ role: "ki", text: String(res.antwort || "").trim() || "✓", changes, at: new Date().toISOString() });
     const lv = (res.regel_vorschlaege || []).filter((r) => r && r.regel).slice(0, 3);
     if (lv.length) learnBox("chLearn", lv);
-    toast(changes.length ? `Geändert: ${changes.map((x) => CH_FELD[x.feld]).join(", ")}` : "Claude hat geantwortet", "ok");
+    toast(changes.length ? `Geändert: ${changes.map((x) => CH_FELD[x.feld] || CH_EXTRA[x.feld]).join(", ")}` : "Claude hat geantwortet", "ok");
   } catch (e) { CH.msgs.push({ role: "ki", text: "Fehler: " + e.message, error: true, at: new Date().toISOString() }); toast("Claude: " + e.message, "err", 7000); }
   finally { CH.busy = false; chatRender(); chatSave().catch((e) => toast("Chat nicht gespeichert: " + e.message, "err")); $("chList")?.lastElementChild?.scrollIntoView({ block: "nearest", behavior: "smooth" }); }
 }
 async function chatUndo(i) {
   const m = CH.msgs[i]; if (!m || m.undone) return;
   await chatEnsureTexts(CH.k);
-  const map = {}; for (const c of m.changes || []) map[c.feld] = c.alt;
-  await chatSetFields(CH.k, map); m.undone = true; chatRender(); chatSave().catch(() => { }); toast("Rückgängig gemacht", "ok");
+  const map = {};
+  for (const c of m.changes || []) {
+    if (c.feld === "angaben") chatSetAngaben(CH.k, c.altWerte || {}, c.prevShots || null);
+    else if (c.feld === "kontakt_vw") chatSocial(CH.k, "Kontakt zurück", (it) => { if (c.prevShots) it.shots = c.prevShots; else delete it.shots; });
+    else if (c.feld === "stand") chatSetSteps(CH.k, c.prevSteps || {});
+    else if (c.feld === "notiz") chatSocial(CH.k, "Notiz zurück", (it) => { it.note = c.alt; });
+    else if (c.feld === "weg") { BEW.doc.weg = c.alt || undefined; if (!c.alt) delete BEW.doc.weg; await bewSave(true); renderSend(); bpStatus(); }
+    else map[c.feld] = c.alt;
+  }
+  if (Object.keys(map).length) await chatSetFields(CH.k, map); m.undone = true; chatRender(); chatSave().catch(() => { }); toast("Rückgängig gemacht", "ok");
 }
 document.addEventListener("click", (e) => {
   if (e.target.id === "chSend") { chatSend(); return; }
