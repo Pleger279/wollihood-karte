@@ -448,7 +448,7 @@ main { padding-top: 6px }
 textarea.field { font-size: 15px }
 label.f, div.f { font-weight: 600 }
 label.f small, div.f small { font: 500 12px var(--body); text-transform: none; letter-spacing: 0 }
-.chips { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 2px; border: 0; margin: 0; padding: 3px; background: var(--seg); border-radius: 12px; overflow: visible }
+.chips { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2px; border: 0; margin: 0; padding: 3px; background: var(--seg); border-radius: 12px; overflow: visible }
 .chip { border: 0 !important; border-radius: 9px; background: transparent; padding: 9px 2px; font: 500 13px var(--body); text-transform: none; letter-spacing: 0; color: var(--muted); text-align: center; min-width: 0; overflow: hidden; text-overflow: ellipsis }
 .chip[aria-pressed="true"] { background: var(--surface); color: var(--fg); font-weight: 600; box-shadow: var(--shadow) }
 .chip { letter-spacing: -0.1px; padding-left: 0; padding-right: 0 }
@@ -585,7 +585,7 @@ label.f small, div.f small { color: var(--muted); font: 500 12.5px var(--body) }
 .stabs button[aria-selected="true"] { background: var(--surface); color: var(--fg); font-weight: 600; box-shadow: var(--shadow) }
 .sbody { display: grid; gap: 10px }
 .sdone { margin: 0; font-size: 13.5px; color: var(--ok); display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap }
-.sdone .linkbtn { font-size: 12.5px; color: var(--muted) }
+.sdone .btn.sm { min-height: 30px; padding: 3px 10px; font-size: 12.5px; flex: none }
 #kText { min-height: 170px }
 .btn.ki { background: var(--accent-soft); color: var(--accent); border-color: transparent }
 .kbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap } .kbar .btn { flex: none }
@@ -705,3 +705,9 @@ button, .btn, .linkbtn, label[for] { transition: transform .12s ease, opacity .1
 @keyframes actflash { 0% { box-shadow: 0 0 0 3px var(--accent) } 100% { box-shadow: 0 0 0 0 transparent } }
 .shotgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
 .shotgrid .f small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
+/* v98: Entscheid Neu → Favoriten / Archiv */
+.vinfo { font-size: 12px; color: var(--muted); white-space: nowrap } .vinfo.soon { color: var(--warn); font-weight: 600 } .vinfo.arch { white-space: normal }
+.card.arch .thumb, .card.arch .l1, .card.arch .l2, .card.arch .l3, .card.arch .l4 { opacity: .6 }
+.dvote { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 0 2px }
+.dvote .vmini { width: 52px; height: 44px }
+.ch-kurz .ch-msg p { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden }

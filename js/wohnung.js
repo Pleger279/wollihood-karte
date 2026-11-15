@@ -23,7 +23,7 @@ function setStep(k, name, data) {
   if (needPerson()) return;
   const me = S.person, label = (S.hits.find((h) => keyOf(h) === k) || {}).street || "Inserat", now = new Date().toISOString();
   socialOp(`Schritt ${name} ${data ? "gesetzt" : "zurückgesetzt"} von ${PEOPLE[me]} (${label})`, (items) => {
-    const it = items[k] || (items[k] = { votes: {}, comments: [] });
+    const it = items[k] || (items[k] = { votes: {} });
     const steps = JSON.parse(JSON.stringify(it.steps || stepsOf(k)));
     if (data) steps[name] = { ...(steps[name] || {}), ...data, by: me, at: now }; else delete steps[name];
     it.steps = steps;
@@ -41,7 +41,7 @@ function defaultTab(k) {        // v93: der Schritt nach dem weitesten erledigte
 function standPanel(k) {
   const steps = stepsOf(k), tab = S.dTab || defaultTab(k);
   const x = S.hits.find((h) => keyOf(h) === k) || {};
-  const doneLine = (n, txt) => { const s = steps[n]; return `<p class="sdone">✓ ${esc(txt)}${s?.by ? ` · ${esc(PEOPLE[s.by] || s.by)}, ${esc(ago(s.at))}` : ""} <button type="button" class="linkbtn" data-unstep="${n}">rückgängig</button></p>`; };
+  const doneLine = (n, txt) => { const s = steps[n]; return `<p class="sdone">✓ ${esc(txt)}${s?.by ? ` · ${esc(PEOPLE[s.by] || s.by)}, ${esc(ago(s.at))}` : ""} <button type="button" class="btn sm" data-unstep="${n}">Rückgängig</button></p>`; };
   let body = "";
   if (tab === "kontakt") body = `<p class="hint">Kurze Nachricht fürs Kontaktfeld im Inserat – vor der Besichtigung.</p>
       <div class="bp-read" id="bRead-kontakt"><p class="hint">Lade …</p></div>
@@ -94,7 +94,7 @@ function dRestSync() {
   const r = $("dRest"), b = $("dRestBtn"); if (!r || !b) return;
   const bew = (S.dTab || defaultTab(S.detailKey)) === "bewerbung";
   b.hidden = !bew; r.hidden = bew && !S.dRestOpen;
-  b.textContent = r.hidden ? "Inserat, Notizen & Kontakt zeigen ›" : "Inserat, Notizen & Kontakt ausblenden";
+  b.textContent = r.hidden ? "Notizen, Beschreibung & Kontakt zeigen ›" : "Notizen, Beschreibung & Kontakt ausblenden";
 }
 // Kontakt-Nachricht: archiv/<id>/bewerbung/kontakt.json, Claude schreibt beim ersten Öffnen
 const KON = { k: null, sha: null, data: null, busy: false, auto: new Set(), edit: false, draft: null };
@@ -180,26 +180,17 @@ function saveBtnState() {
 }
 document.addEventListener("input", (e) => { if (e.target.id === "ownNote" || e.target.id === "kText") saveBtnState(); if (e.target.id === "kText") KON.draft = e.target.value; });
 // «Bewertung & Notizen»: Daumen, Stern, Kommentare, Notiz und eigene Dateien an einem Ort
+// «Notizen & Fotos» (früher «Bewertung & Notizen»; Daumen stehen seit v98 oben beim Titel, Stern und Kommentare gibt es nicht mehr)
 function usPanel(k) {
-  const it = itemOf(k), mine = myVote(k), other = S.person ? otherOf(S.person) : null, ov = other ? (it.votes || {})[other] : null;
-  const files = it.files || [];
-  return `<div class="panel" id="dUs"><h2>Bewertung &amp; Notizen</h2>
-    <div class="usrow"><span>Du</span><span class="vbs">
-      <button type="button" class="vmini up" data-dvote="up" aria-pressed="${mine === "up"}" aria-label="Daumen hoch">${thumb("up")}</button>
-      <button type="button" class="vmini down" data-dvote="down" aria-pressed="${mine === "down"}" aria-label="Daumen runter">${thumb("down")}</button>
-      <button type="button" class="vmini" data-dfav aria-pressed="${isFav(k)}" aria-label="Favorit" style="${isFav(k) ? "color:var(--star);border-color:var(--star)" : ""}">${isFav(k) ? icon.star : icon.starO}</button></span></div>
-    ${other ? `<div class="usrow"><span>${esc(PEOPLE[other])}</span><span class="ochip ${ov || ""}">${ov === "up" ? "dafür " + thumb("up") : ov === "down" ? "dagegen " + thumb("down") : "noch offen"}</span></div>` : ""}
-    <div class="dthread">${(it.comments || []).map((c) => `<div class="cmt ${c.by === S.person ? "mine" : ""}">
-        <div class="who">${esc(PEOPLE[c.by] || c.by)}<span>${esc(ago(c.at))}</span></div>
-        <p>${esc(c.text)}</p>${c.by === S.person ? `<button type="button" class="del" data-ddel="${esc(c.id)}">löschen</button>` : ""}</div>`).join("")}</div>
-    <label class="f"><small>Kommentar${other ? " an " + esc(PEOPLE[other]) : ""}</small><div class="dcform"><textarea class="field" rows="1" id="dCmt" placeholder="Schreiben …"></textarea><button type="button" class="btn primary" id="dCmtSend">Senden</button></div></label>
+  const it = itemOf(k), files = it.files || [];
+  return `<div class="panel" id="dUs"><h2>Notizen &amp; Fotos</h2>
     <label class="f"><small>Notiz</small>
       <textarea class="field" id="ownNote" rows="2" placeholder="Kontakt, Termine …">${esc(it.note || "")}</textarea></label>
     <div class="kbar"><button type="button" class="btn sm" id="ownNoteSave" disabled>Gespeichert</button></div>
     ${files.length ? `<div class="ownfiles">${files.map((f) => f.type === "application/pdf" ? `<a href="#" data-doc="${esc(f.path)}">📄 ${esc(f.name || "Dokument")}</a>`
       : `<img data-src="${esc(f.path)}" data-full="${esc(f.path)}" alt="${esc(f.name || "")}">`).join("")}</div>` : ""}
     ${shotsBox(k)}
-    <label class="linkbtn" for="ownFiles" style="cursor:pointer">+ Screenshot oder Dokument</label>
+    <label class="linkbtn" for="ownFiles" style="cursor:pointer">+ Foto, Screenshot oder Dokument</label>
     <input type="file" id="ownFiles" accept="image/*,application/pdf" multiple hidden></div>`;
 }
 function refreshUs() {
@@ -207,6 +198,9 @@ function refreshUs() {
   el.outerHTML = usPanel(S.detailKey);
   $("dUs").querySelectorAll("img[data-src]").forEach((img) => repoFile(img.dataset.src).then((u) => (img.src = u)).catch(() => img.remove()));
 }
+// Daumen oben auf der Wohnungsseite
+const votePanel = (k, x) => `<div class="dvote" id="dVote">${voteRow(k, x, "data-dvote")}</div>`;
+function voteSync(k) { const el = $("dVote"); if (el && S.detailKey === k) el.outerHTML = votePanel(k, hitByKey(k)); }
 const QUARTER = { "8001": "Altstadt", "8004": "Aussersihl", "8005": "Industriequartier", "8006": "Oberstrass", "8008": "Riesbach",
   "8032": "Hottingen", "8037": "Wipkingen", "8047": "Albisrieden", "8048": "Altstetten", "8050": "Oerlikon", "8051": "Schwamendingen",
   "8053": "Witikon", "8057": "Unterstrass", "8064": "Altstetten", "8038": "Wollishofen", "8041": "Leimbach", "8002": "Enge", "8045": "Friesenberg", "8003": "Wiedikon", "8055": "Friesenberg", "8134": "Adliswil", "8135": "Langnau a.A.", "8802": "Kilchberg" };
@@ -432,16 +426,16 @@ function renderDetail(x, a, d) {
   const portal = x.sources?.[0]?.portal || x.portal || "";
   const sub = [quarter, portal ? `auf ${portal} ${ago(x.published || x.first_seen)}` : "", a?.online === "online" ? "noch online" : a?.online === "offline" ? "offline" : a?.online === "reserviert" ? "reserviert" : ""].filter(Boolean).join(" · ");
   const ai = x.ai?.text ? `<div class="aibox"><small>✦ Claude</small><span>${esc(x.ai.text)}</span>${(x.ai.haken || []).length ? `<span class="hk">${esc(x.ai.haken.join(" · "))}</span>` : ""}</div>` : "";
-  const out = verdict(S.detailKey) === "out";
   $("dBody").innerHTML = `
     ${gal}
     <div class="dhead"><h1>${esc(placeName(x))}</h1><div class="sub">${esc(sub)}</div></div>
+    ${votePanel(S.detailKey, x)}
     ${facts}
-    ${standPanel(S.detailKey)}
+    ${ai}
     ${chatPanel()}
+    ${standPanel(S.detailKey)}
     <button type="button" class="linkbtn d-restbtn" id="dRestBtn" hidden></button>
     <div id="dRest">
-    ${ai}
     ${usPanel(S.detailKey)}
     ${desc || attrs ? `<div class="panel"><h2>Beschreibung</h2>${desc ? `<div class="desc clamp" id="dDesc">${esc(desc)}</div><button type="button" class="linkbtn" id="dDescMore" style="justify-self:start">Mehr lesen</button>` : ""}${attrs ? `<div class="chips2">${attrs}</div>` : ""}</div>` : ""}
     ${x.lat != null ? `<div class="detail-mini">${miniMap(x)}</div>` : ""}
@@ -450,7 +444,6 @@ function renderDetail(x, a, d) {
     ${docs ? `<div class="panel doclist"><h2>Dokumente</h2>${docs}</div>` : ""}
     ${onl || '<div class="onl">Noch nicht gesichert. Neue Treffer, Favoriten und Wohnungen mit Stand sichert Wollihood beim nächsten Suchlauf.</div>'}
     <div class="srcs" style="padding:0">Gefunden auf: ${sourcesHtml(x)}${mail ? " · " + mail : ""}${(x.notes || []).length ? `<br>${esc(x.notes.join(" · "))}` : ""}</div>
-    <button type="button" class="quiet${out ? " back" : ""}" data-dout="${out ? 0 : 1}">${out ? "Zurückholen" : "Aussortieren"}</button>
     </div>`;
   const dm = $("dBody").querySelector(".mini"); if (dm) setTimeout(() => initMini(dm), 60);
   const dd = $("dDesc"); if (dd) setTimeout(() => { if (dd.scrollHeight <= dd.clientHeight + 4) $("dDescMore")?.remove(); }, 30);
@@ -494,7 +487,7 @@ async function uploadOwn(k, files, note) {
   }
   if (added.length || note) {
     socialOp(`${PEOPLE[S.person]} ergänzt (${x.street || "Inserat"})`, (items) => {
-      const it = items[k] || (items[k] = { votes: {}, comments: [] });
+      const it = items[k] || (items[k] = { votes: {} });
       if (added.length) it.files = [...(it.files || []), ...added];
       if (note) it.note = [it.note, note].filter(Boolean).join("\n");
       it.updated = new Date().toISOString();
@@ -629,13 +622,13 @@ async function shotsRun(k, files) {
     const kontakt = {}; for (const [f, v] of Object.entries(res.kontakt || {})) if (v) kontakt[f] = v;
     delete S.shotBusy[k];
     socialOp(`${PEOPLE[S.person]}: Screenshots gelesen (${x.street || "Inserat"})`, (items) => {
-      const it = items[k] || (items[k] = { votes: {}, comments: [] });
+      const it = items[k] || (items[k] = { votes: {} });
       it.shots = { status: "vorschlag", angaben, kontakt, fotos, quellen: files.map((f) => f.name).filter(Boolean), by: S.person, at: new Date().toISOString() };
     });
     toast("Claude hat die Screenshots gelesen – bitte prüfen.", "ok");
   } catch (e) {
     delete S.shotBusy[k];
-    socialOp("Screenshots: Fehler", (items) => { const it = items[k] || (items[k] = { votes: {}, comments: [] }); it.shots = { status: "fehler", error: e.message, at: new Date().toISOString() }; });
+    socialOp("Screenshots: Fehler", (items) => { const it = items[k] || (items[k] = { votes: {} }); it.shots = { status: "fehler", error: e.message, at: new Date().toISOString() }; });
     toast("Claude: " + e.message, "err", 7000);
   }
   if (S.detailKey === k) setTimeout(refreshUs, 50);
@@ -681,7 +674,7 @@ $("dBody").addEventListener("click", async (e) => {
   const keep = new Set([...box.querySelectorAll("[data-shfoto]")].filter((c) => c.checked).map((c) => Number(c.dataset.shfoto)));
   const fotos = (sh.fotos || []).filter((_, i) => keep.has(i));
   const ok = { status: "ok", angaben, kontakt, fotos, quellen: sh.quellen || [], by: S.person, at: new Date().toISOString() };
-  socialOp(`${PEOPLE[S.person]}: Angaben aus Screenshots übernommen`, (items) => { const it = items[k] || (items[k] = { votes: {}, comments: [] }); it.shots = ok; it.updated = ok.at; });
+  socialOp(`${PEOPLE[S.person]}: Angaben aus Screenshots übernommen`, (items) => { const it = items[k] || (items[k] = { votes: {} }); it.shots = ok; it.updated = ok.at; });
   if (kontakt.firma && (kontakt.telefon || kontakt.mail)) agencyAdd(kontakt.firma, kontakt);
   const x = hitByKey(k); if (x) shotOverlay(x);
   toast("Übernommen. Wollihood ergänzt den Rest beim nächsten Suchlauf.", "ok");

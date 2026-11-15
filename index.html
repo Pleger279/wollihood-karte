@@ -17,7 +17,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Archivo:wght@400;600;700;800&family=Inter:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@geoman-io/leaflet-geoman-free@2.17.0/dist/leaflet-geoman.css">
-<link rel="stylesheet" href="css/app.css?v=97">
+<link rel="stylesheet" href="css/app.css?v=98">
 </head>
 <body>
 
@@ -54,8 +54,7 @@
     <div class="chips" role="group" aria-label="Filter">
       <button class="chip" type="button" data-filter="new" aria-pressed="true">Neu</button>
       <button class="chip" type="button" data-filter="fav" aria-pressed="false">Favoriten</button>
-      <button class="chip" type="button" data-filter="all" aria-pressed="false">Alle</button>
-      <button class="chip" type="button" data-filter="out" aria-pressed="false">Aussortiert</button>
+      <button class="chip" type="button" data-filter="arch" aria-pressed="false">Archiv</button>
     </div>
     <div class="sortrow" role="group" aria-label="Sortierung">
       <span class="hint" id="listCount"></span>
@@ -63,11 +62,10 @@
     </div>
     <div class="panel whoami" id="whoPanel" hidden>
       <div class="ftitle">Wer nutzt dieses Handy?</div>
-      <p class="hint">Damit eure Daumen und Kommentare richtig zugeordnet werden. Du kannst das unter Mehr jederzeit ändern.</p>
+      <p class="hint">Damit eure Daumen richtig zugeordnet werden. Du kannst das unter Mehr jederzeit ändern.</p>
       <div class="seg"><button type="button" class="opt" data-who="pascal">Pascal</button><button type="button" class="opt" data-who="leonie">Leonie</button></div>
     </div>
     <div id="hitList" class="view"></div>
-    <button class="btn" id="allSeenBtn" type="button" hidden>Alle als gelesen markieren</button>
   </section>
 
   <!-- Suche: Gebiet + Kriterien, je für «Suche» und «Push & Mail» -->
@@ -90,7 +88,7 @@
       <div class="arow one" id="searchAreaBtns" hidden>
         <button class="btn" type="button" id="saCopy">Gebiet von «Push &amp; Mail» übernehmen</button>
       </div>
-      <div class="maplegend"><span><i style="background:var(--accent)"></i>offen</span><span><i style="background:var(--star)"></i>Favorit</span><span><i style="background:var(--ok)"></i>läuft</span>
+      <div class="maplegend"><span><i style="background:var(--accent)"></i>neu</span><span><i style="background:var(--ok)"></i>Favorit</span>
         <button type="button" class="linkbtn" id="outToggle" hidden></button></div>
       <div id="map"></div>
     </div>
@@ -161,11 +159,13 @@
       <label class="switch" for="mp-hits">Neue Treffer <input type="checkbox" id="mp-hits" data-mp="hits"></label>
       <label class="switch" for="mp-pages">Neues auf Genossenschaftsseiten <input type="checkbox" id="mp-pages" data-mp="pages"></label>
       <div class="ftitle sm" id="mpOtherTitle">Reaktionen der anderen Person</div>
-      <label class="switch" for="mp-comment">Neuer Kommentar <input type="checkbox" id="mp-comment" data-mp="comment"></label>
-      <label class="switch" for="mp-match">Neuer Favorit (Stern oder beide Daumen hoch) <input type="checkbox" id="mp-match" data-mp="match"></label>
+      <label class="switch" for="mp-match">Neuer Favorit <input type="checkbox" id="mp-match" data-mp="match"></label>
+      <label class="switch" for="mp-split">Ihr seid uneinig <input type="checkbox" id="mp-split" data-mp="split"></label>
       <label class="switch" for="mp-status">Stand geändert (angefragt, Besichtigung …) <input type="checkbox" id="mp-status" data-mp="status"></label>
       <label class="switch" for="mp-up">Daumen hoch <input type="checkbox" id="mp-up" data-mp="up"></label>
       <label class="switch" for="mp-down">Daumen runter <input type="checkbox" id="mp-down" data-mp="down"></label>
+      <div class="ftitle sm">Fristen</div>
+      <label class="switch" for="mp-expiring">Geht morgen ins Archiv (dein Daumen fehlt) <input type="checkbox" id="mp-expiring" data-mp="expiring"></label>
       <div class="ftitle sm">Postfach und System</div>
       <label class="switch" for="mp-mail">Neue Mail im Wollihood-Postfach <input type="checkbox" id="mp-mail" data-mp="mail"></label>
       <label class="switch" for="mp-source">Eine Quelle ist gestört <input type="checkbox" id="mp-source" data-mp="source"></label>
@@ -275,17 +275,17 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@geoman-io/leaflet-geoman-free@2.17.0/dist/leaflet-geoman.min.js"></script>
-<script>const APP_VERSION = "97 · 15.11.2026";</script>
-<script src="js/core.js?v=97"></script>
-<script src="js/treffer.js?v=97"></script>
-<script src="js/wohnung.js?v=97"></script>
-<script src="js/liste.js?v=97"></script>
-<script src="js/suche.js?v=97"></script>
-<script src="js/mehr.js?v=97"></script>
-<script src="js/bewerbung.js?v=97"></script>
-<script src="js/chat.js?v=97"></script>
-<script src="js/dossier.js?v=97"></script>
-<script src="js/formular.js?v=97"></script>
-<script src="js/senden.js?v=97"></script>
+<script>const APP_VERSION = "98 · 15.11.2026";</script>
+<script src="js/core.js?v=98"></script>
+<script src="js/treffer.js?v=98"></script>
+<script src="js/wohnung.js?v=98"></script>
+<script src="js/liste.js?v=98"></script>
+<script src="js/suche.js?v=98"></script>
+<script src="js/mehr.js?v=98"></script>
+<script src="js/bewerbung.js?v=98"></script>
+<script src="js/chat.js?v=98"></script>
+<script src="js/dossier.js?v=98"></script>
+<script src="js/formular.js?v=98"></script>
+<script src="js/senden.js?v=98"></script>
 </body>
 </html>

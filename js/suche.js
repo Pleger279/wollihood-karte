@@ -102,18 +102,17 @@ function renderMarkers() {
   S.hits.forEach((x) => {
     const k = keyOf(x);
     if (x.lat == null || !inSavedArea(x)) return;
-    const out = verdict(k) === "out";
+    const sd = standOf(k, x), out = sd.s === "arch";
     if (out) { nOut++; if (!S.showOutOnMap) return; }
-    const st = itemOf(k).status?.value;
     const outPush = S.amode === "push" && S.work && hasFeat(S.work.push) && !inAreas(x.lat, x.lon, S.work.push);
-    // Farbe mit Bedeutung: grau = aussortiert / ausserhalb Push, grün = läuft schon, gelb = Favorit, blau = offen
-    const c = out || outPush ? "#9a9a9a" : st ? css("--ok") : isFav(k) ? css("--star") : accent();
+    // Farbe mit Bedeutung (v98): grau = Archiv / ausserhalb Push, grün = Favorit, blau = neu (noch zu entscheiden)
+    const c = out || outPush ? "#9a9a9a" : sd.s === "fav" ? css("--ok") : accent();
     S.markers[k] = L.circleMarker([x.lat, x.lon], { radius: out ? 6 : 8, color: "#fff", weight: 2, fillColor: c, fillOpacity: out ? 0.6 : 0.95, pmIgnore: true })
       .bindPopup(`${x.image ? `<img src="${esc(x.image)}" alt="" style="width:200px;height:112px;object-fit:cover;border-radius:6px;display:block;margin-bottom:6px" referrerpolicy="no-referrer">` : ""}<b>${esc(chf(x.rent))} · ${esc(rooms(x.rooms))}${x.m2 ? " · " + esc(x.m2) + " m²" : ""}</b><br>${esc(x.street || "")}<br><a href="#" data-k="${esc(keyOf(x))}" onclick="openDetail(this.dataset.k);return false">Details</a> · <a href="${esc(goodUrl(x))}" target="_blank" rel="noopener">Inserat ↗</a>`, { maxWidth: 220 })
       .addTo(S.hitLayer);
   });
   const t = $("outToggle");
-  if (t) { t.hidden = !nOut; t.textContent = S.showOutOnMap ? `Aussortierte ausblenden (${nOut})` : `Aussortierte zeigen (${nOut})`; }
+  if (t) { t.hidden = !nOut; t.textContent = S.showOutOnMap ? `Archiv ausblenden (${nOut})` : `Archiv zeigen (${nOut})`; }
 }
 function collectFromMap() {
   const features = [];

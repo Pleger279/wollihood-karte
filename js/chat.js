@@ -31,7 +31,7 @@ function angCurrent(k) {
 function chatSetAngaben(k, neu, prevShots) {
   const now = new Date().toISOString();
   socialOp(`${PEOPLE[S.person]}: Angaben im Chat korrigiert`, (items) => {
-    const it = items[k] || (items[k] = { votes: {}, comments: [] });
+    const it = items[k] || (items[k] = { votes: {} });
     if (prevShots !== undefined) { if (prevShots) it.shots = prevShots; else delete it.shots; }
     else { const sh = it.shots?.status === "ok" ? it.shots : {}; it.shots = { ...sh, status: "ok", angaben: { ...(sh.angaben || {}), ...neu }, by: S.person, at: now, quelle: "chat" }; }
     it.updated = now;
@@ -41,7 +41,7 @@ function chatSetAngaben(k, neu, prevShots) {
   setTimeout(() => { refreshDetail(); renderHits(); }, 80);
 }
 function chatSocial(k, label, fn) {
-  socialOp(`${PEOPLE[S.person]}: ${label} (Chat)`, (items) => { const it = items[k] || (items[k] = { votes: {}, comments: [] }); fn(it); it.updated = new Date().toISOString(); });
+  socialOp(`${PEOPLE[S.person]}: ${label} (Chat)`, (items) => { const it = items[k] || (items[k] = { votes: {} }); fn(it); it.updated = new Date().toISOString(); });
   setTimeout(() => { refreshDetail(); renderHits(); }, 80);
 }
 function chatSetSteps(k, steps) {
@@ -61,15 +61,16 @@ function chatPanel() {
 }
 async function chatLoad(k) {
   if (CH.k !== k) {
-    CH.k = k; CH.sha = null; CH.msgs = []; CH.all = false;
+    CH.k = k; CH.sha = null; CH.msgs = []; CH.all = false; CH.live = false;
     try { const r = await readJson(`archiv/${await aidOf(k)}/bewerbung/chat.json`); if (CH.k !== k) return; CH.msgs = r.data.msgs || []; CH.sha = r.sha; } catch { }
   }
   chatRender();
 }
 function chatRender() {
   const el = $("chList"); if (!el || CH.k !== S.detailKey) return;
-  const list = CH.msgs, from = CH.all ? 0 : Math.max(0, list.length - 6);
-  el.innerHTML = (from ? `<button type="button" class="linkbtn" id="chMore">${from} frühere zeigen</button>` : "")
+  el.classList.toggle("ch-kurz", !CH.all && !CH.live);      // alter Verlauf: letzte Antwort gekürzt, bis man aufklappt oder schreibt
+  const list = CH.msgs, from = CH.all ? 0 : Math.max(0, list.length - 2);     // v98: Chat steht oben, darum nur letzte Frage + Antwort; Rest aufklappbar
+  el.innerHTML = (from ? `<button type="button" class="linkbtn" id="chMore">Ganzen Verlauf zeigen (${from} frühere)</button>` : "")
     + (list.length ? "" : `<p class="hint">Fragen zur Wohnung, Texte ändern, Angaben korrigieren, Termin oder Stand melden – z.B. «Besichtigung am Do 18 Uhr» oder «Adresse ist Scheideggstrasse 104». Gilt für euch beide.</p>`)
     + list.slice(from).map((m, j) => { const i = from + j;
       if (m.role === "user") return `<div class="ch-msg me"><small>${esc(PEOPLE[m.by] || m.by || "")} · ${esc(ago(m.at))}</small><p>${esc(m.text)}</p></div>`;
@@ -104,7 +105,7 @@ async function chatSend() {
   const c = await bewCtx();
   if (!c.key) { toast("Zuerst den Claude-Schlüssel hinterlegen (Mehr → «Claude für Bewerbungen»).", "err"); return; }
   CH.msgs.push({ role: "user", by: S.person, text, at: new Date().toISOString() });
-  inp.value = ""; inp.style.height = ""; CH.busy = true; chatRender();
+  inp.value = ""; inp.style.height = ""; CH.busy = true; CH.live = true; chatRender();
   try {
     await chatEnsureTexts(k);
     if (BEW.edit?.size) bewRead();

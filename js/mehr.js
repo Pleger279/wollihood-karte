@@ -52,14 +52,13 @@ function renderStatus() {
     : h?.last_run
       ? `<span class="dot ${bad.length || (h.push && !h.push.ok) || stale ? "bad" : ""}"></span><span class="${stale ? "stale" : ""}">${h.paused ? "Pausiert" : "Gesucht " + esc(ago(h.last_run))}</span>`
       : "Wohnungssuche Wollishofen";
-  const live = S.hits.filter(inSavedArea).filter((x) => verdict(keyOf(x)) !== "out");
+  const pool = S.hits.filter(inSavedArea), nSt = (w) => pool.filter((x) => standOf(keyOf(x), x).s === w).length;
   // Quellen inkl. der einzelnen Abos (gelb oder rot zählt nicht als ok)
   const subs = Object.values(h?.newsletters || {});
   const allN = src.length + subs.length, allOk = src.length - bad.length + subs.filter((x) => x.level === "ok").length;
-  const week = live.filter((x) => Date.now() - new Date(x.first_seen) < 7 * 864e5).length;
   $("stats").innerHTML = `
-    <div class="stat"><b>${live.filter(isNew).length}</b><span>neu</span></div>
-    <div class="stat"><b>${week}</b><span>7 Tage</span></div>
+    <div class="stat"><b>${nSt("neu")}</b><span>neu</span></div>
+    <div class="stat"><b>${nSt("fav")}</b><span>Favoriten</span></div>
     <div class="stat"><b>${allOk}/${allN}</b><span>Quellen ok</span></div>`;
   const srcRow = (name, level, msg, u, sub) => `<div class="src${sub ? " sub" : ""}"><span class="s ${level === "ok" ? "" : level}"></span>${u ? `<a class="srclink" href="${esc(u)}" target="_blank" rel="noopener"><b>${esc(name)}</b> ↗</a>` : `<b>${esc(name)}</b>`}<div class="m">${esc(msg)}</div></div>`;
   const nl = Object.entries(h?.newsletters || {});
@@ -100,23 +99,21 @@ async function load() {
     toast(e.message, "err", 8000); return;
   }
   const [hits, health, events, marks, social, people, arch, ags, man] = await Promise.allSettled([
-    readJson("state/recent.json"), readJson("state/health.json"), readJson("state/events.json"), readJson("marks.json"),
+    readJson("state/recent.json"), readJson("state/health.json"), readJson("state/events.json"), Promise.resolve(null),
     readJson("social.json"), readJson("people.json"), readJson("archiv/index.json"), readJson("agencies.json"), readJson("manual.json")]);
   if (man.status === "fulfilled") S.manual = man.value.data.items || [];
   if (arch.status === "fulfilled") S.archive = arch.value.data || {};
   if (ags.status === "fulfilled") { S.agencies = ags.value.data.agencies || {}; S.agenciesSha = ags.value.sha; }
   if (social.status === "fulfilled") { S.social = social.value.data.items || {}; S.socialSha = social.value.sha; }
   if (people.status === "fulfilled") { S.people = people.value.data.people || {}; S.peopleSha = people.value.sha; }
-  renderMyPush(); syncDevicePerson(); migrateMarks();
+  renderMyPush(); syncDevicePerson();
   if (hits.status === "fulfilled") { S.hits = hits.value.data; store.set("wh_cache_hits", JSON.stringify(S.hits)); }
   if (health.status === "fulfilled") S.health = health.value.data;
   mergeManual();
   S.hits.forEach(shotOverlay);
   if (social.status === "fulfilled" && foldTwins(JSON.parse(JSON.stringify(S.social)))) socialOp("Doppel zusammengeführt", foldTwins);
   if (events.status === "fulfilled") S.events = events.value.data;
-  if (marks.status === "fulfilled") { S.marks = marks.value.data; S.marksSha = marks.value.sha; }
-  else if (marks.reason?.status === 404) { S.marks = JSON.parse(store.get("wh_marks") || "{}"); S.marksSha = null; }
-  if (!S.filterChosen) { S.filter = S.hits.some(isNew) ? "new" : "all"; S.filterChosen = true; }
+  if (!S.filterChosen) { S.filter = S.hits.some((x) => needsMe(keyOf(x), x)) ? "new" : "fav"; S.filterChosen = true; }
   renderHits(); renderStatus(); renderMarkers();
   autoRun();
   const sh = location.hash.match(/^#share=([\w]+)/); if (sh) handleShare(sh[1]);
@@ -148,8 +145,8 @@ function showSetup(err) {
 }
 function showApp() {
   $("setup").hidden = true; $("tabbar").hidden = false;
-  try { S.hits = JSON.parse(store.get("wh_cache_hits") || "[]"); S.marks = JSON.parse(store.get("wh_marks") || "{}"); } catch {}
-  S.filter = S.hits.some(isNew) ? "new" : "all";
+  try { S.hits = JSON.parse(store.get("wh_cache_hits") || "[]"); } catch {}
+  S.filter = "new";
   showTab(S.tab); renderHits(); applyDeep(false); load();
 }
 $("connectBtn").addEventListener("click", () => {
@@ -245,7 +242,7 @@ $("wpOff").addEventListener("click", async () => {
 
 
 // ---------- Meine Push-Mitteilungen ----------
-const MP_DEFAULT = { hits: true, pages: true, comment: true, match: true, status: true, up: true, down: false, mail: true, source: true };
+const MP_DEFAULT = { hits: true, pages: true, match: true, split: true, expiring: true, status: true, up: true, down: false, mail: true, source: true };
 function renderMyPush() {
   const p = S.person;
   document.querySelectorAll("[data-who]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.who === p)));

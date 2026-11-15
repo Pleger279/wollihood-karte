@@ -145,7 +145,7 @@ async function saveManual() {
     if (known) {
       // schon in der Liste (oder wird gerade geholt): nur Screenshots/Notiz dazu
       if (S.manFiles.length || note) await uploadOwn(keyOf(known), S.manFiles, note);
-      if (verdict(keyOf(known)) === "out") setOut(keyOf(known), false);
+      if (standOf(keyOf(known), known).s === "arch") setVote(keyOf(known), "up", true);      // aus dem Archiv zurückholen
       S.manFiles = [];
       toast(known.manual?.pending ? "Diese Wohnung wird schon geholt." : "Diese Wohnung ist schon in der Liste.", "ok"); openDetail(keyOf(known)); return;
     }
@@ -190,7 +190,7 @@ async function handleShare(id) {
     openManual({ url: link, files, text: [meta.title, meta.text].filter(Boolean).join(" ").trim() });
   };
   if (!guess && link) { asNew(); return; }       // geteilter Link einer Wohnung, die Wollihood nicht kennt
-  const rank = (h) => (h === guess ? 0 : verdict(keyOf(h)) === "out" ? 2 : 1);
+  const rank = (h) => (h === guess ? 0 : standOf(keyOf(h), h).s === "arch" ? 2 : 1);
   const list = [...S.hits].sort((a, b) => rank(a) - rank(b));
   S.detailKey = null;
   $("dTitle").textContent = "Geteilt";
@@ -222,7 +222,7 @@ $("dBody").addEventListener("click", async (e) => {
   const stb = e.target.closest("[data-stab]"); if (stb && k0) { S.dTab = stb.dataset.stab; refreshStand(k0); return; }
   const sp = e.target.closest("[data-step]"); if (sp && k0) { if (sp.dataset.step === "bewerbung" && !confirm("Habt ihr die Bewerbung wirklich abgeschickt?")) return; setStep(k0, sp.dataset.step, sp.dataset.step === "besichtigung" ? { done: true } : {}); return; }
   const us = e.target.closest("[data-unstep]"); if (us && k0) { setStep(k0, us.dataset.unstep, null); return; }
-  const an = e.target.closest("[data-answer]"); if (an && k0) { setStep(k0, "antwort", { value: an.dataset.answer }); return; }
+  const an = e.target.closest("[data-answer]"); if (an && k0) { setStep(k0, "antwort", stepsOf(k0).antwort?.value === an.dataset.answer ? null : { value: an.dataset.answer }); return; }   // nochmals antippen = zurücknehmen
   if (e.target.id === "kKi" && k0) { kontaktKi(k0); return; }
   if (e.target.id === "kCopy" && k0) {
     const t = $("kText").value.trim(), x = S.hits.find((h) => keyOf(h) === k0) || {};
@@ -235,17 +235,13 @@ $("dBody").addEventListener("click", async (e) => {
     else toast("Nachricht kopiert.", "ok");
     return;
   }
-  const dv = e.target.closest("[data-dvote]"); if (dv && k0) { setVote(k0, dv.dataset.dvote); refreshUs(); return; }
-  if (e.target.closest("[data-dfav]") && k0) { toggleFav(k0); setTimeout(refreshUs, 30); return; }
-  if (e.target.id === "dCmtSend" && k0) { const ta = $("dCmt"); if (ta.value.trim()) { addComment(k0, ta.value); refreshUs(); } return; }
-  const dl = e.target.closest("[data-ddel]"); if (dl && k0) { deleteComment(k0, dl.dataset.ddel); setTimeout(refreshUs, 30); return; }
-  const dout = e.target.closest("[data-dout]"); if (dout && k0) { setOut(k0, dout.dataset.dout === "1"); if (dout.dataset.dout === "1") closeDetail(); else refreshDetail(); return; }
+  const dv = e.target.closest("[data-dvote]"); if (dv && k0) { setVote(k0, dv.dataset.dvote); voteSync(k0); return; }
   if (e.target.id === "dRestBtn") { S.dRestOpen = !S.dRestOpen; dRestSync(); if (S.dRestOpen) $("dRest").scrollIntoView({ behavior: "smooth", block: "start" }); return; }
   if (e.target.id === "dDescMore") { $("dDesc").classList.toggle("clamp"); e.target.textContent = $("dDesc").classList.contains("clamp") ? "Mehr lesen" : "Weniger"; return; }
   if (e.target.id === "ownNoteSave") {
     if (needPerson()) return;
     const k = S.detailKey, val = $("ownNote").value.trim();
-    socialOp(`${PEOPLE[S.person]} Notiz`, (items) => { const it = items[k] || (items[k] = { votes: {}, comments: [] }); it.note = val; it.updated = new Date().toISOString(); });
+    socialOp(`${PEOPLE[S.person]} Notiz`, (items) => { const it = items[k] || (items[k] = { votes: {} }); it.note = val; it.updated = new Date().toISOString(); });
     saveBtnState(); toast("Notiz gespeichert.", "ok"); return;
   }
   const zimg = e.target.closest(".gal img, .ownfiles img");
@@ -354,8 +350,6 @@ function aerialUrl(x) {
   const d = 0.0008, dl = d * 1.48;          // ca. 90 × 120 m, Haus in der Mitte
   return `https://wms.geo.admin.ch/?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=ch.swisstopo.swissimage&STYLES=&CRS=EPSG:4326&BBOX=${(+x.lat - d).toFixed(5)},${(+x.lon - dl).toFixed(5)},${(+x.lat + d).toFixed(5)},${(+x.lon + dl).toFixed(5)}&WIDTH=480&HEIGHT=360&FORMAT=image/jpeg`;
 }
-// Favoriten: alles mit Stern, zwei Daumen hoch oder einem Stand (läuft schon)
-const inFav = (k) => verdict(k) !== "out" && (isFav(k) || !!itemOf(k).status?.value);
 const ST_ORDER = ["besichtigung", "beworben", "angefragt", "zusage", "", "absage"];
 const ST_GROUP = { besichtigung: "Besichtigung", beworben: "Beworben", angefragt: "Angefragt", zusage: "Zusage", "": "Noch nichts unternommen", absage: "Absage" };
 function nextStep(k) {
@@ -369,13 +363,21 @@ function nextStep(k) {
   return { t: "Kontakt aufnehmen ›" };
 }
 const houseIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>';
+// Daumen-Zeile (Karte und Wohnungsseite): eigene Daumen, Stand der anderen Person, Frist bzw. Archiv-Grund
+function voteRow(k, x, attr) {
+  const sd = standOf(k, x), mine = S.person ? sd.v[S.person] : null, other = S.person ? otherOf(S.person) : null, ov = other ? sd.v[other] : null;
+  const info = sd.s === "arch" ? `<span class="vinfo arch">Archiv · ${sd.why === "beide" ? "beide dagegen" : "Frist abgelaufen"}${sd.at ? " " + dmy(sd.at) : ""}</span>`
+    : sd.s === "neu" ? `<span class="vinfo${sd.frist - Date.now() < 2 * 864e5 ? " soon" : ""}">${fristText(sd.frist)}</span>` : "";
+  return `<button type="button" class="vmini up" ${attr}="up" aria-pressed="${mine === "up"}" aria-label="Behalten">${thumb("up")}</button>
+    <button type="button" class="vmini down" ${attr}="down" aria-pressed="${mine === "down"}" aria-label="Ins Archiv">${thumb("down")}</button>
+    ${other ? `<span class="ochip ${ov || ""}">${esc(PEOPLE[other])} ${ov ? thumb(ov) : "offen"}</span>` : ""}${info}`;
+}
 function hitCard(x, withNext) {
-  const k = keyOf(x), it = itemOf(k), st = it.status, mine = myVote(k), v = verdict(k);
-  const other = S.person ? otherOf(S.person) : null, ov = other ? (it.votes || {})[other] : null;
+  const k = keyOf(x), it = itemOf(k), st = it.status, sd = standOf(k, x);
   const quarter = QUARTER[x.plz] || x.city || "";
   const l2 = [x.rooms != null ? `${x.rooms} Zi` : "Zimmer ?", x.m2 ? `${x.m2} m²` : "", quarter].filter(Boolean).join(" · ");
   const own = ownPhoto(k), aer = aerialUrl(x);
-  // Foto: Inserat → eigener Screenshot → Luftbild (swisstopo); fällt das Inseratefoto aus, springt das Luftbild ein
+  // Foto: Ausschnitt aus Screenshot → Inserat → eigenes Foto → Luftbild (swisstopo); fällt das Inseratefoto aus, springt das Luftbild ein
   const sf = shotFotos(k)[0];
   const photo = sf ? `<img data-src="${esc(sf)}" alt="" loading="lazy">`
     : x.image ? `<img src="${esc(x.image)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="${aer ? `this.onerror=null;this.src='${esc(aer)}'` : "this.remove()"}">`
@@ -383,55 +385,44 @@ function hitCard(x, withNext) {
     : aer ? `<img src="${esc(aer)}" alt="Luftbild" loading="lazy" onerror="this.remove()"><span class="aerlbl">Luftbild</span>` : "";
   const haken = (x.ai?.haken || []).length && x.ai?.passt === false;
   const pill = st && st.value ? `<span class="spill st st-${esc(st.value)}">${esc(statusLabel(st))}</span>`
-    : isFav(k) ? '<span class="spill fav">★ Favorit</span>' : v === "split" ? '<span class="spill split">Uneinig</span>' : "";
-  const n = (it.comments || []).length;
+    : sd.split ? '<span class="spill split">Uneinig</span>' : "";
   const ns = withNext ? nextStep(k) : null;
-  const foot = v === "out"
-    ? `<div class="outline"><span>${it.out ? "Aussortiert von " + esc(PEOPLE[it.out.by] || "") : "Beide Daumen runter"}${outTime(k) ? " · " + dmy(outTime(k)) : ""}</span><button type="button" class="linkbtn" data-out="0">Zurückholen</button></div>`
-    : `<div class="cfoot">
-        <button type="button" class="vmini up" data-vote="up" aria-pressed="${mine === "up"}" aria-label="Daumen hoch">${thumb("up")}</button>
-        <button type="button" class="vmini down" data-vote="down" aria-pressed="${mine === "down"}" aria-label="Daumen runter">${thumb("down")}</button>
-        ${other ? `<span class="ochip ${ov || ""}">${esc(PEOPLE[other])} ${ov ? thumb(ov) : "offen"}</span>` : ""}
-        ${manualTag(x)}${x.swap ? '<span class="tag swap">Tausch</span>' : ""}
-        ${n ? `<span class="cchip" data-detail>${bubble}${n}</span>` : ""}
-      </div>`;
-  return `<article class="card" data-key="${esc(k)}">
+  return `<article class="card${sd.s === "arch" ? " arch" : ""}" data-key="${esc(k)}">
     <div class="chead" data-detail role="button" tabindex="0" aria-label="Details: ${esc(placeName(x))}">
-      <div class="thumb">${photo}<span class="ph">${houseIcon}kein Foto</span>${isNew(x) ? '<span class="nb">Neu</span>' : ""}</div>
+      <div class="thumb">${photo}<span class="ph">${houseIcon}kein Foto</span>${isNew(x) && sd.s === "neu" ? '<span class="nb">Neu</span>' : ""}</div>
       <div class="cinfo">
         <div class="l1"><b class="${x.rent ? "" : "na"}">${x.rent ? "CHF " + esc(fmtN(x.rent)) : "Preis offen"}</b>${pill}</div>
         <div class="l2">${esc(l2)}</div>
         <div class="l3">${esc(x.street || x.sources?.[0]?.portal || x.portal || "")}${x.street || x.sources?.[0]?.portal || x.portal ? " · " : ""}${esc(ago(x.published || x.first_seen))}</div>
         ${x.ai && x.ai.text ? `<div class="l4">${haken ? '<span class="warn">!</span>' : '<span class="ai">✦</span>'} ${esc(x.ai.text)}</div>` : ""}
         ${ns ? `<div class="next${ns.wait ? " wait" : ""}">${esc(ns.t)}</div>` : ""}
-        ${foot}
+        <div class="cfoot">${voteRow(k, x, "data-vote")}${manualTag(x)}${x.swap ? '<span class="tag swap">Tausch</span>' : ""}</div>
       </div>
     </div>
   </article>`;
 }
+// In «Neu» zuerst, was noch meinen Daumen braucht (oder uneinig ist); was nur noch auf die andere Person wartet, darunter
+const needsMe = (k, x) => { const sd = standOf(k, x); return sd.s === "neu" && (!S.person || !sd.v[S.person] || sd.split); };
 function renderHits() {
-  if (!["new", "fav", "all", "out"].includes(S.filter)) S.filter = "all";
+  if (!["new", "fav", "arch"].includes(S.filter)) S.filter = "new";
   const pool = S.hits.filter(inSavedArea);
-  const live = pool.filter((x) => verdict(keyOf(x)) !== "out");
-  const cnt = { new: live.filter(isNew).length, fav: live.filter((x) => inFav(keyOf(x))).length, all: 0, out: pool.length - live.length };
-  const names = { new: "Neu", fav: "Favoriten", all: "Alle", out: "Aussortiert" };
-  const newN = cnt.new;
+  const cnt = { new: 0, fav: 0, arch: 0 }; let mineN = 0;
+  pool.forEach((x) => { const k = keyOf(x), s = standOf(k, x).s; cnt[{ neu: "new", fav: "fav", arch: "arch" }[s]]++; if (needsMe(k, x)) mineN++; });
+  const names = { new: "Neu", fav: "Favoriten", arch: "Archiv" };
   document.querySelectorAll("[data-filter]").forEach((b) => {
     const f = b.dataset.filter;
     b.setAttribute("aria-pressed", String(f === S.filter));
-    b.textContent = names[f] + (cnt[f] && f !== "out" ? " · " + cnt[f] : "");
+    b.textContent = names[f] + (cnt[f] && f !== "arch" ? " · " + cnt[f] : "");
   });
   $("whoPanel").hidden = !!S.person;
-  $("newCount").hidden = !newN; $("newCount").textContent = newN;
-  $("allSeenBtn").hidden = !(S.filter === "new" && newN > 1);
+  $("newCount").hidden = !mineN; $("newCount").textContent = mineN;
   const list = filtered();
-  $("listCount").textContent = list.length ? `${list.length} ${S.filter === "new" ? (list.length === 1 ? "neue Wohnung" : "neue Wohnungen") : list.length === 1 ? "Wohnung" : "Wohnungen"}` : "";
+  $("listCount").textContent = list.length ? `${list.length} ${list.length === 1 ? "Wohnung" : "Wohnungen"}` : "";
   if (!list.length) {
     const msg = {
-      new: ["Nichts Neues", "Sobald eine passende Wohnung auftaucht, erscheint sie hier und du bekommst eine Push-Meldung."],
-      fav: ["Noch keine Favoriten", "Hier landen Wohnungen mit Stern, mit zwei Daumen hoch oder mit einem Stand (angefragt, Besichtigung …)."],
-      all: ["Noch keine Treffer", "Die Suche läuft alle 30 Minuten. Treffer der letzten Wochen erscheinen hier."],
-      out: ["Nichts aussortiert", "Haben beide Daumen runter gegeben, landet die Wohnung hier."],
+      new: ["Nichts zu entscheiden", "Neue Wohnungen aus allen Quellen erscheinen hier. 👍 = Favorit, 👎 = Archiv. Ohne Entscheid gehen sie nach 7 Tagen von selbst ins Archiv."],
+      fav: ["Noch keine Favoriten", "Hier landen Wohnungen mit einem 👍 (ohne 👎 der anderen Person), selbst hinzugefügte und alle mit einem Stand (angefragt, Besichtigung …)."],
+      arch: ["Archiv ist leer", "Hier landet, was ihr beide mit 👎 abgelehnt habt oder was 7 Tage lang niemand entschieden hat. Mit 👍 holt ihr eine Wohnung zurück."],
     }[S.filter];
     $("hitList").innerHTML = `<div class="empty"><b>${msg[0]}</b>${msg[1]}</div>`;
     return;
@@ -441,53 +432,24 @@ function renderHits() {
     list.forEach((x) => { const g = itemOf(keyOf(x)).status?.value || ""; (groups.get(g) || groups.get("")).push(x); });
     $("hitList").innerHTML = [...groups].filter(([, xs]) => xs.length)
       .map(([g, xs]) => `<h3 class="grp st-${g || "none"}"><i></i>${ST_GROUP[g]} · ${xs.length}</h3>${xs.map((x) => hitCard(x, true)).join("")}`).join("");
+  } else if (S.filter === "new" && S.person) {
+    const a = list.filter((x) => needsMe(keyOf(x), x)), b = list.filter((x) => !needsMe(keyOf(x), x));
+    $("hitList").innerHTML = (a.length ? `<h3 class="grp st-none"><i></i>Dein Entscheid fehlt · ${a.length}</h3>${a.map((x) => hitCard(x, false)).join("")}` : `<div class="empty"><b>Alles entschieden</b>Von dir fehlt kein Daumen.</div>`)
+      + (b.length ? `<h3 class="grp st-angefragt"><i></i>Wartet auf ${esc(PEOPLE[otherOf(S.person)])} · ${b.length}</h3>${b.map((x) => hitCard(x, false)).join("")}` : "");
   } else {
     $("hitList").innerHTML = list.map((x) => hitCard(x, false)).join("");
   }
   $("hitList").querySelectorAll(".thumb img[data-src]").forEach((img) => repoFile(img.dataset.src).then((u) => (img.src = u)).catch(() => img.remove()));
 }
-let marksQueue = Promise.resolve();
-function setMark(k, val) {
-  if (val) S.marks[k] = val; else delete S.marks[k];
-  S.seen.add(k); saveSeen(); renderHits(); renderMarkers();
-  marksQueue = marksQueue.then(async () => {
-    try { S.marksSha = await writeJson("marks.json", S.marks, S.marksSha, "Treffer markiert"); }
-    catch (e) {
-      if (e.status === 409 || e.status === 422) {
-        try { const cur = await readJson("marks.json"); S.marksSha = cur.sha;
-          S.marksSha = await writeJson("marks.json", { ...cur.data, ...S.marks }, S.marksSha, "Treffer markiert"); }
-        catch (e2) { toast("Markierung nur auf diesem Gerät gespeichert: " + e2.message, "err"); }
-      } else toast("Markierung nur auf diesem Gerät gespeichert: " + e.message, "err");
-    }
-    store.set("wh_marks", JSON.stringify(S.marks));
-  });
-}
-$("hitList").addEventListener("change", (e) => {
-  const card = e.target.closest(".card"); if (!card) return;
-  const k = card.dataset.key;
-  if (e.target.matches("[data-status]")) setStatus(k, e.target.value, null);
-  if (e.target.matches("[data-when]") && e.target.value) setStatus(k, "besichtigung", new Date(e.target.value).toISOString());
-});
 $("hitList").addEventListener("keydown", (e) => {
-  if ((e.key === "Enter" || e.key === " ") && e.target.matches(".chead[data-detail]")) { e.preventDefault(); e.target.click(); return; }
-  if (e.key === "Enter" && !e.shiftKey && e.target.matches("[data-cinput]")) {
-    e.preventDefault(); const card = e.target.closest(".card"); addComment(card.dataset.key, e.target.value); e.target.value = "";
-  }
+  if ((e.key === "Enter" || e.key === " ") && e.target.matches(".chead[data-detail]")) { e.preventDefault(); e.target.click(); }
 });
 $("hitList").addEventListener("click", (e) => {
   const card = e.target.closest(".card"); if (!card) return;
   const k = card.dataset.key;
   if (e.target.closest(".mini")) return;   // die kleine Karte kümmert sich selbst um Tippen und Zoomen
   const vb = e.target.closest("[data-vote]"); if (vb) { setVote(k, vb.dataset.vote); return; }
-  if (e.target.closest("[data-fav]")) { toggleFav(k); return; }
-  const ob = e.target.closest("[data-out]"); if (ob) { setOut(k, ob.dataset.out === "1"); return; }
   if (e.target.closest("[data-detail]")) { if (!S.seen.has(k)) { S.seen.add(k); saveSeen(); setTimeout(renderHits, 400); } openDetail(k); return; }
-  if (e.target.closest("[data-thread]")) { S.openThreads.has(k) ? S.openThreads.delete(k) : S.openThreads.add(k); renderHits();
-    if (S.openThreads.has(k)) setTimeout(() => document.querySelector(`.card[data-key="${CSS.escape(k)}"] [data-cinput]`)?.focus(), 50); return; }
-  if (e.target.closest("[data-csend]")) { const ta = card.querySelector("[data-cinput]"); addComment(k, ta.value); ta.value = ""; return; }
-  const del = e.target.closest("[data-del]"); if (del) { deleteComment(k, del.dataset.del); return; }
-  const mb = null;
-  if (mb) { setMark(k, mb.dataset.mark); return; }
   if (e.target.closest("[data-open]")) { S.seen.add(k); saveSeen(); setTimeout(renderHits, 400); }
 });
 S.sort = store.get("wh_sort") || "new";
@@ -495,5 +457,4 @@ function renderSort() { document.querySelectorAll("[data-sort]").forEach((b) => 
 document.querySelectorAll("[data-sort]").forEach((b) => b.addEventListener("click", () => { S.sort = b.dataset.sort; store.set("wh_sort", S.sort); renderSort(); renderHits(); }));
 renderSort();
 document.querySelectorAll("[data-filter]").forEach((b) => b.addEventListener("click", () => { S.filter = b.dataset.filter; S.filterChosen = true; renderHits(); window.scrollTo(0, 0); }));
-$("allSeenBtn").addEventListener("click", () => { S.hits.forEach((x) => S.seen.add(keyOf(x))); saveSeen(); renderHits(); });
 

@@ -49,7 +49,7 @@ function parseDeep(href) {
   const h = new URL(href, location.href).hash.replace(/^#/, "");
   const q = new URLSearchParams(h);
   if (q.get("nachricht")) return { msg: q.get("nachricht") };
-  return q.get("l") ? { key: q.get("l"), comments: q.get("c") === "1", tries: 0 } : null;
+  return q.get("l") ? { key: q.get("l"), tries: 0 } : null;
 }
 // Persönliche Nachricht in der App zeigen statt Gmail (14.11.: Gmail-Link öffnete am Handy nur eine Fehlerseite).
 // Antworten = mailto: → eigene Mail-App, eigene Adresse. Wollihood schickt nie selbst.
@@ -86,15 +86,13 @@ function applyDeep(final) {
   const k = keyOf(x);
   S.deep = null; history.replaceState(null, "", location.pathname);
   showTab("hits");
-  if (!filtered().some((h) => keyOf(h) === k)) { S.filter = verdict(k) === "out" ? "out" : "all"; S.filterChosen = true; }
-  if (d.comments) S.openThreads.add(k);
+  if (!filtered().some((h) => keyOf(h) === k)) { S.filter = { neu: "new", fav: "fav", arch: "arch" }[standOf(k, x).s]; S.filterChosen = true; }
   renderHits();
   setTimeout(() => {
     const card = document.querySelector(`.card[data-key="${CSS.escape(k)}"]`);
     if (!card) return;
     card.scrollIntoView({ block: "start", behavior: "smooth" });
     card.classList.remove("act-flash"); void card.offsetWidth; card.classList.add("act-flash");
-    if (d.comments) { const t = card.querySelector(".cform textarea"); if (t) setTimeout(() => t.focus({ preventScroll: true }), 500); }
   }, 60);
 }
 S.deep = parseDeep(location.href);
@@ -105,39 +103,53 @@ if (navigator.serviceWorker) navigator.serviceWorker.addEventListener("message",
 function inSavedArea(x) {
   return !!x.manual || x.lat == null || !S.config?.areas?.features?.length || inAreas(x.lat, x.lon, S.config.areas);
 }
-// Zeitpunkt des Aussortierens: von Hand gesetzt, sonst letzte Änderung (zweiter Daumen runter)
-function outTime(k) { const it = itemOf(k); return new Date(it.out?.at || it.updated || 0).getTime() || 0; }
 const dmy = (t) => (t ? new Date(t).toLocaleDateString("de-CH", { day: "2-digit", month: "2-digit" }) : "");
+// Liste je Filter: Neu (noch zu entscheiden) · Favoriten · Archiv
 function filtered() {
-  if (S.filter === "out") return S.hits.filter(inSavedArea).filter((x) => verdict(keyOf(x)) === "out")
-    .sort((a, b) => outTime(keyOf(b)) - outTime(keyOf(a)));
-  return sortHits(S.hits).filter(inSavedArea).filter((x) => {
-    const k = keyOf(x), v = verdict(k);
-    if (S.filter === "out") return v === "out";
-    if (v === "out") return false;
-    if (S.filter === "new") return isNew(x);
-    if (S.filter === "fav") return inFav(k);
-    return true;
-  });
+  const want = { new: "neu", fav: "fav", arch: "arch" }[S.filter] || "neu";
+  const pool = S.hits.filter(inSavedArea).filter((x) => standOf(keyOf(x), x).s === want);
+  if (want === "arch") return pool.sort((a, b) => standOf(keyOf(b), b).at - standOf(keyOf(a), a).at);
+  return sortHits(pool);
 }
-// ---------- Bewertungen & Kommentare ----------
+// ---------- Entscheid pro Wohnung: Neu → Favoriten / Archiv (v98, Pascal 15.11.) ----------
+// Jede Person gibt 👍 (behalten) oder 👎 (Archiv). Regeln (gleich im Suchskript: wollihood/people.py → stand; Tabelle
+// tests/fixtures/stand_cases.json wird von beiden Seiten geprüft):
+//   beide 👎 → Archiv · Stand gesetzt (angefragt …) oder mind. ein 👍 ohne 👎 → Favorit ·
+//   sonst «Neu» (offen, einer 👎, uneinig) bis 7 Tage nach Fund bzw. letztem Daumen, dann Archiv.
+// Von Hand hinzugefügt = 👍 der Person, die sie hinzugefügt hat. Früher: Stern = 👍, «aussortiert» = beide 👎.
 const PEOPLE = { pascal: "Pascal", leonie: "Leonie" };
 const otherOf = (p) => (p === "pascal" ? "leonie" : "pascal");
 S.person = PEOPLE[store.get("wh_person")] ? store.get("wh_person") : null;
-S.social = {}; S.socialSha = null; S.people = {}; S.peopleSha = null; S.openThreads = new Set();
+S.social = {}; S.socialSha = null; S.people = {}; S.peopleSha = null;
 const thumb = (dir) => `<svg viewBox="0 0 24 24" fill="currentColor"${dir === "down" ? ' style="transform:rotate(180deg)"' : ""}><path d="M2 10h4v11H2zM8 21h9.2a2 2 0 0 0 2-1.6l1.6-7.5A2 2 0 0 0 18.8 9.5H14V5a2.5 2.5 0 0 0-2.5-2.5L8 10z"/></svg>`;
-const bubble = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 5h16v11H9l-5 4z"/></svg>';
-const itemOf = (k) => S.social[k] || { votes: {}, comments: [] };
-function verdict(k) {
-  const v = itemOf(k).votes || {};
-  const a = v.pascal, b = v.leonie;
-  if (itemOf(k).out || (a === "down" && b === "down")) return "out";
-  if (a === "up" && b === "up") return "both";
-  if (a && b && a !== b) return "split";
-  return "";
+const itemOf = (k) => S.social[k] || { votes: {} };
+const FRIST_TAGE = 7;
+const hasStand = (it) => !!(it.status?.value || Object.keys(it.steps || {}).length);
+function effVotes(it, x) {
+  const v = { ...(it.votes || {}) };
+  if (it.fav?.by) v[it.fav.by] = "up";
+  if (it.out) { v.pascal = "down"; v.leonie = "down"; }
+  const by = x?.manual?.by; if (by && PEOPLE[by] && !v[by]) v[by] = "up";
+  return v;
 }
-const myVote = (k) => (S.person ? (itemOf(k).votes || {})[S.person] : null);
-const isFav = (k) => verdict(k) !== "out" && (verdict(k) === "both" || !!itemOf(k).fav);
+function standCalc(it, x, now) {
+  const v = effVotes(it, x), a = v.pascal, b = v.leonie;
+  const ups = (a === "up") + (b === "up"), downs = (a === "down") + (b === "down");
+  const ts = (t) => (t ? Date.parse(t) || 0 : 0);
+  const t0 = Math.max(ts(x?.first_seen), ts(it.vat || (ups + downs ? it.updated : null)));
+  const frist = t0 + FRIST_TAGE * 864e5;
+  if (downs === 2) return { s: "arch", why: "beide", at: ts(it.out?.at || it.vat || it.updated) || t0, v };
+  if (hasStand(it) || (ups && !downs)) return { s: "fav", v };
+  if (now > frist) return { s: "arch", why: "frist", at: frist, v };
+  return { s: "neu", split: ups === 1 && downs === 1, frist, v };
+}
+const standOf = (k, x, now = Date.now()) => standCalc(itemOf(k), x || hitByKey(k), now);
+const myVote = (k) => (S.person ? standOf(k).v[S.person] : null);
+// Restzeit bis zum Archiv, für die Karte in «Neu»
+function fristText(frist, now = Date.now()) {
+  const d = Math.ceil((frist - now) / 864e5);
+  return d <= 1 ? "letzter Tag" : `noch ${d} Tage`;
+}
 const STATUS = [["", "Noch nichts unternommen"], ["angefragt", "Angefragt"], ["besichtigung", "Besichtigung"],
   ["beworben", "Beworben"], ["zusage", "Zusage"], ["absage", "Absage"]];
 const statusLabel = (st) => {
@@ -146,68 +158,21 @@ const statusLabel = (st) => {
   if (st.value === "besichtigung" && st.when) {
     const d = new Date(st.when), day = d.toLocaleDateString("de-CH", { day: "numeric", month: "numeric" });
     if (d < new Date()) return `Besichtigt ${day}`;
-    return `${base} ${d.toLocaleDateString("de-CH", { weekday: "short" })} ${day} ${d.toLocaleTimeString("de-CH", { hour: "2-digit", minute: "2-digit" })}`;
+    return `${base} ${day}`;      // Uhrzeit steht in der Zeile darunter («nächster Schritt»); das Schild muss kurz bleiben
   }
   return base;
 };
-function toggleFav(k) {
-  if (needPerson()) return;
-  const me = S.person, label = (S.hits.find((h) => keyOf(h) === k) || {}).street || "Inserat";
-  const on = !itemOf(k).fav;
-  if (!on && verdict(k) === "both") { toast("Ihr habt beide Daumen hoch gegeben, darum bleibt sie in den Favoriten."); return; }
-  socialOp(`${PEOPLE[me]} ${on ? "favorisiert" : "entfernt Favorit"} (${label})`, (items) => {
-    const it = items[k] || (items[k] = { votes: {}, comments: [] });
-    if (on) it.fav = { by: me, at: new Date().toISOString() }; else delete it.fav;
-    it.updated = new Date().toISOString();
-  });
-}
-// Von Hand aussortieren (gilt für beide), mit Rückgängig
-function setOut(k, on) {
-  if (needPerson()) return;
-  const me = S.person, label = (S.hits.find((h) => keyOf(h) === k) || {}).street || "Inserat";
-  socialOp(`${PEOPLE[me]} ${on ? "sortiert aus" : "holt zurück"} (${label})`, (items) => {
-    const it = items[k] || (items[k] = { votes: {}, comments: [] });
-    if (on) it.out = { by: me, at: new Date().toISOString() }; else delete it.out;
-    it.updated = new Date().toISOString();
-  });
-  if (on) toastAction("Aussortiert.", "Rückgängig", () => setOut(k, false));
-  else if (verdict(k) === "out") toast("Zurückgeholt, aber ihr habt beide Daumen runter gegeben. Ändere deinen Daumen, damit sie wieder erscheint.", "", 7000);
-  else toast("Zurückgeholt.");
-}
-function setStatus(k, value, when) {
-  if (needPerson()) return;
-  const me = S.person, label = (S.hits.find((h) => keyOf(h) === k) || {}).street || "Inserat";
-  socialOp(`Status ${value || "zurückgesetzt"} von ${PEOPLE[me]} (${label})`, (items) => {
-    const it = items[k] || (items[k] = { votes: {}, comments: [] });
-    if (value) it.status = { value, when: value === "besichtigung" ? (when || it.status?.when || null) : null, by: me, at: new Date().toISOString() };
-    else delete it.status;
-    it.updated = new Date().toISOString();
-  });
-}
-// einmalig: alte Merkliste in Favoriten übernehmen
-async function migrateMarks() {
-  const keys = Object.entries(S.marks || {}).filter(([, v]) => v === "fav").map(([k]) => k);
-  if (!keys.length || store.get("wh_marks_migrated")) return;
-  const todo = keys.filter((k) => !itemOf(k).fav);
-  store.set("wh_marks_migrated", "1");
-  if (!todo.length) return;
-  socialOp("Merkliste übernommen", (items) => {
-    todo.forEach((k) => { const it = items[k] || (items[k] = { votes: {}, comments: [] }); it.fav = it.fav || { by: S.person || "pascal", at: new Date().toISOString() }; });
-  });
-}
 // Doppelte Wohnung zusammengeführt (Suchskript merge_twins): Bewertung/Notizen der zweiten Fundstelle zum Hauptschlüssel holen
 function foldTwins(items) {
   let n = 0;
   for (const x of S.hits || []) {
     const k = keyOf(x), rest = (x.keys || []).slice(1).filter((k2) => items[k2] && k2 !== k);
     for (const k2 of rest) {
-      const a = items[k] || (items[k] = { votes: {}, comments: [] }), b = items[k2];
+      const a = items[k] || (items[k] = { votes: {} }), b = items[k2];
       if (b.folded_into === k) continue;
       for (const [p, v] of Object.entries(b.votes || {})) if (!(a.votes || (a.votes = {}))[p]) { a.votes[p] = v; }
       for (const f of ["fav", "out", "status", "steps"]) if (!a[f] && b[f]) a[f] = b[f];
       if ((b.note || "").trim()) a.note = (a.note || "").trim() ? `${a.note}\n\n${b.note}` : b.note;
-      const have = new Set((a.comments || []).map((c) => c.at + c.text));
-      a.comments = [...(a.comments || []), ...(b.comments || []).filter((c) => !have.has(c.at + c.text))].sort((u, v) => (u.at < v.at ? -1 : 1));
       b.folded_into = k; n++;
     }
   }
@@ -240,33 +205,24 @@ function needPerson() {
   toast("Bitte zuerst oben wählen, wer dieses Handy nutzt.", "err");
   return true;
 }
-function setVote(k, dir) {
+// Daumen setzen; nochmals derselbe Daumen nimmt ihn zurück. Alte Felder (Stern, aussortiert) werden dabei zu Daumen.
+function setVote(k, dir, quiet) {
   if (needPerson()) return;
-  const me = S.person, label = (S.hits.find((h) => keyOf(h) === k) || {}).street || "Inserat";
-  const val = myVote(k) === dir ? null : dir;
+  const me = S.person, x = hitByKey(k) || {}, label = x.street || "Inserat";
+  const before = standOf(k, x), val = before.v[me] === dir ? null : dir;
   S.seen.add(k); saveSeen();
-  socialOp(`${PEOPLE[me]} ${val === "up" ? "dafür" : val === "down" ? "dagegen" : "neutral"} (${label})`, (items) => {
-    const it = items[k] || (items[k] = { votes: {}, comments: [] });
-    it.votes = it.votes || {};
-    if (val) it.votes[me] = val; else delete it.votes[me];
-    it.updated = new Date().toISOString();
+  const now = new Date().toISOString();
+  socialOp(`${PEOPLE[me]} ${val === "up" ? "dafür" : val === "down" ? "dagegen" : "offen"} (${label})`, (items) => {
+    const it = items[k] || (items[k] = { votes: {} });
+    const v = effVotes(it, null); delete it.fav; delete it.out;
+    if (val) v[me] = val; else delete v[me];
+    it.votes = v; it.vat = now; it.updated = now;
   });
-}
-function addComment(k, text) {
-  if (needPerson()) return;
-  const me = S.person, t = text.trim(); if (!t) return;
-  const c = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), by: me, at: new Date().toISOString(), text: t.slice(0, 1000) };
-  S.openThreads.add(k);
-  socialOp(`Kommentar von ${PEOPLE[me]}`, (items) => {
-    const it = items[k] || (items[k] = { votes: {}, comments: [] });
-    it.comments = it.comments || [];
-    if (!it.comments.some((x) => x.id === c.id)) it.comments.push(c);
-    it.updated = c.at;
-  });
-}
-function deleteComment(k, id) {
-  socialOp(`Kommentar gelöscht`, (items) => {
-    const it = items[k]; if (!it) return;
-    it.comments = (it.comments || []).filter((x) => !(x.id === id && x.by === S.person));
-  });
+  const after = standOf(k, x);
+  if (quiet || after.s === before.s) return;
+  const prev = before.v[me], undo = () => setVote(k, prev || dir, true);   // vorheriger Daumen, sonst derselbe nochmals = zurücknehmen
+  if (after.s === "arch") toastAction("Ins Archiv verschoben.", "Rückgängig", undo);
+  else if (after.s === "fav") toastAction("Bei den Favoriten.", "Rückgängig", undo);
+  else if (before.s === "arch") toast(after.split ? `Zurückgeholt – ${PEOPLE[otherOf(me)]} ist dagegen, ihr habt wieder ${FRIST_TAGE} Tage.` : "Zurückgeholt.", "ok", 6000);
+  else toast("Wieder bei «Neu».", "");
 }
