@@ -724,10 +724,11 @@ button, .btn, .linkbtn, label[for] { transition: transform .12s ease, opacity .1
 .act-busy::after, .act-done::after, .act-fail::after { content: attr(data-busy); position: absolute; inset: 0; display: flex; align-items: center;
   justify-content: center; padding: 0 8px; border-radius: inherit; font: 600 13px/1.1 var(--body); white-space: nowrap; overflow: hidden;
   background: var(--accent-soft); color: var(--accent); box-shadow: inset 0 0 0 1.5px var(--accent) }
-.act-busy::after { animation: actpulse 1.2s ease-in-out infinite }
+.act-busy::after { animation: actpulse 1.4s ease-in-out infinite }
+.act-busy, .act-done, .act-fail { color: transparent !important }
 .act-done::after { background: var(--ok-soft); color: var(--ok); box-shadow: inset 0 0 0 1.5px var(--ok) }
 .act-fail::after { background: #FDECEB; color: var(--bad); box-shadow: inset 0 0 0 1.5px var(--bad) }
-@keyframes actpulse { 50% { opacity: .65 } }
+@keyframes actpulse { 50% { background: color-mix(in srgb, var(--accent-soft) 55%, var(--surface, #fff)) } }   /* deckend: Knopftext scheint nie durch */
 .act-flash { animation: actflash 1.6s ease-out }
 @keyframes actflash { 0% { box-shadow: 0 0 0 3px var(--accent) } 100% { box-shadow: 0 0 0 0 transparent } }
 .shotgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
@@ -1083,7 +1084,8 @@ function actPaint() {
   const el = actEl(); if (!el) return;
   const s = Math.round((Date.now() - ACT.t0) / 1000), small = el.offsetWidth < 96;
   el.classList.add("act-busy"); el.classList.remove("act-done", "act-fail");
-  el.setAttribute("data-busy", small ? (ACT.ki ? `✦ ${s} s` : s >= 1 ? `${s} s` : "…") : ACT.ki ? `Claude arbeitet … ${s} s` : s >= 2 ? `läuft … ${s} s` : "läuft …");
+  void s;   // v94 (Pascal 15.11.): keine ablaufenden Sekunden mehr
+  el.setAttribute("data-busy", small ? (ACT.ki ? "✦ …" : "…") : ACT.ki ? "Claude arbeitet …" : "läuft …");
 }
 function actBegin(url) {
   if (!ACT.running && (!ACT.el || Date.now() - ACT.at > 2500)) return false;
@@ -3457,7 +3459,7 @@ let installEvt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("installBtn").hidden = false; $("installHint").hidden = true; });
 $("installBtn").addEventListener("click", async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("installBtn").hidden = true; });
 if (window.matchMedia("(display-mode: standalone)").matches) { $("installHint").textContent = "Läuft als App."; }
-const APP_VERSION = "93 · 15.11.2026";
+const APP_VERSION = "94 · 15.11.2026";
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").then((reg) => { reg.update().catch(() => {}); }).catch(() => {});
   let reloaded = false;
