@@ -471,6 +471,7 @@ label.f small, div.f small { font: 500 12px var(--body); text-transform: none; l
 .chips { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 2px; border: 0; margin: 0; padding: 3px; background: var(--seg); border-radius: 12px; overflow: visible }
 .chip { border: 0 !important; border-radius: 9px; background: transparent; padding: 9px 2px; font: 500 13px var(--body); text-transform: none; letter-spacing: 0; color: var(--muted); text-align: center; min-width: 0; overflow: hidden; text-overflow: ellipsis }
 .chip[aria-pressed="true"] { background: var(--surface); color: var(--fg); font-weight: 600; box-shadow: var(--shadow) }
+.chip { letter-spacing: -0.1px; padding-left: 0; padding-right: 0 }
 .sortrow { margin-top: -2px; justify-content: space-between }
 .sortrow .hint { font: 500 12px var(--body); text-transform: none; letter-spacing: 0 }
 .sortbtn { font: 500 12.5px var(--body); text-transform: none; letter-spacing: 0; padding: 6px 8px; border-bottom: 2px solid transparent }
@@ -619,10 +620,10 @@ label.f small, div.f small { color: var(--muted); font: 500 12.5px var(--body) }
 .bp-part { padding: 0; overflow: hidden }
 .bp-head { all: unset; box-sizing: border-box; width: 100%; display: flex; align-items: center; gap: 10px; padding: 14px 16px; cursor: pointer }
 .bp-head b { font: 600 16px var(--body) }
-.bp-st { margin-left: auto; font-size: 13px; text-align: right } .bp-st.ok { color: var(--ok) } .bp-st.warn { color: var(--warn) } .bp-st.muted { color: var(--muted) }
+.bp-st { margin-left: auto; font-size: 13px; text-align: right; white-space: nowrap } .bp-st.ok { color: var(--ok) } .bp-st.warn { color: var(--warn) } .bp-st.muted { color: var(--muted) }
 .bp-chev { color: var(--muted); font-size: 20px; transition: transform .15s } .bp-part.open .bp-chev { transform: rotate(90deg) }
 .bp-body { display: none; padding: 0 16px 16px; gap: 12px } .bp-part.open .bp-body { display: grid }
-.bp-body > .panel { box-shadow: none; border: 1px solid var(--hair); margin: 0 }
+.bp-body > .panel, .bp-body > details.panel { box-shadow: none; border: 0; border-top: 1px solid var(--hair); border-radius: 0; margin: 0; padding: 12px 0 0; background: transparent }
 .bp-read { background: var(--sunk); border-radius: 12px; padding: 14px 16px; font-size: 15px; line-height: 1.5 }
 .bp-read p { margin: 0 0 .7em } .bp-read p:last-child { margin: 0 }
 .bp-meta { font-size: 12.5px; color: var(--muted); margin-bottom: 8px }
@@ -640,6 +641,7 @@ label.f small, div.f small { color: var(--muted); font: 500 12.5px var(--body) }
 .bewfoot.bp-clean { display: none }
 /* v90: Bewerbung im Tab der Wohnungsseite */
 #bBody { display: grid; gap: 12px; min-width: 0 }
+#kState:empty, #kTips:empty, #kLearn:empty, #chLearn:empty { display: none }
 #bBody > .panel { box-shadow: none; border: 1px solid var(--hair); margin: 0 }
 #dStand .bewfoot { position: sticky; bottom: 0; margin: 0; border-radius: 12px; padding: 10px 12px }
 .d-restbtn { justify-self: center; padding: 10px }
@@ -1364,8 +1366,9 @@ const statusLabel = (st) => {
   if (!st || !st.value) return "";
   const base = (STATUS.find(([v]) => v === st.value) || [0, st.value])[1];
   if (st.value === "besichtigung" && st.when) {
-    const d = new Date(st.when);
-    return `${base} ${d.toLocaleDateString("de-CH", { weekday: "short", day: "2-digit", month: "2-digit" })} ${d.toLocaleTimeString("de-CH", { hour: "2-digit", minute: "2-digit" })}`;
+    const d = new Date(st.when), day = d.toLocaleDateString("de-CH", { day: "numeric", month: "numeric" });
+    if (d < new Date()) return `Besichtigt ${day}`;
+    return `${base} ${d.toLocaleDateString("de-CH", { weekday: "short" })} ${day} ${d.toLocaleTimeString("de-CH", { hour: "2-digit", minute: "2-digit" })}`;
   }
   return base;
 };
@@ -1529,7 +1532,10 @@ function setStep(k, name, data) {
   });
   setTimeout(() => refreshStand(k), 30);
 }
-function defaultTab(k) { const st = stepsOf(k); return (STEPS.find(([n]) => !stepDone(st, n)) || STEPS[3])[0]; }
+function defaultTab(k) {        // v93: der Schritt nach dem weitesten erledigten (übersprungene zählen nicht)
+  const st = stepsOf(k); let last = -1; STEPS.forEach(([n], i) => { if (stepDone(st, n)) last = i; });
+  return STEPS[Math.min(last + 1, STEPS.length - 1)][0];
+}
 function standPanel(k) {
   const steps = stepsOf(k), tab = S.dTab || defaultTab(k);
   const x = S.hits.find((h) => keyOf(h) === k) || {};
@@ -3144,12 +3150,22 @@ async function saveConfig(c, message, okText) {
   try {
     S.configSha = await writeJson("config.json", c, S.configSha, message);
     S.config = c; S.areasDirty = false; $("areaState").hidden = true; fitMap();
+    try { S.formBase = JSON.stringify(readForm()); } catch { } searchDirtySync();
     if (pushOutside(c.areas, c.push && c.push.areas)) toast("Hinweis: Ein Teil des Push-Gebiets liegt ausserhalb des Suchgebiets. Dort wird nicht gesucht.", "", 8000);
     renderHits(); renderMarkers();
     toast(okText, "ok", 6000);
     return true;
   } catch (e) { toast(e.message, "err", 8000); return false; }
 }
+{ const f0 = fillForm; fillForm = function () { f0(); try { S.formBase = JSON.stringify(readForm()); } catch { } setTimeout(searchDirtySync, 0); }; }
+// v93: «Speichern» der Suche nur blau, wenn etwas geändert ist (UX-Check 15.11.)
+function searchDirtySync() {
+  const b = document.querySelector("#v-search [data-save]"); if (!b || !S.config) return;
+  let d = !!S.areasDirty; try { d = d || JSON.stringify(readForm()) !== S.formBase; } catch { d = true; }
+  b.classList.toggle("primary", d); b.textContent = "Speichern"; b.disabled = !d;
+  b.hidden = !d;     // nichts geändert → kein schwebender Knopf über der Karte
+}
+["input", "change", "click"].forEach((ev) => document.addEventListener(ev, (e) => { if (e.target.closest?.("#v-search")) setTimeout(searchDirtySync, 0); }));
 document.querySelectorAll("[data-save]").forEach((b) => b.addEventListener("click", async () => {
   const c = readForm(); const p = validate(c);
   if (p) { toast(p, "err"); return; }
@@ -3441,7 +3457,7 @@ let installEvt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("installBtn").hidden = false; $("installHint").hidden = true; });
 $("installBtn").addEventListener("click", async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("installBtn").hidden = true; });
 if (window.matchMedia("(display-mode: standalone)").matches) { $("installHint").textContent = "Läuft als App."; }
-const APP_VERSION = "92 · 15.11.2026";
+const APP_VERSION = "93 · 15.11.2026";
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").then((reg) => { reg.update().catch(() => {}); }).catch(() => {});
   let reloaded = false;
@@ -3554,7 +3570,7 @@ function renderBew() {
       <details class="panel adv" id="bStamm"><summary>Personalien &amp; Referenzen</summary>
         <div class="advbody"><p class="hint">Gilt für alle Bewerbungen und für die Personalien-Seite im Dossier.</p><div id="bStammBody"></div></div>
       </details>`)}
-    ${bpPart("begleit", "Begleit-Mail / Bemerkung", `
+    ${bpPart("begleit", "Begleit-Mail", `
       <p class="hint">Kurzer Text, mit dem ihr das Dossier schickt – als Mail oder im Feld «Bemerkung» eines Online-Formulars.</p>
       <div class="bp-read" id="bRead-bemerkung"></div>
       <div class="bp-edit" data-tedit="bemerkung" hidden>
@@ -3564,7 +3580,7 @@ function renderBew() {
       </div>
       ${bpTextBar("bemerkung")}
       <div class="kbar"><button type="button" class="btn sm" id="bNoteCopy">Text kopieren</button></div>`)}
-    ${bpPart("senden", "Verschicken & Dateien", `<div id="bSendBody"></div>`)}
+    ${bpPart("senden", "Senden & Dateien", `<div id="bSendBody"></div>`)}
     <div class="bewfoot"><span class="hint warnline" id="bDirty" hidden>Nicht gespeichert</span><button type="button" class="btn sm" id="bSave">Gespeichert</button></div>`;
   bewTips(); bewCount(); renderDossier(); renderStamm(); renderForm(); renderCopy(); bewMark(); dossierSum(); FOTO.img = null; fotoRender();
   bpRenderText("text"); bpRenderText("bemerkung"); renderSend(); bpStatus();
@@ -3775,7 +3791,7 @@ function bpTextSt(feld) {
   if (open) return [`${open} Vorschl${open === 1 ? "ag" : "äge"} offen`, "warn"];
   if (ph) return [`${ph} Platzhalter offen`, "warn"];
   if (p && p.basis === t) return ["geprüft ✓", "ok"];
-  return [p ? "geändert seit Prüfung" : "nicht geprüft", "muted"];
+  return [p ? "geändert" : "ungeprüft", "muted"];
 }
 function bpStatus() {
   const set = (id, [txt, cls]) => { const el = $("bpSt-" + id); if (el) { el.textContent = txt; el.className = "bp-st " + cls; } };
@@ -3786,7 +3802,7 @@ function bpStatus() {
   const items = dossierItems().filter(dossierOn), old = items.filter((b) => baustAlter(b)?.alt).length;
   set("unterlagen", [`${items.length} Dokumente${old ? ` · ${old} zu alt` : ""}`, old ? "warn" : "ok"]);
   const wg = WEGE.find(([w]) => w === (BEW.doc.weg || sendWegVorschlag()[0]))?.[1] || "";
-  set("senden", stepsOf(BEW.k).bewerbung ? ["verschickt ✓", "ok"] : [wg + (BEW.doc.weg ? "" : " (Vorschlag)"), "muted"]);
+  set("senden", stepsOf(BEW.k).bewerbung ? ["verschickt ✓", "ok"] : [(BEW.doc.weg ? "" : "✦ ") + wg.replace("Per ", "").replace(" / Flatfox", ""), "muted"]);
 }
 function bpToggle(id, force) {
   const el = document.querySelector(`[data-bpart="${id}"]`); if (!el) return;
@@ -3821,6 +3837,7 @@ $("bBody").addEventListener("click", (e) => {
   const t = e.target, q = (sel) => t.closest(sel);
   let b;
   if ((b = q("[data-bptoggle]"))) { bpToggle(b.dataset.bptoggle); return; }
+  if ((b = q("[data-tipdone]"))) { BEW.doc.hinweise = (BEW.doc.hinweise || []).filter((h) => !String(h.text || "").startsWith(b.dataset.tipdone)); bewTips(); bewSave(true); return; }
 });
 $("bBody").addEventListener("change", (e) => {
   if (e.target.id === "bAnrede") bewMark();
@@ -4039,7 +4056,7 @@ async function bewKi(mode, instrIn, kfeld) {
 }
 // Hinweise nach Art: «Zu klären» sichtbar, Ideen eingeklappt, Erklärungen als Zeile bei den Änderungen
 const tipArt = (t) => (["klaeren", "idee", "erklaerung"].includes(t.art) ? t.art : "klaeren");
-const tipRow = (t, cls) => `<div class="${cls}"${t.stelle ? ` data-stelle="${esc(t.stelle)}" role="button" tabindex="0"` : ""}>${esc(t.text)}${t.stelle ? ' <span class="tipgo" aria-hidden="true">›</span>' : ""}</div>`;
+const tipRow = (t, cls) => `<div class="${cls} bp-k"><span${t.stelle ? ` data-stelle="${esc(t.stelle)}" role="button" tabindex="0"` : ""}>${esc(t.text)}${t.stelle ? ' <span class="tipgo" aria-hidden="true">›</span>' : ""}</span><button type="button" class="linkbtn" data-tipdone="${esc(t.text.slice(0, 60))}">Erledigt</button></div>`;
 const bewErkl = () => (BEW.doc.hinweise || []).filter((t) => tipArt(t) === "erklaerung").slice(0, 2);
 function bewTips() {
   const h = BEW.doc.hinweise || [], k = h.filter((t) => tipArt(t) === "klaeren").slice(0, 3), id = h.filter((t) => tipArt(t) === "idee").slice(0, 3);
@@ -4185,7 +4202,7 @@ function chatPanel() {
   return `<div class="panel" id="dChat"><h2>Chat mit Claude</h2>
     <div class="ch-list" id="chList"><p class="hint">Lade …</p></div>
     <div id="chLearn"></div>
-    <div class="ch-form"><textarea class="field" id="chIn" rows="1" placeholder="z.B. «Kontakt-Nachricht kürzer» oder eine Frage"></textarea><button type="button" class="btn primary" id="chSend" aria-label="Senden">Senden</button></div>
+    <div class="ch-form"><textarea class="field" id="chIn" rows="1" placeholder="Frage oder Änderungswunsch …"></textarea><button type="button" class="btn primary" id="chSend" aria-label="Senden">Senden</button></div>
   </div>`;
 }
 async function chatLoad(k) {
@@ -4199,7 +4216,7 @@ function chatRender() {
   const el = $("chList"); if (!el || CH.k !== S.detailKey) return;
   const list = CH.msgs, from = CH.all ? 0 : Math.max(0, list.length - 6);
   el.innerHTML = (from ? `<button type="button" class="linkbtn" id="chMore">${from} frühere zeigen</button>` : "")
-    + (list.length ? "" : `<p class="hint">Fragt Claude etwas zu dieser Wohnung oder lasst Texte ändern – Kontakt-Nachricht, Anschreiben, Begleit-Mail. Gilt für euch beide.</p>`)
+    + (list.length ? "" : `<p class="hint">Fragen zur Wohnung oder Texte ändern lassen, z.B. «Kontakt-Nachricht kürzer». Gilt für euch beide.</p>`)
     + list.slice(from).map((m, j) => { const i = from + j;
       if (m.role === "user") return `<div class="ch-msg me"><small>${esc(PEOPLE[m.by] || m.by || "")} · ${esc(ago(m.at))}</small><p>${esc(m.text)}</p></div>`;
       const ch = (m.changes || []).map((c) => `<details class="ch-chg"><summary>${m.undone ? "↶ zurückgenommen: " : "✎ "}${esc(CH_FELD[c.feld] || c.feld)}</summary><div class="diff">${wdiff(c.alt || "", c.neu || "")}</div></details>`).join("");
@@ -5405,7 +5422,7 @@ function sendWegVorschlag() {
   if (/per (e-?)?mail|an (die )?folgende (e-?)?mail|unterlagen[^.]{0,60}(an|per) [\w.-]+@/.test(txt) || (c.mail && !c.apply)) return ["mail", c.mail ? "Mail-Adresse der Verwaltung bekannt" : "Inserat verlangt Unterlagen per Mail"];
   if (c.apply || /bewerbungsformular|online[- ]?(bewerb|formular|anmeld)|plattform|emeria|wohnungsbewerbung\.ch/.test(txt)) return ["plattform", c.apply ? "Inserat hat einen Bewerbungslink" : "Inserat nennt ein Online-Formular"];
   if (/flatfox/.test(txt) || String(BEW.k).startsWith("flatfox:")) return ["portal", "Inserat auf Flatfox"];
-  return ["mail", "Standard"];
+  return ["mail", "im Inserat steht nichts anderes"];
 }
 function sendSelected() { return dossierItems().filter(dossierOn); }
 function renderSend() {
