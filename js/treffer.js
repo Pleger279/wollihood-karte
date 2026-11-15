@@ -144,7 +144,6 @@ function standCalc(it, x, now) {
   return { s: "neu", split: ups === 1 && downs === 1, frist, v };
 }
 const standOf = (k, x, now = Date.now()) => standCalc(itemOf(k), x || hitByKey(k), now);
-const myVote = (k) => (S.person ? standOf(k).v[S.person] : null);
 // Restzeit bis zum Archiv, für die Karte in «Neu»
 function fristText(frist, now = Date.now()) {
   const d = Math.ceil((frist - now) / 864e5);
