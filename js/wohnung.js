@@ -200,7 +200,12 @@ function refreshUs() {
   $("dUs").querySelectorAll("img[data-src]").forEach((img) => repoFile(img.dataset.src).then((u) => (img.src = u)).catch(() => img.remove()));
 }
 // Daumen oben auf der Wohnungsseite
-const votePanel = (k, x) => `<div class="dvote" id="dVote">${voteRow(k, x, "data-dvote")}</div>`;
+const votePanel = (k, x) => {
+  const sd = standOf(k, x);
+  const arch = sd.s !== "arch" ? `<button type="button" class="linkbtn varch" data-darch="1">Ins Archiv</button>`
+    : sd.why === "hand" ? `<button type="button" class="linkbtn varch" data-darch="0">Zurückholen</button>` : "";
+  return `<div class="dvote" id="dVote">${voteRow(k, x, "data-dvote")}${arch}</div>`;
+};
 function voteSync(k) { const el = $("dVote"); if (el && S.detailKey === k) el.outerHTML = votePanel(k, hitByKey(k)); }
 const QUARTER = { "8001": "Altstadt", "8004": "Aussersihl", "8005": "Industriequartier", "8006": "Oberstrass", "8008": "Riesbach",
   "8032": "Hottingen", "8037": "Wipkingen", "8047": "Albisrieden", "8048": "Altstetten", "8050": "Oerlikon", "8051": "Schwamendingen",

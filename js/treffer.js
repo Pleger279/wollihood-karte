@@ -11,8 +11,14 @@ function sortHits(list) {
 const MINI_ZOOM = 14;
 function miniMap(x) {
   if (x.lat == null || x.lon == null) return "";
-  return `<div class="mini" data-mapkey="${esc(keyOf(x))}" data-lat="${x.lat}" data-lon="${x.lon}" role="button" aria-label="Auf der Karte zeigen">
-    <span class="lbl">Grosse Karte ›</span></div>`;
+  return `<div class="mini" data-mapkey="${esc(keyOf(x))}" data-lat="${x.lat}" data-lon="${x.lon}" data-gmaps="${esc(gmapsUrl(x))}" role="button" aria-label="In Google Maps öffnen">
+    <span class="lbl">In Google Maps öffnen ›</span></div>`;
+}
+// v104 (Pascal 17.11.): Karte auf der Wohnungsseite öffnet die Karten-App mit dem Standort statt der Suchseite.
+// Mit Hausnummer die Adresse (Maps zeigt dann den Namen), sonst die Koordinaten.
+function gmapsUrl(x) {
+  const q = /\d/.test(x.street || "") ? `${x.street}, ${[x.plz, x.city].filter(Boolean).join(" ")}` : `${x.lat},${x.lon}`;
+  return "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(q);
 }
 const minis = new Map();
 const miniObserver = "IntersectionObserver" in window ? new IntersectionObserver((entries) => {
@@ -28,7 +34,7 @@ function initMini(el) {
   m.attributionControl.setPrefix(false);
   L.control.zoom({ position: "topright", zoomInTitle: "Näher", zoomOutTitle: "Weiter weg" }).addTo(m);
   L.circleMarker(ll, { radius: 7, color: "#fff", weight: 3, fillColor: accent(), fillOpacity: 1, interactive: false }).addTo(m);
-  m.on("click", () => showOnMap(el.dataset.mapkey));
+  m.on("click", () => (el.dataset.gmaps ? window.open(el.dataset.gmaps, "_blank", "noopener") : showOnMap(el.dataset.mapkey)));
   minis.set(el, m);
 }
 function showOnMap(k) {
@@ -125,6 +131,7 @@ const thumb = (dir) => `<svg viewBox="0 0 24 24" fill="currentColor"${dir === "d
 const itemOf = (k) => S.social[k] || { votes: {} };
 const FRIST_TAGE = 7;
 // Antwort «Absage» → Archiv (17.11., Pascal); gleich wie people.is_absage im Suchskript
+// Von Hand ins Archiv (v104, Pascal 17.11.): social[k].arch = {by, at}; gilt für beide, «Zurückholen» oder 👍 hebt es auf
 const isAbsage = (it) => (it.steps ? it.steps.antwort?.value === "absage" : it.status?.value === "absage");
 const hasStand = (it) => !!(it.status?.value || Object.keys(it.steps || {}).length);
 function effVotes(it, x) {
@@ -140,6 +147,7 @@ function standCalc(it, x, now) {
   const ts = (t) => (t ? Date.parse(t) || 0 : 0);
   const t0 = Math.max(ts(x?.first_seen), ts(it.vat || (ups + downs ? it.updated : null)));
   const frist = t0 + FRIST_TAGE * 864e5;
+  if (it.arch) return { s: "arch", why: "hand", by: it.arch.by, at: ts(it.arch.at) || t0, v };
   if (isAbsage(it)) return { s: "arch", why: "absage", at: ts(it.steps?.antwort?.at || it.status?.at) || t0, v };
   if (downs === 2) return { s: "arch", why: "beide", at: ts(it.out?.at || it.vat || it.updated) || t0, v };
   if (hasStand(it) || (ups && !downs)) return { s: "fav", v };
@@ -208,16 +216,31 @@ function needPerson() {
   return true;
 }
 // Daumen setzen; nochmals derselbe Daumen nimmt ihn zurück. Alte Felder (Stern, aussortiert) werden dabei zu Daumen.
+function setArch(k, on, quiet) {
+  if (needPerson()) return;
+  const x = hitByKey(k) || {}, label = x.street || "Inserat", now = new Date().toISOString();
+  if (on && !quiet && !confirm("Wohnung ins Archiv verschieben?")) return;
+  socialOp(`${PEOPLE[S.person]}: ${on ? "ins Archiv" : "zurückgeholt"} (${label})`, (items) => {
+    const it = items[k] || (items[k] = {});
+    if (on) it.arch = { by: S.person, at: now }; else delete it.arch;
+    it.updated = now;
+  });
+  voteSync(k);
+  if (quiet) return;
+  if (on) toastAction("Ins Archiv verschoben.", "Rückgängig", () => { setArch(k, false, true); toast("Zurückgeholt.", "ok"); });
+  else toast("Zurückgeholt.", "ok");
+}
 function setVote(k, dir, quiet) {
   if (needPerson()) return;
   const me = S.person, x = hitByKey(k) || {}, label = x.street || "Inserat";
-  const before = standOf(k, x), val = before.v[me] === dir ? null : dir;
+  const before = standOf(k, x), val = before.v[me] === dir && !(before.why === "hand" && dir === "up") ? null : dir;   // 👍 auf von Hand Archiviertes holt zurück, statt den Daumen zu entfernen
   S.seen.add(k); saveSeen();
   const now = new Date().toISOString();
   socialOp(`${PEOPLE[me]} ${val === "up" ? "dafür" : val === "down" ? "dagegen" : "offen"} (${label})`, (items) => {
     const it = items[k] || (items[k] = { votes: {} });
     const v = effVotes(it, null); delete it.fav; delete it.out;
     if (val) v[me] = val; else delete v[me];
+    if (val === "up") delete it.arch;          // 👍 holt eine von Hand archivierte Wohnung zurück
     it.votes = v; it.vat = now; it.updated = now;
   });
   const after = standOf(k, x);

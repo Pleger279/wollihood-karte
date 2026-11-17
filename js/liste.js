@@ -236,6 +236,7 @@ $("dBody").addEventListener("click", async (e) => {
     return;
   }
   const dv = e.target.closest("[data-dvote]"); if (dv && k0) { setVote(k0, dv.dataset.dvote); voteSync(k0); return; }
+  const da = e.target.closest("[data-darch]"); if (da && k0) { setArch(k0, da.dataset.darch === "1"); return; }
   if (e.target.id === "dRestBtn") { S.dRestOpen = !S.dRestOpen; dRestSync(); if (S.dRestOpen) $("dRest").scrollIntoView({ behavior: "smooth", block: "start" }); return; }
   if (e.target.id === "dDescMore") { $("dDesc").classList.toggle("clamp"); e.target.textContent = $("dDesc").classList.contains("clamp") ? "Mehr lesen" : "Weniger"; return; }
   if (e.target.id === "ownNoteSave") {
@@ -366,7 +367,7 @@ const houseIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" st
 // Daumen-Zeile (Karte und Wohnungsseite): eigene Daumen, Stand der anderen Person, Frist bzw. Archiv-Grund
 function voteRow(k, x, attr) {
   const sd = standOf(k, x), mine = S.person ? sd.v[S.person] : null, other = S.person ? otherOf(S.person) : null, ov = other ? sd.v[other] : null;
-  const info = sd.s === "arch" ? `<span class="vinfo arch">Archiv · ${sd.why === "absage" ? "Absage" : sd.why === "beide" ? "beide dagegen" : "Frist abgelaufen"}${sd.at ? " " + dmy(sd.at) : ""}</span>`
+  const info = sd.s === "arch" ? `<span class="vinfo arch">Archiv · ${sd.why === "hand" ? `von Hand${PEOPLE[sd.by] ? ` (${esc(PEOPLE[sd.by])})` : ""}` : sd.why === "absage" ? "Absage" : sd.why === "beide" ? "beide dagegen" : "Frist abgelaufen"}${sd.at ? " " + dmy(sd.at) : ""}</span>`
     : sd.s === "neu" ? `<span class="vinfo${sd.frist - Date.now() < 2 * 864e5 ? " soon" : ""}">${fristText(sd.frist)}</span>` : "";
   return `<button type="button" class="vmini up" ${attr}="up" aria-pressed="${mine === "up"}" aria-label="Behalten">${thumb("up")}</button>
     <button type="button" class="vmini down" ${attr}="down" aria-pressed="${mine === "down"}" aria-label="Ins Archiv">${thumb("down")}</button>

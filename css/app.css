@@ -716,3 +716,6 @@ button, .btn, .linkbtn, label[for] { transition: transform .12s ease, opacity .1
 .dq-box { margin: 14px 0 10px }
 .dq-box > .btn { width: 100%; justify-content: center }
 .dq-box .doclink { margin-top: 8px }
+
+/* v104: Ins Archiv / Zurückholen neben den Daumen */
+.dvote .varch { margin-left: auto; color: var(--muted); font-weight: 600 }
