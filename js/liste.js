@@ -366,7 +366,7 @@ const houseIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" st
 // Daumen-Zeile (Karte und Wohnungsseite): eigene Daumen, Stand der anderen Person, Frist bzw. Archiv-Grund
 function voteRow(k, x, attr) {
   const sd = standOf(k, x), mine = S.person ? sd.v[S.person] : null, other = S.person ? otherOf(S.person) : null, ov = other ? sd.v[other] : null;
-  const info = sd.s === "arch" ? `<span class="vinfo arch">Archiv · ${sd.why === "beide" ? "beide dagegen" : "Frist abgelaufen"}${sd.at ? " " + dmy(sd.at) : ""}</span>`
+  const info = sd.s === "arch" ? `<span class="vinfo arch">Archiv · ${sd.why === "absage" ? "Absage" : sd.why === "beide" ? "beide dagegen" : "Frist abgelaufen"}${sd.at ? " " + dmy(sd.at) : ""}</span>`
     : sd.s === "neu" ? `<span class="vinfo${sd.frist - Date.now() < 2 * 864e5 ? " soon" : ""}">${fristText(sd.frist)}</span>` : "";
   return `<button type="button" class="vmini up" ${attr}="up" aria-pressed="${mine === "up"}" aria-label="Behalten">${thumb("up")}</button>
     <button type="button" class="vmini down" ${attr}="down" aria-pressed="${mine === "down"}" aria-label="Ins Archiv">${thumb("down")}</button>

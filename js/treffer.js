@@ -124,6 +124,8 @@ S.social = {}; S.socialSha = null; S.people = {}; S.peopleSha = null;
 const thumb = (dir) => `<svg viewBox="0 0 24 24" fill="currentColor"${dir === "down" ? ' style="transform:rotate(180deg)"' : ""}><path d="M2 10h4v11H2zM8 21h9.2a2 2 0 0 0 2-1.6l1.6-7.5A2 2 0 0 0 18.8 9.5H14V5a2.5 2.5 0 0 0-2.5-2.5L8 10z"/></svg>`;
 const itemOf = (k) => S.social[k] || { votes: {} };
 const FRIST_TAGE = 7;
+// Antwort «Absage» → Archiv (17.11., Pascal); gleich wie people.is_absage im Suchskript
+const isAbsage = (it) => (it.steps ? it.steps.antwort?.value === "absage" : it.status?.value === "absage");
 const hasStand = (it) => !!(it.status?.value || Object.keys(it.steps || {}).length);
 function effVotes(it, x) {
   const v = { ...(it.votes || {}) };
@@ -138,6 +140,7 @@ function standCalc(it, x, now) {
   const ts = (t) => (t ? Date.parse(t) || 0 : 0);
   const t0 = Math.max(ts(x?.first_seen), ts(it.vat || (ups + downs ? it.updated : null)));
   const frist = t0 + FRIST_TAGE * 864e5;
+  if (isAbsage(it)) return { s: "arch", why: "absage", at: ts(it.steps?.antwort?.at || it.status?.at) || t0, v };
   if (downs === 2) return { s: "arch", why: "beide", at: ts(it.out?.at || it.vat || it.updated) || t0, v };
   if (hasStand(it) || (ups && !downs)) return { s: "fav", v };
   if (now > frist) return { s: "arch", why: "frist", at: frist, v };
