@@ -73,7 +73,7 @@ function standPanel(k) {
 }
 function refreshStand(k) {
   const el = $("dStand"); if (!el || S.detailKey !== k) return;
-  bewPark(); el.outerHTML = standPanel(k); afterStand(k);
+  bewPark(); el.outerHTML = standPanel(k); afterStand(k); festCheck(k);
 }
 function afterStand(k) {
   const tab = S.dTab || defaultTab(k);
@@ -465,7 +465,7 @@ function renderDetail(x, a, d) {
   // Bilder aus dem privaten Repo nachladen
   $("dBody").querySelectorAll("img[data-src]").forEach((img) => repoFile(img.dataset.src).then((u) => (img.src = u)).catch(() => img.closest("figure")?.remove()));
   S.detailData = d;
-  afterStand(S.detailKey); chatLoad(S.detailKey);
+  afterStand(S.detailKey); chatLoad(S.detailKey); festCheck(S.detailKey);
 }
 // ---------- Eigene Dateien, Notiz, «Teilen → Wollihood» ----------
 async function aidOf(k) {

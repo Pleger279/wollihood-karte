@@ -1,7 +1,7 @@
 // Hält die App-Hülle offline bereit und zeigt Push-Meldungen an.
-const CACHE = "wollihood-v105";
+const CACHE = "wollihood-v106";
 const SHARE = "wollihood-share";   // geteilte Screenshots, bis die App sie einer Wohnung zuordnet
-const SHELL = ["./", "./index.html", "./css/app.css?v=105", "./js/core.js?v=105", "./js/treffer.js?v=105", "./js/wohnung.js?v=105", "./js/liste.js?v=105", "./js/suche.js?v=105", "./js/mehr.js?v=105", "./js/bewerbung.js?v=105", "./js/chat.js?v=105", "./js/dossier.js?v=105", "./js/formular.js?v=105", "./js/senden.js?v=105", "./manifest.webmanifest", "./icons/icon-192.png", "./icons/icon-512.png", "./icons/badge-96.png"];
+const SHELL = ["./", "./index.html", "./css/app.css?v=106", "./js/core.js?v=106", "./js/treffer.js?v=106", "./js/wohnung.js?v=106", "./js/liste.js?v=106", "./js/suche.js?v=106", "./js/mehr.js?v=106", "./js/bewerbung.js?v=106", "./js/chat.js?v=106", "./js/dossier.js?v=106", "./js/formular.js?v=106", "./js/senden.js?v=106", "./js/fest.js?v=106", "./manifest.webmanifest", "./icons/icon-192.png", "./icons/icon-512.png", "./icons/badge-96.png"];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));

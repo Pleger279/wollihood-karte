@@ -747,3 +747,33 @@ button, .btn, .linkbtn, label[for] { transition: transform .12s ease, opacity .1
 .ch-scroll { flex: 1; overflow-y: auto; padding: 6px 16px 10px; display: grid; gap: 8px; align-content: start; overscroll-behavior: contain }
 .ch-sheet .ch-form { padding: 10px 16px calc(env(safe-area-inset-bottom, 0px) + 10px); border-top: 1px solid var(--hair); background: var(--bg) }
 @media (min-width: 760px) { .ch-sheet { left: auto; width: 440px; right: 16px } }
+
+/* ===== Fest bei Zusage (v106) ===== */
+.fest { position: fixed; inset: 0; z-index: 98; display: grid; place-items: center; padding: 20px; background: rgba(10,30,50,.55); backdrop-filter: blur(3px); animation: fest-in .35s ease }
+.fest.fest-weg { opacity: 0; transition: opacity .3s }
+.fest-cv { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 2 }
+.fest-card { position: relative; z-index: 1; background: var(--bg); border-radius: 24px; padding: 22px 22px 18px; width: min(380px, 100%); max-height: 92vh; overflow-y: auto;
+  display: grid; gap: 10px; justify-items: center; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,.35); animation: fest-pop .6s cubic-bezier(.2,1.4,.4,1) }
+.fest-haus { width: 120px; height: 110px; cursor: pointer; overflow: visible }
+.fest-dach { fill: none; stroke: var(--fg); stroke-width: 6; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 140; stroke-dashoffset: 140; animation: fest-strich .7s .2s ease forwards }
+.fest-wand { fill: var(--sunk); stroke: var(--fg); stroke-width: 4 }
+.fest-fenster { fill: #2B3440; transition: fill .4s }
+.fest-fenster.f1 { animation: fest-licht .4s .9s forwards } .fest-fenster.f2 { animation: fest-licht .4s 1.3s forwards }
+.fest-tuer { fill: var(--accent); transform-origin: 51px 87px; animation: fest-tuer .8s 1.6s ease forwards }
+.fest-herz { fill: #E4572E; animation: fest-herz 1s 2.1s ease forwards }
+.fest-zu { font: 800 40px/1 var(--body); letter-spacing: -1px; background: linear-gradient(90deg, var(--accent), #1E7A46, #E4572E); -webkit-background-clip: text; background-clip: text; color: transparent }
+.fest-lead { margin: 0; font: 600 17px/1.35 var(--body) }
+.fest-zahlen { display: grid; gap: 6px; width: 100%; margin: 4px 0 }
+.fest-zahlen > div { display: grid; grid-template-columns: 64px 1fr; align-items: center; gap: 10px; text-align: left; background: var(--sunk); border-radius: 12px; padding: 8px 12px; opacity: 0; animation: fest-auf .45s ease forwards }
+.fest-zahlen b { font: 800 26px/1 var(--body); color: var(--accent); text-align: right; font-variant-numeric: tabular-nums }
+.fest-zahlen span { font: 600 14.5px/1.25 var(--body) } .fest-zahlen small { display: block; font-weight: 400; color: var(--muted); font-size: 12.5px }
+.fest-gruss { margin: 2px 0 4px; color: var(--muted); font-size: 14.5px; line-height: 1.45 }
+.fest-ok { justify-self: stretch }
+@keyframes fest-in { from { opacity: 0 } }
+@keyframes fest-pop { from { transform: scale(.6) translateY(30px); opacity: 0 } }
+@keyframes fest-strich { to { stroke-dashoffset: 0 } }
+@keyframes fest-licht { to { fill: #FFD400 } }
+@keyframes fest-tuer { to { transform: perspective(200px) rotateY(-65deg) } }
+@keyframes fest-herz { 0% { r: 0 } 60% { r: 9 } 100% { r: 7 } }
+@keyframes fest-auf { from { opacity: 0; transform: translateY(8px) } to { opacity: 1; transform: none } }
+@media (prefers-reduced-motion: reduce) { .fest *, .fest { animation-duration: .01s !important; animation-delay: 0s !important } .fest-zahlen > div { opacity: 1 } }
