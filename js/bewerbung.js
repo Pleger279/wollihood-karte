@@ -30,7 +30,7 @@ function bewNew() {
 async function openBew(k) {
   if ($("detail").hidden || S.detailKey !== k) await openDetail(k);
   if (S.detailKey !== k) return;
-  S.dTab = "bewerbung"; refreshStand(k);
+  S.dTab = "bewerbung"; dPageSet("bewerben"); refreshStand(k);
 }
 async function bewLoad(k) {
   BEW.k = k; BEW.doc = null; BEW.x = S.hits.find((h) => keyOf(h) === k) || {}; BEW.aid = await aidOf(k); BEW.open = null; BEW.edit = new Set(); BEW.pundo = null;

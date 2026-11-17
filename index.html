@@ -17,7 +17,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Archivo:wght@400;600;700;800&family=Inter:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@geoman-io/leaflet-geoman-free@2.17.0/dist/leaflet-geoman.css">
-<link rel="stylesheet" href="css/app.css?v=104">
+<link rel="stylesheet" href="css/app.css?v=105">
 </head>
 <body>
 
@@ -244,6 +244,14 @@
   <div class="sheet" id="detail" hidden role="dialog" aria-modal="true" aria-labelledby="dTitle">
     <div class="sheethead"><b id="dTitle">Details</b><button type="button" class="iconbtn" id="dClose" aria-label="Schliessen">✕</button></div>
     <div class="sheetbody" id="dBody"></div>
+    <!-- Chat pro Wohnung (v105): schwebender Knopf, Chat als Fenster von unten -->
+    <button type="button" class="ch-fab" id="chFab" aria-label="Chat mit Claude öffnen">✦<span class="ch-fabdot" id="chFabDot" hidden></span></button>
+    <div class="ch-back" id="chBack" hidden></div>
+    <div class="ch-sheet" id="chSheet" hidden role="dialog" aria-label="Chat mit Claude">
+      <div class="ch-grip" id="chGrip"><span></span><b>✦ Chat mit Claude</b><button type="button" class="iconbtn" id="chClose" aria-label="Chat schliessen">✕</button></div>
+      <div class="ch-scroll" id="chScroll"><div class="ch-list" id="chList"><p class="hint">Lade …</p></div><div id="chLearn"></div></div>
+      <div class="ch-form"><textarea class="field" id="chIn" rows="1" placeholder="Frage oder Änderungswunsch …"></textarea><button type="button" class="btn primary" id="chSend" aria-label="Senden">Senden</button></div>
+    </div>
   </div>
   <!-- Persönliche Nachricht (Push-Klick, #nachricht=<id>) -->
   <div class="sheet" id="nmsg" hidden role="dialog" aria-modal="true" aria-labelledby="nTitle">
@@ -275,17 +283,17 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@geoman-io/leaflet-geoman-free@2.17.0/dist/leaflet-geoman.min.js"></script>
-<script>const APP_VERSION = "104 · 17.11.2026";</script>
-<script src="js/core.js?v=104"></script>
-<script src="js/treffer.js?v=104"></script>
-<script src="js/wohnung.js?v=104"></script>
-<script src="js/liste.js?v=104"></script>
-<script src="js/suche.js?v=104"></script>
-<script src="js/mehr.js?v=104"></script>
-<script src="js/bewerbung.js?v=104"></script>
-<script src="js/chat.js?v=104"></script>
-<script src="js/dossier.js?v=104"></script>
-<script src="js/formular.js?v=104"></script>
-<script src="js/senden.js?v=104"></script>
+<script>const APP_VERSION = "105 · 17.11.2026";</script>
+<script src="js/core.js?v=105"></script>
+<script src="js/treffer.js?v=105"></script>
+<script src="js/wohnung.js?v=105"></script>
+<script src="js/liste.js?v=105"></script>
+<script src="js/suche.js?v=105"></script>
+<script src="js/mehr.js?v=105"></script>
+<script src="js/bewerbung.js?v=105"></script>
+<script src="js/chat.js?v=105"></script>
+<script src="js/dossier.js?v=105"></script>
+<script src="js/formular.js?v=105"></script>
+<script src="js/senden.js?v=105"></script>
 </body>
 </html>

@@ -52,27 +52,54 @@ function chatSetSteps(k, steps) {
 }
 const stepsText = (st) => STEPS.filter(([n]) => n === "besichtigung" ? st.besichtigung && (st.besichtigung.when || st.besichtigung.done) : st[n])
   .map(([n, l]) => n === "antwort" ? (st.antwort.value === "zusage" ? "Zusage" : "Absage") : n === "besichtigung" && st.besichtigung.when ? `${l} ${new Date(st.besichtigung.when).toLocaleString("de-CH", { dateStyle: "short", timeStyle: "short" })}` : l).join(" → ") || "(nichts)";
-function chatPanel() {
-  return `<div class="panel" id="dChat"><h2>Chat mit Claude</h2>
-    <div class="ch-list" id="chList"><p class="hint">Lade …</p></div>
-    <div id="chLearn"></div>
-    <div class="ch-form"><textarea class="field" id="chIn" rows="1" placeholder="Frage oder Änderungswunsch …"></textarea><button type="button" class="btn primary" id="chSend" aria-label="Senden">Senden</button></div>
-  </div>`;
+// v105 (Pascal 17.11.): Chat nicht mehr mitten auf der Wohnungsseite, sondern schwebender Knopf ✦ → Fenster von unten.
+// Die Elemente stehen fest in index.html (#chSheet) und überleben so jedes Neuzeichnen der Wohnungsseite.
+function chatOpen() {
+  if (!$("chSheet").hidden) return;
+  $("chSheet").hidden = false; $("chBack").hidden = false; $("chFab").hidden = true;
+  history.pushState({ chat: 1 }, "");
+  chatRender(); chatKb();
+  const sc = $("chScroll"); sc.scrollTop = sc.scrollHeight;
 }
+function chatHide() {
+  if ($("chSheet").hidden) return;
+  $("chSheet").hidden = true; $("chBack").hidden = true; $("chFab").hidden = false; $("chSheet").style.transform = "";
+  $("chIn").blur();
+}
+function chatClose() { if ($("chSheet").hidden) return; if (history.state?.chat) history.back(); else chatHide(); }
+window.addEventListener("popstate", () => { if (!history.state?.chat) chatHide(); });
+// Tastatur am Handy: Fenster bleibt über der Tastatur
+function chatKb() {
+  const vv = window.visualViewport; if (!vv) return;
+  $("chSheet").style.setProperty("--kb", Math.max(0, window.innerHeight - vv.height - vv.offsetTop) + "px");
+}
+window.visualViewport?.addEventListener("resize", chatKb);
+$("chFab").addEventListener("click", chatOpen);
+$("chClose").addEventListener("click", chatClose);
+$("chBack").addEventListener("click", chatClose);
+// Nach unten wischen schliesst (am Griff oben)
+(() => {
+  let y0 = null, dy = 0; const sh = $("chSheet"), g = $("chGrip");
+  g.addEventListener("pointerdown", (e) => { if (e.target.closest("button")) return; y0 = e.clientY; dy = 0; g.setPointerCapture?.(e.pointerId); sh.style.transition = "none"; });
+  g.addEventListener("pointermove", (e) => { if (y0 == null) return; dy = Math.max(0, e.clientY - y0); sh.style.transform = dy ? `translateY(${dy}px)` : ""; });
+  const up = () => { if (y0 == null) return; y0 = null; sh.style.transition = ""; sh.style.transform = ""; if (dy > 80) chatClose(); };
+  g.addEventListener("pointerup", up); g.addEventListener("pointercancel", up);
+})();
 async function chatLoad(k) {
   if (CH.k !== k) {
-    CH.k = k; CH.sha = null; CH.msgs = []; CH.all = false; CH.live = false;
+    CH.k = k; CH.sha = null; CH.msgs = []; CH.all = false; CH.live = false; chatRender();
     try { const r = await readJson(`archiv/${await aidOf(k)}/bewerbung/chat.json`); if (CH.k !== k) return; CH.msgs = r.data.msgs || []; CH.sha = r.sha; } catch { }
   }
   chatRender();
 }
 function chatRender() {
-  const el = $("chList"); if (!el || CH.k !== S.detailKey) return;
-  el.classList.toggle("ch-kurz", !CH.all && !CH.live);      // alter Verlauf: letzte Antwort gekürzt, bis man aufklappt oder schreibt
-  const list = CH.msgs, from = CH.all ? 0 : Math.max(0, list.length - 2);     // v98: Chat steht oben, darum nur letzte Frage + Antwort; Rest aufklappbar
-  el.innerHTML = (from ? `<button type="button" class="linkbtn" id="chMore">Ganzen Verlauf zeigen (${from} frühere)</button>` : "")
-    + (list.length ? "" : `<p class="hint">Fragen zur Wohnung, Texte ändern, Angaben korrigieren, Termin oder Stand melden – z.B. «Besichtigung am Do 18 Uhr» oder «Adresse ist Scheideggstrasse 104». Gilt für euch beide.</p>`)
-    + list.slice(from).map((m, j) => { const i = from + j;
+  const el = $("chList"); if (!el) return;
+  const list = CH.k === S.detailKey ? CH.msgs : [];
+  $("chFabDot").hidden = !list.length;
+  $("chFab").setAttribute("aria-label", list.length ? `Chat mit Claude öffnen (${list.length} Nachrichten)` : "Chat mit Claude öffnen");
+  if (CH.k !== S.detailKey) { el.innerHTML = '<p class="hint">Lade …</p>'; return; }
+  el.innerHTML = (list.length ? "" : `<p class="hint">Fragen zur Wohnung, Texte ändern, Angaben korrigieren, Termin oder Stand melden – z.B. «Besichtigung am Do 18 Uhr» oder «Adresse ist Scheideggstrasse 104». Gilt für euch beide.</p>`)
+    + list.map((m, i) => {
       if (m.role === "user") return `<div class="ch-msg me"><small>${esc(PEOPLE[m.by] || m.by || "")} · ${esc(ago(m.at))}</small><p>${esc(m.text)}</p></div>`;
       const ch = (m.changes || []).map((c) => `<details class="ch-chg"><summary>${m.undone ? "↶ zurückgenommen: " : "✎ "}${esc(CH_FELD[c.feld] || CH_EXTRA[c.feld] || c.feld)}</summary><div class="diff">${wdiff(c.alt || "", c.neu || "")}</div></details>`).join("");
       return `<div class="ch-msg ki${m.error ? " err" : ""}"><small>✦ Claude · ${esc(ago(m.at))}</small><p>${esc(m.text)}</p>${ch}${(m.changes || []).length && !m.undone ? `<button type="button" class="linkbtn" data-chundo="${i}">Rückgängig</button>` : ""}</div>`;
@@ -191,7 +218,7 @@ ${text}
     if (lv.length) learnBox("chLearn", lv);
     toast(changes.length ? `Geändert: ${changes.map((x) => CH_FELD[x.feld] || CH_EXTRA[x.feld]).join(", ")}` : "Claude hat geantwortet", "ok");
   } catch (e) { CH.msgs.push({ role: "ki", text: "Fehler: " + e.message, error: true, at: new Date().toISOString() }); toast("Claude: " + e.message, "err", 7000); }
-  finally { CH.busy = false; chatRender(); chatSave().catch((e) => toast("Chat nicht gespeichert: " + e.message, "err")); $("chList")?.lastElementChild?.scrollIntoView({ block: "nearest", behavior: "smooth" }); }
+  finally { CH.busy = false; chatRender(); chatSave().catch((e) => toast("Chat nicht gespeichert: " + e.message, "err")); const sc = $("chScroll"); if (sc) sc.scrollTo({ top: sc.scrollHeight, behavior: "smooth" }); }
 }
 async function chatUndo(i) {
   const m = CH.msgs[i]; if (!m || m.undone) return;
@@ -209,7 +236,6 @@ async function chatUndo(i) {
 }
 document.addEventListener("click", (e) => {
   if (e.target.id === "chSend") { chatSend(); return; }
-  if (e.target.id === "chMore") { CH.all = true; chatRender(); return; }
   const u = e.target.closest("[data-chundo]"); if (u) chatUndo(+u.dataset.chundo);
 });
 document.addEventListener("input", (e) => { if (e.target.id === "chIn") { e.target.style.height = "auto"; e.target.style.height = Math.min(e.target.scrollHeight, 160) + "px"; } });

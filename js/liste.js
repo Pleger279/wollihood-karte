@@ -237,7 +237,7 @@ $("dBody").addEventListener("click", async (e) => {
   }
   const dv = e.target.closest("[data-dvote]"); if (dv && k0) { setVote(k0, dv.dataset.dvote); voteSync(k0); return; }
   const da = e.target.closest("[data-darch]"); if (da && k0) { setArch(k0, da.dataset.darch === "1"); return; }
-  if (e.target.id === "dRestBtn") { S.dRestOpen = !S.dRestOpen; dRestSync(); if (S.dRestOpen) $("dRest").scrollIntoView({ behavior: "smooth", block: "start" }); return; }
+  const dp = e.target.closest("[data-dpg]"); if (dp) { dPageSet(dp.dataset.dpg); return; }
   if (e.target.id === "dDescMore") { $("dDesc").classList.toggle("clamp"); e.target.textContent = $("dDesc").classList.contains("clamp") ? "Mehr lesen" : "Weniger"; return; }
   if (e.target.id === "ownNoteSave") {
     if (needPerson()) return;

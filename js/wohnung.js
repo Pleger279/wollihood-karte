@@ -79,7 +79,7 @@ function afterStand(k) {
   const tab = S.dTab || defaultTab(k);
   if (tab === "bewerbung") bewAttach(k);
   if (tab === "kontakt") kontaktLoad(k);
-  dRestSync();
+  const t = document.querySelector('#dBody [data-dpg="bewerben"]'); if (t) t.innerHTML = "Bewerben" + stepsDoneText(k);
 }
 // Bewerbung im Tab (v90): #bBody wird zwischen Tab und Halter verschoben, nie neu erzeugt (Listener und ungespeicherter Stand bleiben)
 function bewPark() { const b = $("bBody"); if (b && b.parentElement !== $("bHolder")) $("bHolder").appendChild(b); }
@@ -90,12 +90,14 @@ function bewAttach(k) {
 }
 const bewActive = () => !!$("bBody")?.closest("#dStand") && !$("detail").hidden;
 const bewUnsaved = () => !!(BEW.k && BEW.doc && $("bText") && (bewDirty() || (typeof FORM !== "undefined" && FORM.dirty)));
-// Bei offenem Tab «Bewerbung» rutscht der Rest der Wohnungsseite in «Zum Inserat»
-function dRestSync() {
-  const r = $("dRest"), b = $("dRestBtn"); if (!r || !b) return;
-  const bew = (S.dTab || defaultTab(S.detailKey)) === "bewerbung";
-  b.hidden = !bew; r.hidden = bew && !S.dRestOpen;
-  b.textContent = r.hidden ? "Notizen, Beschreibung & Kontakt zeigen ›" : "Notizen, Beschreibung & Kontakt ausblenden";
+// Reiter der Wohnungsseite (v105): «Bewerben», sobald ein Schritt gesetzt ist, sonst «Wohnung». Wahl bleibt bis zum Schliessen.
+function dPageOf(k) { return S.dPage || (Object.keys(stepsOf(k)).length ? "bewerben" : "wohnung"); }
+function stepsDoneText(k) { const st = stepsOf(k), n = STEPS.filter(([s]) => stepDone(st, s)).length; return n ? ` <span class="dpg-n">${n}/${STEPS.length}</span>` : ""; }
+function dPageSet(p) {
+  S.dPage = p;
+  document.querySelectorAll("#dBody [data-dpg]").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.dpg === p)));
+  if ($("dPgBewerben")) $("dPgBewerben").hidden = p !== "bewerben";
+  if ($("dPgWohnung")) $("dPgWohnung").hidden = p !== "wohnung";
 }
 // Kontakt-Nachricht: archiv/<id>/bewerbung/kontakt.json, Claude schreibt beim ersten Öffnen
 const KON = { k: null, sha: null, data: null, busy: false, auto: new Set(), edit: false, draft: null };
@@ -358,7 +360,7 @@ function leaveGuard() {
 function closeDetail(force) {
   if (force !== true && !leaveGuard()) return;
   bewPark(); KON.edit = false; KON.draft = null;
-  $("detail").hidden = true; document.body.style.overflow = ""; if (location.hash.startsWith("#d=")) history.replaceState(null, "", location.pathname); }
+  chatHide(); $("detail").hidden = true; document.body.style.overflow = ""; if (location.hash.startsWith("#d=")) history.replaceState(null, "", location.pathname); }
 $("dClose").addEventListener("click", closeDetail);
 document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("detail").hidden) closeDetail(); });
 async function openDetail(k) {
@@ -366,7 +368,7 @@ async function openDetail(k) {
   const x = S.hits.find((h) => keyOf(h) === k) || {};
   const a = archEntry(x);
   if (S.detailKey !== k) { KON.edit = false; KON.draft = null; if (BEW.k && BEW.k !== k) { BEW.k = null; BEW.doc = null; } }
-  bewPark(); S.detailKey = k; S.dTab = null; S.dRestOpen = false;
+  bewPark(); S.detailKey = k; S.dTab = null; S.dPage = null;
   $("dTitle").textContent = "Wohnung";
   $("detail").hidden = false; document.body.style.overflow = "hidden";
   $("dBody").innerHTML = '<p class="hint">Lade …</p>';
@@ -432,22 +434,29 @@ function renderDetail(x, a, d) {
   const portal = x.sources?.[0]?.portal || x.portal || "";
   const sub = [quarter, portal ? `auf ${portal} ${ago(x.published || x.first_seen)}` : "", a?.online === "online" ? "noch online" : a?.online === "offline" ? "offline" : a?.online === "reserviert" ? "reserviert" : ""].filter(Boolean).join(" · ");
   const ai = x.ai?.text ? `<div class="aibox"><small>✦ Claude</small><span>${esc(x.ai.text)}</span>${(x.ai.haken || []).length ? `<span class="hk">${esc(x.ai.haken.join(" · "))}</span>` : ""}</div>` : "";
+  // v105 (Pascal 17.11.): zuerst «Wollen wir die?» (Fotos, Eckdaten, Lage, Claude, Daumen), dann zwei Reiter
+  // «Wohnung» (Inserat, Kontakt der Verwaltung) und «Bewerben» (Schritte, Kontakt, Notizen). Chat als schwebender Knopf (chat.js).
+  const pg = dPageOf(S.detailKey);
   $("dBody").innerHTML = `
     ${gal}
     <div class="dhead"><h1>${esc(placeName(x))}</h1><div class="sub">${esc(sub)}</div></div>
-    ${votePanel(S.detailKey, x)}
     ${facts}
-    ${ai}
-    ${chatPanel()}
-    ${standPanel(S.detailKey)}
-    <button type="button" class="linkbtn d-restbtn" id="dRestBtn" hidden></button>
-    <div id="dRest">
-    ${usPanel(S.detailKey)}
-    ${desc || attrs ? `<div class="panel"><h2>Beschreibung</h2>${desc ? `<div class="desc clamp" id="dDesc">${esc(desc)}</div><button type="button" class="linkbtn" id="dDescMore" style="justify-self:start">Mehr lesen</button>` : ""}${attrs ? `<div class="chips2">${attrs}</div>` : ""}</div>` : ""}
     ${x.lat != null ? `<div class="detail-mini">${miniMap(x)}</div>` : ""}
+    ${ai}
+    ${votePanel(S.detailKey, x)}
+    <div class="dpg-tabs" role="tablist" aria-label="Wohnung oder Bewerben">
+      <button type="button" role="tab" data-dpg="wohnung" aria-selected="${pg === "wohnung"}">Wohnung</button>
+      <button type="button" role="tab" data-dpg="bewerben" aria-selected="${pg === "bewerben"}">Bewerben${stepsDoneText(S.detailKey)}</button></div>
+    <div class="dpg" id="dPgBewerben" ${pg === "bewerben" ? "" : "hidden"}>
+    ${standPanel(S.detailKey)}
     <div class="panel"><h2>Kontakt</h2><div class="contact">${lines.join("") || '<p class="hint">Keine Angaben.</p>'}${bookForm}</div></div>
+    ${usPanel(S.detailKey)}
+    </div>
+    <div class="dpg" id="dPgWohnung" ${pg === "wohnung" ? "" : "hidden"}>
+    ${desc || attrs ? `<div class="panel"><h2>Beschreibung</h2>${desc ? `<div class="desc clamp" id="dDesc">${esc(desc)}</div><button type="button" class="linkbtn" id="dDescMore" style="justify-self:start">Mehr lesen</button>` : ""}${attrs ? `<div class="chips2">${attrs}</div>` : ""}</div>` : ""}
     ${searchPanel(x)}
     ${docs ? `<div class="panel doclist"><h2>Dokumente</h2>${docs}</div>` : ""}
+    ${firstUrl(x) ? `<a class="linkbtn" style="justify-self:center" href="${esc(goodUrl(x))}" target="_blank" rel="noopener">${goodSource(x) ? `Inserat auf ${esc(goodSource(x).portal || portalOf(goodSource(x).url))} öffnen ↗` : `Auf Comparis suchen ↗`}</a>` : ""}
     ${onl || '<div class="onl">Noch nicht gesichert. Neue Treffer, Favoriten und Wohnungen mit Stand sichert Wollihood beim nächsten Suchlauf.</div>'}
     <div class="srcs" style="padding:0">Gefunden auf: ${sourcesHtml(x)}${mail ? " · " + mail : ""}${(x.notes || []).length ? `<br>${esc(x.notes.join(" · "))}` : ""}</div>
     </div>`;
